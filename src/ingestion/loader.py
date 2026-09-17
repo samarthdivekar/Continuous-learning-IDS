@@ -2,7 +2,7 @@
 
 Reads the (error-corrected) CICFlowMeter CSVs in chunks, normalises column
 names, maps labels to categories, applies the attempted-attack policy and the
-optional benign thinning, and returns one chronologically sorted DataFrame.
+optional label-agnostic flow sampling, and returns one chronologically sorted DataFrame.
 
 Src/Dst IP are kept as strings: they define graph topology, never features.
 """
@@ -73,12 +73,12 @@ def _open(src):
     return src.open() if isinstance(src, ZipMember) else open(src, "rb")
 
 
-def _read_one_csv(path, attempted_policy: str, benign_keep: float,
+def _read_one_csv(path, attempted_policy: str, flow_sample: float,
                   rng: np.random.Generator, chunksize: int = 1_000_000) -> tuple[pd.DataFrame, dict]:
     with _open(path) as fh:
         header = pd.read_csv(fh, nrows=0).columns.tolist()
     mapping = normalise_columns(header)
-    stats = {"file": path.name, "rows_read": 0, "dropped_attempted": 0, "thinned_benign": 0,
+    stats = {"file": path.name, "rows_read": 0, "sampled_out": 0, "dropped_attempted": 0,
              "attempted_relabelled": 0}
     parts = []
     fh = _open(path)
@@ -87,18 +87,23 @@ def _read_one_csv(path, attempted_policy: str, benign_keep: float,
                                     {"src_ip", "dst_ip", "label", "timestamp", "flow_id"}}):
         chunk = chunk.rename(columns=mapping)
         stats["rows_read"] += len(chunk)
+        if flow_sample < 1.0:
+            # LABEL-AGNOSTIC uniform flow sampling (like 1-in-N sampled NetFlow),
+            # decided BEFORE labels are looked at. Benign and attack flows are
+            # kept with the same probability, so the window graphs are sparser
+            # but never shaped by ground truth. (An earlier version thinned only
+            # benign flows; that let labels decide which edges the GNN saw,
+            # including in test windows, and was removed.)
+            sampled = rng.random(len(chunk)) < flow_sample
+            stats["sampled_out"] += int((~sampled).sum())
+            chunk = chunk.loc[sampled].reset_index(drop=True)
         labels = chunk["label"].astype(str).str.strip()
         table = build_label_table(labels.unique(), attempted_policy)
         cat = labels.map(table)
         attempted = labels.map({lab: is_attempted(lab) for lab in labels.unique()})
         stats["attempted_relabelled"] += int((attempted & (cat == "Benign")).sum())
-        keep = cat.notna()
+        keep = cat.notna()  # only attempted_policy="drop" removes rows here (not the default)
         stats["dropped_attempted"] += int((~keep).sum())
-        if benign_keep < 1.0:
-            benign = (cat == "Benign").to_numpy()
-            thin = benign & (rng.random(len(chunk)) >= benign_keep)
-            stats["thinned_benign"] += int(thin.sum())
-            keep &= ~thin
         chunk = chunk.loc[keep.to_numpy()].copy()
         chunk["raw_label"] = labels[keep]
         chunk["category"] = cat[keep]
@@ -116,12 +121,12 @@ def _read_one_csv(path, attempted_policy: str, benign_keep: float,
 
 
 def load_flows(csv_files: list[Path], attempted_policy: str = "benign",
-               benign_keep_fraction: float = 1.0, seed: int = 0) -> tuple[pd.DataFrame, list[dict]]:
+               flow_sample_fraction: float = 1.0, seed: int = 0) -> tuple[pd.DataFrame, list[dict]]:
     rng = np.random.default_rng(seed)
     frames, all_stats = [], []
     for f in csv_files:
         log.info("Reading %s", f.name)
-        df, st = _read_one_csv(f, attempted_policy, benign_keep_fraction, rng)
+        df, st = _read_one_csv(f, attempted_policy, flow_sample_fraction, rng)
         frames.append(df)
         all_stats.append(st)
     df = pd.concat(frames, ignore_index=True)

@@ -43,7 +43,7 @@ def prepare_dataset(cfg: dict, force: bool = False, csv_files: list[Path] | None
     if csv_files is None:
         folder = ensure_extracted(resolve_path(cfg, "raw"), cfg["dataset_info"])
         csv_files = list_csvs(folder)
-    df, load_stats = load_flows(csv_files, pre["attempted_policy"], pre.get("benign_keep_fraction", 1.0),
+    df, load_stats = load_flows(csv_files, pre["attempted_policy"], pre.get("flow_sample_fraction", 1.0),
                                 seed=cfg["seed"])
     unknown = set(df["category"].unique()) - set(cfg["categories"])
     if unknown:

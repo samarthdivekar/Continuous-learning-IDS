@@ -94,7 +94,7 @@ def test_metrics_and_drift_status_empty_then_seeded(client):
     assert m["series"]["gnn_ewc_replay"][0]["accuracy"] == 0.9
     assert client.get("/metrics?source=bogus").status_code == 422
     d = client.get("/drift-status").json()
-    assert d["events"] == [] and d["demo"] is None
+    assert d["events"] == [] and d["demo"] == {"status": "idle"}
 
 
 def test_retrain_without_demo_is_rejected(client):

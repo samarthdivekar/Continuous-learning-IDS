@@ -15,6 +15,7 @@ import pandas as pd
 from sqlalchemy import delete
 
 from src.db.models import DriftEventRow, GraphWindow, Metric, WindowStat
+from src.api.app import series_key
 from src.db.session import get_sessionmaker
 from src.graph.window_builder import SPLIT_NAMES, graph_cache_dir
 from src.preprocessing.pipeline import processed_dir
@@ -70,11 +71,13 @@ def seed(dataset: str, label_mode: str, Session=None) -> dict:
                 for r in de.itertuples():
                     s.add(DriftEventRow(run_id=run_id, detector=r.detector, prev_error=_f(r.prev_error),
                                         new_error=_f(r.new_error), triggered_retrain=bool(r.triggered_retrain),
-                                        model_name=f"{r.model}:{r.policy}" if r.policy not in ("adwin",) else r.model,
+                                        model_name=series_key(r.model, r.policy),
                                         stream_index=int(r.stream_index), window_id=int(r.window_id),
                                         reason=r.reason, ts=_ts(r.ts)))
             sw = pd.read_csv(d / "stream_windows.csv")
-            sw = sw[sw["policy"].isin(["adwin", "never"])]
+            # one deployment per model (its default policy), so window rows of
+            # different runs are never mixed under one model name
+            sw = sw[[series_key(m, p) == m for m, p in zip(sw["model"], sw["policy"])]]
             for r in sw.itertuples():
                 s.add(WindowStat(run_id=run_id, model_name=r.model, stream_index=int(r.stream_index),
                                  window_id=int(r.window_id), task_id=int(r.task_id), n_flows=int(r.n_flows),

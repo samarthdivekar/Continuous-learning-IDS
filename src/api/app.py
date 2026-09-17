@@ -78,6 +78,15 @@ def _remote(method: str, path: str, **kw):
     return r.json()
 
 
+def series_key(model: str, policy: str | None) -> str:
+    """Dashboard series id. Each model's DEFAULT deployment keeps the bare model name
+    (ADWIN for adaptive models, 'never' for the static baseline); every other
+    policy of the drift experiment (periodic, oracle, never-for-an-adaptive-model)
+    gets its own 'model:policy' series so different runs are never merged."""
+    default = "never" if model == "xgboost_static" else "adwin"
+    return model if policy in (None, default) else f"{model}:{policy}"
+
+
 def store_predictions(Session, flow_ids: list[int], result: dict) -> int:
     now = datetime.now(timezone.utc)
     rows = [Prediction(flow_id=fid, model_name=model, predicted_label=lab, confidence=conf, ts=now)
@@ -185,7 +194,7 @@ def create_app(database_url: str | None = None, service=None, load_models: bool 
             rows = s.scalars(q.order_by(Metric.id)).all()
         series: dict[str, list] = {}
         for r in rows:
-            key = r.model_name if not r.policy or r.policy in ("adwin", "never") else f"{r.model_name}:{r.policy}"
+            key = series_key(r.model_name, r.policy)
             series.setdefault(key, []).append({
                 "ts": r.ts.isoformat() if r.ts else None, "task_id": r.task_id, "stream_index": r.stream_index,
                 "accuracy": r.accuracy, "macro_f1": r.macro_f1, "retention_rate": r.retention_rate, "fpr": r.fpr,
@@ -210,8 +219,8 @@ def create_app(database_url: str | None = None, service=None, load_models: bool 
                 demo = _remote("GET", "/demo/status")
             except HTTPException:
                 demo = None
-        elif state.service.demo is not None:
-            demo = state.service.demo.describe()
+        else:  # same shape as the ML container's /demo/status
+            demo = state.service.demo.describe() if state.service.demo is not None else {"status": "idle"}
         return {
             "run_id": run_id,
             "per_model": {m: {"drift_flags": int(n), "retrains_triggered": int(t or 0)} for m, n, t in counts},

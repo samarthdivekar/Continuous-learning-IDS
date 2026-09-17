@@ -126,6 +126,9 @@ def run_task_sequence(cfg: dict, data, model_names: list[str], out_dir: Path,
                     "next_task_recall_before_training": Rm[i, i + 1] if i + 1 < len(tasks) else np.nan,
                     "train_seconds": stats.seconds, "train_steps": stats.steps,
                     "ewc_stability_ratio": (stats.extra.get("ewc") or {}).get("stability_ratio"),
+                    # the λ/γ this learner ACTUALLY trained with (after per-model overrides)
+                    "ewc_lambda": learner.ewc.lam if getattr(learner, "ewc", None) is not None else np.nan,
+                    "ewc_gamma": learner.ewc.gamma if getattr(learner, "ewc", None) is not None else np.nan,
                 }
                 summary_rows.append(row)
 
@@ -157,7 +160,20 @@ def run_task_sequence(cfg: dict, data, model_names: list[str], out_dir: Path,
     return pd.DataFrame(summary_rows)
 
 
+LONG_COLUMNS = ["model", "ip_mode", "after_task", "after_task_category", "scope", "metric", "value"]
+
+
+def _merge_write(path: Path, new: pd.DataFrame) -> None:
+    """Replace rows of the models in `new`, keep rows of every other model already
+    on disk. Lets one model be re-run into an existing results directory, and lets
+    several single-model calls share a directory without overwriting each other."""
+    if path.exists() and len(new):
+        old = pd.read_csv(path)
+        if "model" in old:
+            new = pd.concat([old[~old["model"].isin(new["model"].unique())], new], ignore_index=True)
+    new.to_csv(path, index=False)
+
+
 def _write(out_dir: Path, long_rows: list, summary_rows: list) -> None:
-    pd.DataFrame(long_rows, columns=["model", "ip_mode", "after_task", "after_task_category", "scope", "metric",
-                                     "value"]).to_csv(out_dir / "metrics_long.csv", index=False)
-    pd.DataFrame(summary_rows).to_csv(out_dir / "summary.csv", index=False)
+    _merge_write(out_dir / "metrics_long.csv", pd.DataFrame(long_rows, columns=LONG_COLUMNS))
+    _merge_write(out_dir / "summary.csv", pd.DataFrame(summary_rows))

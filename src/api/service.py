@@ -16,9 +16,8 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 import torch
-import yaml
 
-from src.db.models import DriftEventRow, Metric, Prediction, WindowStat
+from src.db.models import DriftEventRow, Metric, WindowStat
 from src.evaluation.stream import StreamRunner
 from src.graph.window_builder import build_window_graph
 from src.ingestion.columns import canonical_name
@@ -151,12 +150,15 @@ class MLService:
                 buf.add_many(graphs)
             else:
                 buf.add(torch.cat([g.edge_attr for g in graphs]).numpy(), torch.cat([g.y for g in graphs]).numpy())
+                learner.buffered_windows.update(int(g.window_id) for g in graphs)
         learner.n_learn_calls += 1
         return True
 
     def active_learners(self) -> dict:
-        """Live demo learners take precedence: they are the ones adapting."""
-        if self.demo is not None and self.demo.runners:
+        """Live demo learners take precedence once they are READY (warm-started or
+        trained on task 1); until then, and after a failed demo, /predict keeps
+        using the checkpoint-loaded models instead of half-initialised ones."""
+        if self.demo is not None and self.demo.ready:
             return {r.learner.name: r.learner for r in self.demo.runners}
         return self.models
 
@@ -278,6 +280,7 @@ class DemoRunner(threading.Thread):
         self.stop_event = threading.Event()
         self.retrain_requested = threading.Event()
         self.runners: list[StreamRunner] = []
+        self.ready = False  # True once every runner is warm-started or trained on task 1
         self.status = "initialising"
         self.position = 0
         self.total = 0
@@ -334,6 +337,7 @@ class DemoRunner(threading.Thread):
             if self.max_windows:
                 stream = stream[: self.max_windows]
             self.total = len(stream)
+            self.ready = True
             self.status = "streaming"
             for k, g in enumerate(stream):
                 if self.stop_event.is_set():
@@ -358,6 +362,7 @@ class DemoRunner(threading.Thread):
         except Exception as exc:  # surfaced through /demo/status
             log.exception("demo failed")
             self.error = repr(exc)
+            self.ready = False
             self.status = "failed"
 
     def describe(self) -> dict:

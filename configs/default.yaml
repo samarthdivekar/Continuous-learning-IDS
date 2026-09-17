@@ -31,9 +31,11 @@ preprocessing:
   # Development subsample: keep this fraction of *windows* per task
   # (whole windows, so graph structure is intact). null = full dataset.
   window_fraction: null
-  # Benign-flow thinning applied before windowing (1.0 = keep all).
-  # Only used for very large datasets (2018); documented in results run_info.
-  benign_keep_fraction: 1.0
+  # Label-agnostic uniform flow sampling applied while reading (1.0 = keep all).
+  # Every flow is kept with this probability regardless of its label, like
+  # 1-in-N sampled NetFlow. Only used for very large datasets (2018).
+  # Never subsample by label: that would let ground truth shape the graphs.
+  flow_sample_fraction: 1.0
   clip_value: 10.0          # clip scaled features to +-clip_value
   # A contiguous burst of one attack category is split into separate
   # segments when flows are more than this many seconds apart.

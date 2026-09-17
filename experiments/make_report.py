@@ -155,7 +155,7 @@ def tuning_section(ds: str) -> list[str]:
         df["val_fpr_seen"] = df["val_fpr_seen"].map(lambda v: fmt(v, pct=True))
         sel = (RES / ds / "multiclass" / "ewc_lambda_sweep" / "selected.json")
         out += [f"### {ds} — EWC λ / γ sweep (validation split)", "", md_table(df), "",
-                f"Selected: `{sel.read_text().strip() if sel.exists() else 'n/a'}`", ""]
+                f"Selected: `{json.dumps(json.loads(sel.read_text())) if sel.exists() else 'n/a'}`", ""]
     return out
 
 

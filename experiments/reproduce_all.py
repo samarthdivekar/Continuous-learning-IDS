@@ -14,6 +14,11 @@ Order (each step reads only files produced by earlier steps):
   9  src.db.seed       load results into the database (for the API/dashboard)
 
 Steps can be skipped with --skip (e.g. --skip tune sweep to reuse existing selections).
+
+Exact commands used for the committed results:
+  python -m experiments.reproduce_all --dataset cicids2017
+  python -m experiments.reproduce_all --dataset csecicids2018 --seeds 42 --skip tune sweep seed --loao-modes binary
+(2018 reuses the 2017 validation-selected hyper-parameters; see configs/csecicids2018.yaml.)
 """
 import argparse
 import subprocess
@@ -35,6 +40,7 @@ def main():
     p.add_argument("--dataset", default="cicids2017")
     p.add_argument("--seeds", nargs="*", default=["42", "43", "44"])
     p.add_argument("--skip", nargs="*", default=[], choices=STEPS)
+    p.add_argument("--loao-modes", nargs="*", default=["binary", "multiclass"], choices=["binary", "multiclass"])
     p.add_argument("--dev", action="store_true")
     a = p.parse_args()
     d = ["--dataset", a.dataset] + (["--dev"] if a.dev else [])
@@ -52,7 +58,7 @@ def main():
     if "drift" in todo:
         run(["experiments.run_drift_stream", *d, "--label-mode", "multiclass"])
     if "loao" in todo:
-        for mode in ("binary", "multiclass"):
+        for mode in a.loao_modes:
             run(["experiments.run_loao", *d, "--label-mode", mode])
     if "ipremap" in todo:
         run(["experiments.run_ip_remap", *d, "--label-mode", "multiclass"])

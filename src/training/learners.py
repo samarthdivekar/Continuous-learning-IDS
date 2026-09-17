@@ -285,6 +285,7 @@ class FFNNLearner(_TorchLearner):
             if self.spec.get("replay") else None
         self.joint_X: list[np.ndarray] = []
         self.joint_y: list[np.ndarray] = []
+        self.buffered_windows: set[int] = set()
 
     def _to_labels(self, y_cat: np.ndarray) -> np.ndarray:
         return (y_cat > 0).astype(np.int64) if self.label_mode == "binary" else y_cat.astype(np.int64)
@@ -349,7 +350,12 @@ class FFNNLearner(_TorchLearner):
             extra["ewc"] = self.ewc.consolidate(batches, self._raw_task_loss,
                                                 max_batches=self.cfg["ewc"]["fisher_batches"], lr=self.lr, tag=tag)
         if self.buffer is not None:
-            self.buffer.add(X_new, ycat_new)
+            # Offer each window's flows to the reservoir once (drift adaptations overlap).
+            fresh = [g for g in graphs if int(g.window_id) not in self.buffered_windows]
+            if fresh:
+                self.buffer.add(torch.cat([g.edge_attr for g in fresh]).numpy(),
+                                torch.cat([g.y for g in fresh]).numpy())
+                self.buffered_windows.update(int(g.window_id) for g in fresh)
             extra["buffer"] = self.buffer.summary()
         self.n_learn_calls += 1
         stats = LearnStats(tag, time.time() - t0, steps, last, extra)

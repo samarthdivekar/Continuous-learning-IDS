@@ -61,3 +61,36 @@ def test_window_granularity_lacks_power_without_baseline():
     mon = ADWINMonitor(delta=0.002, min_windows_between=1)
     values = np.where(rng.random(70) < 0.35, rng.uniform(0.5, 1.0, 70), rng.uniform(0, 0.01, 70))
     assert _feed(mon, values) == []
+
+
+def test_burst_inside_one_window_is_an_increase():
+    """Reviewer's counter-example for the old window-level direction check: a
+    1,000-flow misclassified burst followed by clean traffic inside ONE window
+    used to be logged as 'error decreased'. river resets ADWIN after each
+    detection, so direction must be decided per detection."""
+    import numpy as np
+    rng = np.random.default_rng(0)
+    mon = ADWINMonitor(delta=0.002, min_windows_between=1)
+    mon.calibrate(rng.random(70_000) < 0.02)
+    window = np.r_[np.ones(1000), (rng.random(4000) < 0.01).astype(float)]
+    ev = mon.update_window(window, 0, 0, "")
+    assert ev is not None and ev.triggered_retrain and ev.reason == "error increased"
+    assert ev.new_error > ev.prev_error
+
+
+def test_river_resets_after_detection():
+    """Pins the river behaviour the monitor relies on."""
+    from river import drift
+    a = drift.ADWIN(delta=0.002)
+    for _ in range(2000):
+        a.update(0.0)
+    for _ in range(200):
+        before = a.estimation
+        a.update(1.0)
+        if a.drift_detected:
+            break
+    # at detection the kept recent sub-window is clearly above the old level
+    # (it can still contain a few pre-change values, so it need not exceed 0.5)
+    assert a.drift_detected and a.estimation > before + 0.1
+    a.update(1.0)
+    assert a.width == 1   # full reset on the next update

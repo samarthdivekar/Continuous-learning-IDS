@@ -5,13 +5,17 @@ dataset_info:
   url: https://intrusion-detection.distrinet-research.be/CNS2022/Datasets/CSECICIDS2018_improved.zip
   extract_dir: csecicids2018
 preprocessing:
-  # 2018 is ~30x larger than 2017. Benign flows are thinned uniformly at
-  # random (seeded) before windowing so the full run fits a 4 GB GPU and
-  # 24 GB RAM. All attack flows are kept. This is recorded in run_info.json.
-  benign_keep_fraction: 0.1
-# Hyper-parameters are NOT re-tuned on 2018 (compute budget). The values selected
-# on the CIC-IDS2017 validation split are reused explicitly here
-# (results/cicids2017/multiclass/ewc_lambda_sweep/selected.json).
+  # 2018 has 63.2 M flows (~30x CIC-IDS2017) and does not fit 24 GB RAM with 83
+  # float features. Every flow is kept with probability 0.15 INDEPENDENTLY OF
+  # ITS LABEL (seeded), i.e. a 1-in-~7 sampled flow export. Graphs become
+  # uniformly sparser; the benign/attack mix and all topology decisions stay
+  # label-free. Recorded in run_info.json and meta.json load_stats.
+  flow_sample_fraction: 0.15
+# Hyper-parameters are NOT re-tuned on 2018 (compute budget). The validation-
+# selected values from CIC-IDS2017 (tuning/selected.yaml and the per-model
+# ewc_lambda_sweep/selected.json) are reused via `tuning_from`. The ewc block
+# below is only the fallback if those files are absent.
+tuning_from: cicids2017
 ewc:
   lambda: 10.0
   gamma: 0.9

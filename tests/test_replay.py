@@ -79,3 +79,11 @@ def test_tabular_reservoir_capacity_and_balance():
     # stored rows are real rows of that category
     pool_rows = {tuple(r) for r in buf.X[7]}
     assert pool_rows <= {tuple(r) for r in X[9_900:]}
+
+
+def test_same_window_is_offered_to_reservoir_once():
+    buf = GraphReplayBuffer(graphs_per_class=5, seed=0)
+    g = _g({0: 10, 2: 5}, 7)
+    assert buf.add(g) == [2]
+    assert buf.add(_g({0: 10, 2: 5}, 7)) == []      # overlapping adaptation re-offers window 7
+    assert buf.summary()[2] == {"stored": 1, "seen": 1}

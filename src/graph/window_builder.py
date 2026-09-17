@@ -168,8 +168,16 @@ def graphs_from_table(df: pd.DataFrame, feature_cols: list[str], node_feature_ki
 # Disk cache
 # ---------------------------------------------------------------------------
 def cache_key(cfg: dict) -> str:
+    pre = dict(cfg["preprocessing"])
+    if float(pre.get("flow_sample_fraction", 1.0)) == 1.0:
+        # No subsampling. Hash it under the legacy key name so caches and results
+        # produced before the benign-thinning option was replaced by label-agnostic
+        # flow sampling keep their id (their data is byte-identical: neither option
+        # draws random numbers at 1.0). Any real sampling gets a new, distinct key.
+        pre.pop("flow_sample_fraction", None)
+        pre["benign_keep_fraction"] = 1.0
     relevant = {
-        "dataset": cfg["dataset"], "pre": cfg["preprocessing"], "window": cfg["window"],
+        "dataset": cfg["dataset"], "pre": pre, "window": cfg["window"],
         "split": cfg["split"], "node_features": cfg["graph"]["node_features"],
         "categories": cfg["categories"], "seed": cfg["seed"], "v": 3,
     }

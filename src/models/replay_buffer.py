@@ -54,6 +54,11 @@ class GraphReplayBuffer:
         self.rng = random.Random(seed)
         self.pools: dict[int, list] = defaultdict(list)     # category id -> list[Data]
         self.seen: dict[int, int] = defaultdict(int)          # category id -> windows offered so far
+        # window ids already offered. Drift-triggered adaptations train on the
+        # last N windows, so consecutive cycles can overlap; without this a
+        # window would enter the reservoir twice (duplicate entries, and the
+        # reservoir's `seen` counter would no longer count distinct windows).
+        self.offered: set[int] = set()
 
     def __len__(self) -> int:
         return len({id(g) for pool in self.pools.values() for g in pool})
@@ -65,6 +70,11 @@ class GraphReplayBuffer:
     def add(self, graph) -> list[int]:
         """Offer one window graph to every eligible category pool. Returns the
         categories whose pool now contains this graph."""
+        wid = graph.window_id if "window_id" in graph else None
+        if wid is not None:
+            if int(wid) in self.offered:
+                return []
+            self.offered.add(int(wid))
         counts = torch.bincount(graph.y, minlength=self.benign_id + 1)
         added = []
         for cat in torch.nonzero(counts >= self.min_class_edges).flatten().tolist():
