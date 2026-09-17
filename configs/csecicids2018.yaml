@@ -1,0 +1,17 @@
+dataset: csecicids2018
+dataset_info:
+  name: CSE-CIC-IDS2018 (improved / error-corrected, Liu et al. 2022)
+  archive: CSECICIDS2018_improved.zip
+  url: https://intrusion-detection.distrinet-research.be/CNS2022/Datasets/CSECICIDS2018_improved.zip
+  extract_dir: csecicids2018
+preprocessing:
+  # 2018 is ~30x larger than 2017. Benign flows are thinned uniformly at
+  # random (seeded) before windowing so the full run fits a 4 GB GPU and
+  # 24 GB RAM. All attack flows are kept. This is recorded in run_info.json.
+  benign_keep_fraction: 0.1
+# Hyper-parameters are NOT re-tuned on 2018 (compute budget). The values selected
+# on the CIC-IDS2017 validation split are reused explicitly here
+# (results/cicids2017/multiclass/ewc_lambda_sweep/selected.json).
+ewc:
+  lambda: 10.0
+  gamma: 0.9

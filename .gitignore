@@ -1,0 +1,14 @@
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.env
+
+# datasets and derived artefacts (see README "Datasets")
+data/
+cache/
+logs/
+
+# results/ IS committed, except bulky per-flow prediction dumps and dev runs
+results/**/final_predictions_*.parquet
+results/dev/

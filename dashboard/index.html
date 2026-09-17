@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>GNN-IDS Live</title>
+  <link rel="stylesheet" href="styles.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+</head>
+<body>
+<header class="topbar">
+  <div class="title">
+    <h1>Continual-Learning GNN Intrusion Detection</h1>
+    <p id="subtitle" class="muted">connecting…</p>
+  </div>
+  <div class="controls">
+    <label class="select-label">Source
+      <select id="source">
+        <option value="stream">Stream (latest run)</option>
+        <option value="continual">Task sequence (results/)</option>
+      </select>
+    </label>
+    <button id="btn-start" class="btn primary">Start live stream</button>
+    <button id="btn-retrain" class="btn">Retrain now</button>
+    <button id="btn-stop" class="btn">Stop</button>
+    <span id="status-pill" class="pill">idle</span>
+  </div>
+</header>
+
+<main>
+  <section class="legend-row" id="model-legend" aria-label="model legend"></section>
+
+  <section class="grid three">
+    <figure class="card">
+      <figcaption>Accuracy <span class="muted">(tasks seen so far)</span></figcaption>
+      <div class="chart-box"><canvas id="chart-accuracy"></canvas></div>
+    </figure>
+    <figure class="card">
+      <figcaption>Retention <span class="muted">(recall on first attack category)</span></figcaption>
+      <div class="chart-box"><canvas id="chart-retention"></canvas></div>
+    </figure>
+    <figure class="card">
+      <figcaption>False-positive rate <span class="muted">(benign flagged as attack)</span></figcaption>
+      <div class="chart-box"><canvas id="chart-fpr"></canvas></div>
+    </figure>
+  </section>
+
+  <section class="grid two">
+    <figure class="card">
+      <figcaption>Window error rate <span class="muted">— ▼ marks = ADWIN drift → adaptation</span></figcaption>
+      <div class="chart-box tall"><canvas id="chart-error"></canvas></div>
+    </figure>
+    <div class="stack">
+      <div class="card">
+        <div class="card-head">Current window — <span id="count-model">GNN + EWC + replay</span></div>
+        <div class="tiles">
+          <div class="tile"><div class="tile-label">Benign</div><div id="tile-benign" class="tile-value">–</div></div>
+          <div class="tile"><div class="tile-label">Known attack</div><div id="tile-known" class="tile-value">–</div></div>
+          <div class="tile"><div class="tile-label">Novel / drifted<sup>*</sup></div><div id="tile-novel" class="tile-value">–</div></div>
+        </div>
+        <p class="footnote">* prediction confidence below 0.6 — the model is unsure about these flows.</p>
+      </div>
+      <div class="card">
+        <div class="card-head">Adaptation cycles</div>
+        <table class="data-table" id="retrain-table">
+          <thead><tr><th>Model</th><th class="num">Drift flags</th><th class="num">Retrains</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <section class="grid two">
+    <figure class="card">
+      <figcaption>Current window as a graph <span class="muted" id="graph-meta"></span></figcaption>
+      <div class="graph-box"><canvas id="graph-canvas"></canvas></div>
+      <div class="graph-legend">
+        <span><i class="swatch benign"></i>benign flow</span>
+        <span><i class="swatch attack"></i>attack flow (ground truth)</span>
+        <span><i class="dot"></i>host (size = degree)</span>
+      </div>
+    </figure>
+    <div class="card">
+      <div class="card-head">Drift events</div>
+      <div class="table-scroll">
+        <table class="data-table" id="drift-table">
+          <thead><tr><th>Window</th><th>Model</th><th class="num">Error before</th><th class="num">Error after</th><th>Action</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+</main>
+<script src="app.js"></script>
+</body>
+</html>

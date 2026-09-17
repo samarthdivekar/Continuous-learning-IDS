@@ -1,0 +1,125 @@
+# ---------------------------------------------------------------------------
+# Default experiment configuration.
+# Every experiment script loads this file, then applies a dataset overlay
+# (configs/<dataset>.yaml) and any --set key=value overrides from the CLI.
+# The fully-resolved config is written next to every results file.
+# ---------------------------------------------------------------------------
+
+seed: 42
+
+paths:
+  raw: data/raw
+  processed: data/processed
+  cache: cache
+  results: results
+  checkpoints: cache/checkpoints
+
+dataset: cicids2017
+
+# Canonical category order. The index of a category is its class id in
+# multiclass mode, so it must never change between runs. Datasets without a
+# category (e.g. 2018 has no stand-alone PortScan) simply never emit that id.
+categories: [Benign, BruteForce, DoS, WebAttack, Infiltration, Botnet, PortScan, DDoS]
+
+preprocessing:
+  # What to do with flows labelled "<attack> - Attempted" in the corrected
+  # releases (attack flows that carried no malicious payload):
+  #   benign -> relabel as Benign (follows the dataset authors' guidance)
+  #   drop   -> remove the flow entirely
+  #   attack -> keep as the attack category
+  attempted_policy: benign
+  # Development subsample: keep this fraction of *windows* per task
+  # (whole windows, so graph structure is intact). null = full dataset.
+  window_fraction: null
+  # Benign-flow thinning applied before windowing (1.0 = keep all).
+  # Only used for very large datasets (2018); documented in results run_info.
+  benign_keep_fraction: 1.0
+  clip_value: 10.0          # clip scaled features to +-clip_value
+  # A contiguous burst of one attack category is split into separate
+  # segments when flows are more than this many seconds apart.
+  segment_gap_seconds: 3600
+  min_segment_flows: 10
+
+window:
+  mode: count               # count | time
+  flows_per_window: 5000    # used when mode == count
+  seconds: 30               # used when mode == time
+  min_fraction: 0.2         # a trailing partial window smaller than this is merged into the previous one
+
+split:
+  # Windows inside each task are assigned by position modulo `period`.
+  # Deterministic, reproducible, keeps whole windows intact and spreads
+  # test windows across the entire task period (attacks are bursty).
+  period: 10
+  val_positions: [5]
+  test_positions: [2, 8]
+
+label_mode: multiclass      # multiclass | binary
+
+graph:
+  node_features: degree     # constant | degree
+  hidden: 64
+  layers: 2
+  dropout: 0.2
+  edge_skip: true           # classifier also sees the edge's own (projected) features
+  neighbor_sampling:
+    enabled: auto           # auto | true | false  (auto = only for windows larger than max_edges_full)
+    max_edges_full: 20000
+    fanouts: [25, 10]
+    batch_edges: 4096
+
+ffnn:
+  hidden: [256, 128]
+  dropout: 0.2
+
+train:
+  device: auto              # auto | cuda | cpu
+  optimizer: adam
+  lr: 0.001
+  weight_decay: 0.0
+  grad_clip: 5.0
+  # Epochs per task, selected on the VALIDATION split by experiments/tune_val.py
+  # (see results/<dataset>/<label_mode>/tuning/tuning.csv).
+  gnn_epochs: 10
+  ffnn_epochs: 10
+  ffnn_batch_size: 1024
+  class_weight_power: 0.5   # w_c = (N / (K n_c)) ** power, clipped
+  class_weight_clip: [0.05, 50.0]
+
+ewc:
+  lambda: 100.0
+  gamma: 1.0                # online-EWC decay on old Fisher (1.0 = plain accumulation)
+  fisher_batches: 50        # graphs (GNN) or mini-batches (FFNN) used to estimate Fisher
+  normalize: max            # none | max | mean
+  stability_warn: 1.0       # warn when lr * lambda * max(F) exceeds this
+
+replay:
+  # GNN: whole windowed subgraphs (v1). FFNN: individual flow rows.
+  graphs_per_class: 10
+  graphs_per_step: 2        # fixed budget per step regardless of how many classes are stored
+  min_class_edges: 1
+  flows_per_class: 5000
+  flows_per_step: 512       # fixed replay mini-batch size for the FFNN
+  replay_weight: 1.0        # loss = L_new + replay_weight * L_replay
+  # GNN: average replay CE per category first (mirrors FFNN balanced row sampling).
+  # Hypothesised to help rare classes; it LOWERED validation macro-F1 in tuning, so it is off.
+  category_balanced_loss: false
+
+xgboost:
+  n_estimators: 300
+  max_depth: 8
+  learning_rate: 0.1
+  subsample: 0.8
+  colsample_bytree: 0.8
+  tree_method: hist
+
+drift:
+  delta: 0.002
+  signal: error             # error (needs delayed labels) | confidence (label-free proxy)
+  adapt_windows: 20         # most recent windows used for an adaptation cycle
+  min_windows_between: 5    # refractory period after an adaptation
+  adapt_epochs: null        # null = the family's tuned epochs (train.gnn_epochs / train.ffnn_epochs)
+  periodic_every: 25        # for the periodic-retraining comparison
+
+ip_remap:
+  pool_size: 65536

@@ -1,0 +1,23 @@
+# Pinned to the versions every reported result was produced with.
+# PyTorch must be installed FIRST from the PyTorch index matching your CUDA:
+#   pip install torch==2.14.0 --index-url https://download.pytorch.org/whl/cu126   (NVIDIA GPU)
+#   pip install torch==2.14.0 --index-url https://download.pytorch.org/whl/cpu     (CPU only / Docker)
+# then:  pip install -r requirements.txt
+# torch-geometric is used WITHOUT the optional compiled extensions (pyg-lib,
+# torch-scatter, torch-sparse); see src/graph/sampling.py for why.
+torch-geometric==2.8.0.post1
+xgboost==3.4.1
+scikit-learn==1.9.1
+river==0.26.1
+pandas==3.0.5
+numpy==2.5.3
+pyarrow==25.0.1
+scipy==1.18.1
+PyYAML==6.0.3
+matplotlib==3.11.2
+fastapi==0.141.1
+uvicorn==0.53.0
+SQLAlchemy==2.0.54
+psycopg2-binary==2.9.13
+httpx==0.28.1
+pytest==9.1.1

@@ -1,0 +1,91 @@
+# Five layers, each in its own container (brief §8):
+#   1 ingestion  CSV -> processed flows -> cached graphs -> DB seed (one-shot job)
+#   2 db         PostgreSQL + TimescaleDB
+#   3 ml         model service: predictions, drift monitor, live stream demo
+#   4 api        public FastAPI REST service
+#   5 dashboard  nginx serving the Chart.js dashboard, proxying /api to the api container
+#
+# NOTE: written for Docker Compose v2 but NOT executed on the development machine
+# (Docker was unavailable there). See README "Known limitations".
+#
+#   cp .env.example .env
+#   docker compose up --build            -> http://localhost:8080
+#   docker compose --profile reproduce run --rm experiments   (CPU re-run of all experiments; slow)
+
+x-app: &app
+  build: .
+  image: clgnn-ids:latest
+  env_file: .env
+  environment:
+    DATABASE_URL: postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+    DEVICE: cpu
+  volumes:
+    - ./data:/app/data
+    - ./cache:/app/cache
+    - ./results:/app/results
+
+services:
+  db:
+    image: timescale/timescaledb:latest-pg16
+    env_file: .env
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    ports:
+      - "5432:5432"
+
+  ingestion:
+    <<: *app
+    command: >
+      sh -c "python -m experiments.prepare_data --dataset $${DATASET} &&
+             python -m src.db.seed --dataset $${DATASET} --label-mode $${LABEL_MODE}"
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: "no"
+
+  ml:
+    <<: *app
+    command: ["uvicorn", "src.api.ml_app:app", "--host", "0.0.0.0", "--port", "8001"]
+    depends_on:
+      ingestion:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8001/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+
+  api:
+    <<: *app
+    command: ["uvicorn", "src.api.app:app", "--host", "0.0.0.0", "--port", "8000"]
+    environment:
+      DATABASE_URL: postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+      ML_SERVICE_URL: http://ml:8001
+    depends_on:
+      ml:
+        condition: service_healthy
+    ports:
+      - "8000:8000"
+
+  dashboard:
+    image: nginx:1.27-alpine
+    volumes:
+      - ./dashboard:/usr/share/nginx/html:ro
+      - ./docker/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      - api
+    ports:
+      - "8080:80"
+
+  experiments:
+    <<: *app
+    profiles: ["reproduce"]
+    command: ["python", "-m", "experiments.reproduce_all", "--dataset", "cicids2017"]
+
+volumes:
+  pgdata:

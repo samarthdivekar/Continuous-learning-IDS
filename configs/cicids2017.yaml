@@ -1,0 +1,6 @@
+dataset: cicids2017
+dataset_info:
+  name: CIC-IDS2017 (improved / error-corrected, Engelen et al. 2021; Liu et al. 2022)
+  archive: CICIDS2017_improved.zip
+  url: https://intrusion-detection.distrinet-research.be/CNS2022/Datasets/CICIDS2017_improved.zip
+  extract_dir: cicids2017
