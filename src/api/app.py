@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import os
 from contextlib import asynccontextmanager
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 import httpx
@@ -23,7 +23,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 from sqlalchemy import case, desc, func, select, text
 
-from src.db.models import DriftEventRow, FlowRecord, GraphWindow, Metric, WindowStat
+from src.db.models import DriftEventRow, FlowRecord, GraphWindow, Metric, Prediction, WindowStat
 from src.db.session import get_sessionmaker
 from src.utils.config import REPO_ROOT
 
@@ -76,6 +76,17 @@ def _remote(method: str, path: str, **kw):
     if r.status_code >= 400:
         raise HTTPException(r.status_code, r.json().get("detail", r.text))
     return r.json()
+
+
+def store_predictions(Session, flow_ids: list[int], result: dict) -> int:
+    now = datetime.now(timezone.utc)
+    rows = [Prediction(flow_id=fid, model_name=model, predicted_label=lab, confidence=conf, ts=now)
+            for model, r in result.get("models", {}).items()
+            for fid, lab, conf in zip(flow_ids, r["labels"], r["confidence"])]
+    with Session() as s:
+        s.add_all(rows)
+        s.commit()
+    return len(rows)
 
 
 def create_app(database_url: str | None = None, service=None, load_models: bool = True) -> FastAPI:
@@ -154,8 +165,9 @@ def create_app(database_url: str | None = None, service=None, load_models: bool 
                 raise HTTPException(404, str(exc))
             except FileNotFoundError as exc:
                 raise HTTPException(503, str(exc))
-            if body.store and flow_ids:
-                state.service.store_predictions(flow_ids, result)
+        # Stored here (not in the ML service) so it works in both deployment modes.
+        if body.store and flow_ids:
+            store_predictions(state.Session, flow_ids, result)
         return result
 
     @router.get("/metrics")

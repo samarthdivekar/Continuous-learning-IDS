@@ -116,6 +116,7 @@ xgboost:
 drift:
   delta: 0.002
   signal: error             # error (needs delayed labels) | confidence (label-free proxy)
+  granularity: flow         # flow = every flow's value fed to ADWIN | window = one mean per window
   adapt_windows: 20         # most recent windows used for an adaptation cycle
   min_windows_between: 5    # refractory period after an adaptation
   adapt_epochs: null        # null = the family's tuned epochs (train.gnn_epochs / train.ffnn_epochs)

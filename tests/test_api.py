@@ -7,7 +7,7 @@ from fastapi.testclient import TestClient
 
 from src.api.app import create_app
 from src.api.service import MLService
-from src.db.models import Metric
+from src.db.models import Metric, Prediction
 from src.db.session import reset_for_tests
 from src.evaluation.continual import run_task_sequence
 from src.preprocessing.pipeline import load_processed, prepare_dataset
@@ -61,6 +61,8 @@ def test_ingest_then_predict_by_flow_ids(client):
         assert len(body["models"][m]["labels"]) == 5
         assert all(0 <= c <= 1 for c in body["models"][m]["confidence"])
     assert any("imputed" in w for w in body["warnings"])  # most features absent in this request
+    with client.Session() as s:  # one stored prediction per flow per model
+        assert s.query(Prediction).filter(Prediction.flow_id.in_(ids)).count() == 5 * len(body["models"])
 
 
 def test_predict_window_and_validation(client):

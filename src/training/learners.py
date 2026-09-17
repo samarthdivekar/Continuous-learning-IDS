@@ -311,16 +311,21 @@ class FFNNLearner(_TorchLearner):
         weight = class_weights(y, self.num_classes, tcfg["class_weight_power"],
                                tcfg["class_weight_clip"]).to(self.device)
 
-        Xt = torch.from_numpy(X).to(self.device)
-        yt = torch.from_numpy(y).to(self.device)
+        # Small matrices live on the GPU; large ones (e.g. joint training on 2018,
+        # ~2 GB) stay in host memory and only mini-batches are transferred.
+        on_device = X.nbytes < 1_000_000_000
+        store = self.device if on_device else torch.device("cpu")
+        Xt = torch.from_numpy(X).to(store)
+        yt = torch.from_numpy(y).to(store)
         bs = int(tcfg["ffnn_batch_size"])
         self.model.train()
         steps, last = 0, float("nan")
         for _ in range(epochs):
-            perm = torch.from_numpy(self.rng.permutation(len(y))).to(self.device)
+            perm = torch.from_numpy(self.rng.permutation(len(y))).to(store)
             for s in range(0, len(y), bs):
                 idx = perm[s:s + bs]
-                loss = F.cross_entropy(self.model(Xt[idx]), yt[idx], weight=weight)
+                xb, yb = Xt[idx].to(self.device, non_blocking=True), yt[idx].to(self.device, non_blocking=True)
+                loss = F.cross_entropy(self.model(xb), yb, weight=weight)
                 replay_loss = torch.zeros((), device=self.device)
                 if self.buffer is not None and self.buffer.categories:
                     rX, rcat = self.buffer.sample()

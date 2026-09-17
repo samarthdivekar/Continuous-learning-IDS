@@ -126,6 +126,34 @@ class MLService:
                 self.model_errors[name] = f"checkpoint missing: {exc.filename}"
         log.info("loaded models: %s; missing: %s", list(self.models), self.model_errors)
 
+    def warm_start(self, learner, task: int = 0) -> bool:
+        """Restore `learner` to its state right after training task `task` from the
+        checkpoints written by experiments/run_continual.py. Model weights and EWC
+        state come from the checkpoint; replay buffers are refilled from that
+        task's training windows exactly as learn() does after training."""
+        d = self.checkpoint_dir()
+        try:
+            if learner.family == "xgb":
+                with open(d / f"{learner.name}_after_task{task}.pkl", "rb") as fh:
+                    learner.model = pickle.load(fh)
+                return True
+            state = torch.load(d / f"{learner.name}_after_task{task}.pt", map_location=self.device,
+                               weights_only=False)
+        except FileNotFoundError:
+            return False
+        learner.model.load_state_dict(state["model"])
+        if getattr(learner, "ewc", None) is not None and "ewc" in state:
+            learner.ewc.load_state_dict(state["ewc"], self.device)
+        graphs = self.data.graphs(task, "train")
+        buf = getattr(learner, "buffer", None)
+        if buf is not None:
+            if learner.family == "gnn":
+                buf.add_many(graphs)
+            else:
+                buf.add(torch.cat([g.edge_attr for g in graphs]).numpy(), torch.cat([g.y for g in graphs]).numpy())
+        learner.n_learn_calls += 1
+        return True
+
     def active_learners(self) -> dict:
         """Live demo learners take precedence: they are the ones adapting."""
         if self.demo is not None and self.demo.runners:
@@ -183,16 +211,6 @@ class MLService:
                                   enumerate(np.bincount((g.y > 0).long().numpy() if self.cfg["label_mode"] == "binary"
                                                         else g.y.numpy(), minlength=len(names))) if c}
         return out
-
-    def store_predictions(self, flow_ids: list[int], result: dict) -> None:
-        if not self.Session:
-            return
-        now = datetime.now(timezone.utc)
-        with self.Session() as s:
-            for model, r in result["models"].items():
-                for fid, lab, conf in zip(flow_ids, r["labels"], r["confidence"]):
-                    s.add(Prediction(flow_id=fid, model_name=model, predicted_label=lab, confidence=conf, ts=now))
-            s.commit()
 
     # --------------------------------------------------------------- graphs
     def graph_summary(self, window_id: int, max_nodes: int = 150) -> dict:
@@ -305,10 +323,13 @@ class DemoRunner(threading.Thread):
                 self.runners.append(StreamRunner(cfg, data, learner, policy=policy, eval_every=self.eval_every,
                                                  on_window=self._on_window, on_drift=self._on_drift,
                                                  on_eval=self._on_eval))
-            self.status = "training on task 1"
+            self.warm_started = {}
             for r in self.runners:
+                warm = self.svc.warm_start(r.learner, task=0)
+                self.warm_started[r.learner.name] = warm
+                self.status = "evaluating task-1 checkpoints" if warm else "training on task 1"
                 with self.svc.lock:
-                    r.start()
+                    r.start(pretrained=warm)
             stream = self.runners[0].stream_graphs()
             if self.max_windows:
                 stream = stream[: self.max_windows]
@@ -342,6 +363,7 @@ class DemoRunner(threading.Thread):
     def describe(self) -> dict:
         return {"run_id": self.run_id, "status": self.status, "position": self.position, "total": self.total,
                 "error": self.error, "alive": self.is_alive(),
+                "warm_started": getattr(self, "warm_started", {}),
                 "retrains": {r.learner.name: r.retrains for r in self.runners}}
 
 

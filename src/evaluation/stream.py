@@ -101,8 +101,16 @@ class StreamRunner:
         self.finish(stream[-1] if stream else None, len(stream))
 
     # Step-wise API (used by the live demo to interleave several models) ------
-    def start(self) -> None:
-        self.learner.learn(self.data.graphs(0, "train"), tag="initial_task0")
+    def start(self, pretrained: bool = False) -> None:
+        """pretrained=True: the learner was already restored from a task-0
+        checkpoint (live demo warm start), so initial training is skipped."""
+        if not pretrained:
+            self.learner.learn(self.data.graphs(0, "train"), tag="initial_task0")
+        # Baseline for ADWIN: the model's signal on held-out task-0 windows.
+        if self.policy == "adwin" and self.learner.adapts:
+            for g in self.data.graphs(0, "val"):
+                probs = self.learner.predict_proba(g)
+                self.monitor.calibrate(self._flow_signal(g, probs))
         self.seen_tasks = {0}
         self.prev_task = 0
         self.task_windows: list = []
@@ -113,6 +121,11 @@ class StreamRunner:
             self.adapt(self.task_windows, tag=f"oracle_task{self.prev_task}")
         self.evaluate(n, self.seen_tasks, int(last.window_id) if last is not None else -1,
                       last.window_end if last is not None else "")
+
+    def _flow_signal(self, g, probs) -> np.ndarray:
+        if self.cfg["drift"]["signal"] == "error":
+            return (probs.argmax(1) != edge_labels(g, self.mode).numpy()).astype(np.float64)
+        return 1.0 - probs.max(1)
 
     def step(self, k: int, g) -> dict:
         """Process stream window number `k`: predict, log, monitor, maybe adapt."""
@@ -148,7 +161,10 @@ class StreamRunner:
         # 3) policy decides whether to adapt
         trigger = False
         if self.policy == "adwin" and self.learner.adapts:
-            ev = self.monitor.update(signal, k, int(g.window_id), g.window_start)
+            if self.cfg["drift"].get("granularity", "flow") == "flow":
+                ev = self.monitor.update_window(self._flow_signal(g, probs), k, int(g.window_id), g.window_start)
+            else:
+                ev = self.monitor.update(signal, k, int(g.window_id), g.window_start)
             if ev is not None:
                 row["drift_flag"] = True
                 evd = {**ev.__dict__, "model": self.learner.name}

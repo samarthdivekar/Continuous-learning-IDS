@@ -194,7 +194,8 @@
     } else {
       pill.textContent = "idle"; $("btn-stop").disabled = true; $("btn-retrain").disabled = true;
     }
-    $("subtitle").textContent = `run: ${d.run_id || "none"} · source: ${source === "stream" ? "stream" : "task sequence"}`;
+    const shownRun = source === "stream" ? (runId || (demo && demo.run_id) || d.run_id) : "results/ (task sequence)";
+    $("subtitle").textContent = `run: ${shownRun || "none"} · source: ${source === "stream" ? "stream" : "task sequence"}`;
   }
 
   // ------------------------------------------------------------------ graph
