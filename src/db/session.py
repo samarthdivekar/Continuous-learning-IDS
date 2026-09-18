@@ -7,15 +7,12 @@ DATABASE_URL examples
 On PostgreSQL `init_db` additionally enables the timescaledb extension and
 turns the time-series tables into hypertables. Timescale requires every unique
 index to contain the partitioning column, so the single-column primary key is
-replaced by (id, ts) first. NOTE: this Postgres/Timescale path could not be
-executed on the development machine (no Docker/Postgres available); it is
-written against the documented TimescaleDB API and flagged as untested in the
-README.
+replaced by (id, ts) first. Verified with the timescale/timescaledb:latest-pg16
+image under docker compose: all five hypertables are created on first start.
 """
 from __future__ import annotations
 
 import os
-from pathlib import Path
 
 from sqlalchemy import create_engine, event, text
 from sqlalchemy.engine import Engine

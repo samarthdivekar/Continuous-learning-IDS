@@ -129,7 +129,7 @@ def plot_drift(ddir: Path) -> None:
     fig, axes = plt.subplots(1, 3, figsize=(15, 4.2), sharex=True)
     for ax, col, title in zip(axes, ["accuracy_seen", "retention_rate", "fpr_seen"],
                               ["Accuracy (seen tasks)", "Retention (task-1 category)", "FPR"]):
-        for i, (m, pol) in enumerate(runs):
+        for m, pol in runs:
             d = e[(e["model"] == m) & (e["policy"] == pol)]
             ls = ["-", "--", ":", "-."][["adwin", "periodic", "oracle", "never"].index(pol)]
             ax.plot(d["stream_index"], d[col], color=MODEL_COLORS.get(m, MUTED), linestyle=ls, linewidth=2,
@@ -145,11 +145,13 @@ def plot_loao(ldir: Path) -> None:
     df = pd.read_csv(ldir / "loao.csv")
     piv = df.pivot_table(index="held_out_category", columns="model", values="heldout_detection_rate")
     models = [m for m in MODEL_COLORS if m in piv.columns]
+    # trained once, jointly on all other tasks -> not the continual strategies of those names
+    loao_label = {"xgboost_static": "XGBoost", "gnn_naive": "GNN (graph)", "ffnn_naive": "FFNN (per-flow)"}
     fig, ax = plt.subplots(figsize=(12, 4.5))
     width = 0.8 / len(models)
     x = np.arange(len(piv))
     for i, m in enumerate(models):
-        ax.bar(x + i * width, piv[m].to_numpy(), width - 0.02, color=MODEL_COLORS[m], label=MODEL_LABELS.get(m, m))
+        ax.bar(x + i * width, piv[m].to_numpy(), width - 0.02, color=MODEL_COLORS[m], label=loao_label.get(m, MODEL_LABELS.get(m, m)))
     ax.set_xticks(x + width * (len(models) - 1) / 2)
     ax.set_xticklabels(piv.index)
     ax.set_ylim(0, 1)

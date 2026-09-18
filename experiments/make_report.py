@@ -5,7 +5,6 @@
 from __future__ import annotations
 
 import json
-from pathlib import Path
 
 import numpy as np
 import pandas as pd
@@ -124,10 +123,12 @@ def loao_section(ds: str, mode: str) -> list[str]:
     fpr = df.pivot_table(index="held_out_category", columns="model", values="fpr")
     n = df.groupby("held_out_category")["n_heldout_flows"].first()
     models = [m for m in ORDER if m in det.columns]
+    # each model is trained ONCE, jointly on all other tasks: continual-strategy names would mislead
+    loao_label = {"xgboost_static": "XGBoost", "gnn_naive": "GNN (graph)", "ffnn_naive": "FFNN (per-flow)"}
     tbl = pd.DataFrame({"Held-out category": det.index, "Test flows": n.loc[det.index].values})
     for m in models:
-        tbl[f"{LABELS[m]} detection"] = [fmt(v) for v in det[m]]
-        tbl[f"{LABELS[m]} FPR"] = [fmt(v, pct=True) for v in fpr[m]]
+        tbl[f"{loao_label.get(m, LABELS[m])} detection"] = [fmt(v) for v in det[m]]
+        tbl[f"{loao_label.get(m, LABELS[m])} FPR"] = [fmt(v, pct=True) for v in fpr[m]]
     return [f"### {ds} — {mode} — leave-one-attack-out (joint training on the other tasks, seed 42)", "",
             md_table(tbl), ""]
 

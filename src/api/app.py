@@ -18,7 +18,7 @@ from pathlib import Path
 
 import httpx
 from fastapi import APIRouter, FastAPI, HTTPException, Query
-from fastapi.responses import FileResponse, RedirectResponse
+from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 from sqlalchemy import case, desc, func, select, text

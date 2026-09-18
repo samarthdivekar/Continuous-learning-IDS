@@ -1,5 +1,4 @@
 import numpy as np
-import pandas as pd
 import pytest
 
 from src.graph.window_builder import SPLIT_CODES

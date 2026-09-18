@@ -1,6 +1,5 @@
 import json
 
-import numpy as np
 import pandas as pd
 import yaml
 
@@ -47,7 +46,7 @@ def test_merge_write_replaces_only_rerun_models(tmp_path):
 
 def test_flow_sampling_is_label_agnostic(tmp_path):
     path = tmp_path / "day.csv"
-    raw = synthetic_raw_csv(path, n_benign=20_000)
+    synthetic_raw_csv(path, n_benign=20_000)
     full, _ = load_flows([path], "benign", 1.0, seed=0)
     sampled, stats = load_flows([path], "benign", 0.3, seed=0)
     assert 0.25 < len(sampled) / len(full) < 0.35
