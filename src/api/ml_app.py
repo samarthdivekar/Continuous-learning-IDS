@@ -46,7 +46,12 @@ app = FastAPI(title="GNN-IDS ML service", lifespan=lifespan)
 def health():
     return {"status": "ok", "dataset": svc.cfg["dataset"], "label_mode": svc.cfg["label_mode"],
             "data_available": svc.data_available, "models_loaded": sorted(svc.models),
-            "model_errors": svc.model_errors, "device": str(svc.device)}
+            "model_errors": svc.model_errors, "device": str(svc.device), "gpu": _gpu_name()}
+
+
+def _gpu_name():
+    import torch
+    return torch.cuda.get_device_name(0) if torch.cuda.is_available() and svc.device.type == "cuda" else None
 
 
 @app.post("/predict")
@@ -57,15 +62,20 @@ def predict(body: PredictBody):
         raise HTTPException(404, str(exc))
 
 
+@app.get("/windows/catalog")
+def windows_catalog():
+    return svc.list_windows()
+
+
 @app.post("/retrain")
 def retrain():
     return svc.request_retrain()
 
 
 @app.get("/graph/{window_id}")
-def graph(window_id: int, max_nodes: int = 150):
+def graph(window_id: int, max_nodes: int = 150, model: str | None = None):
     try:
-        return svc.graph_summary(window_id, max_nodes)
+        return svc.graph_summary(window_id, max_nodes, model)
     except KeyError as exc:
         raise HTTPException(404, str(exc))
 

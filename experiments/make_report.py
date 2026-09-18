@@ -41,10 +41,21 @@ def md_table(df: pd.DataFrame) -> str:
     return "\n".join(lines)
 
 
+def ewc_settings(ds: str, mode: str) -> dict:
+    """Validation-selected λ/γ per model (fallback for runs made before the
+    summary carried the columns; the two always agree when both are present)."""
+    for m in (mode, "multiclass"):
+        f = RES / ds / m / "ewc_lambda_sweep" / "selected.json"
+        if f.exists():
+            return json.loads(f.read_text())   # exact model names only
+    return {}
+
+
 def continual_section(ds: str, mode: str) -> list[str]:
     d = RES / ds / mode / "continual"
     if not (d / "summary.csv").exists():
         return []
+    sel = ewc_settings(ds, mode)
     mean = pd.read_csv(d / "summary.csv")
     std = pd.read_csv(d / "summary_std.csv") if (d / "summary_std.csv").exists() else None
     seeds = json.loads((d / "seeds.json").read_text())["seeds"] if (d / "seeds.json").exists() else ["?"]
@@ -60,8 +71,12 @@ def continual_section(ds: str, mode: str) -> list[str]:
             if f.exists():
                 forg.append(json.loads(f.read_text()))
         bwt = np.mean([x["bwt"] for x in forg]) if forg else np.nan
+        lam, gam = m.get("ewc_lambda", np.nan), m.get("ewc_gamma", np.nan)
+        if (lam is None or (isinstance(lam, float) and np.isnan(lam))) and model in sel:
+            lam, gam = sel[model]["lambda"], sel[model]["gamma"]
         rows.append({
             "Model": LABELS[model],
+            "EWC λ / γ": "–" if lam is None or (isinstance(lam, float) and np.isnan(lam)) else f"{lam:g} / {gam:g}",
             "Accuracy (seen)": fmt(m["accuracy_seen"], s.get("accuracy_seen", np.nan)),
             "Macro-F1 (seen)": fmt(m["macro_f1_seen"], s.get("macro_f1_seen", np.nan)),
             "Retention (task-1 recall)": fmt(m["retention_rate"], s.get("retention_rate", np.nan)),

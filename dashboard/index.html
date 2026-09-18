@@ -1,96 +1,65 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-theme="dark">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>GNN-IDS Live</title>
-  <link rel="stylesheet" href="styles.css">
+  <title>GNN-IDS Console</title>
+  <link rel="stylesheet" href="css/app.css">
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/d3@7.9.0/dist/d3.min.js"></script>
 </head>
 <body>
-<header class="topbar">
-  <div class="title">
-    <h1>Continual-Learning GNN Intrusion Detection</h1>
-    <p id="subtitle" class="muted">connecting…</p>
+<header class="appbar">
+  <div class="brand">
+    <div class="brand-mark" aria-hidden="true">
+      <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><circle cx="5" cy="6" r="2.2"/><circle cx="19" cy="6" r="2.2"/><circle cx="12" cy="18" r="2.2"/><circle cx="12" cy="10" r="1.6"/><path d="M6.8 7.2 10.6 9.3M17.2 7.2l-3.8 2.1M12 11.7V15.8"/></svg>
+    </div>
+    <div>
+      <h1>GNN-IDS Security Console</h1>
+      <p>Continual-learning graph intrusion detection · EWC + subgraph replay + ADWIN</p>
+    </div>
   </div>
   <div class="controls">
-    <label class="select-label">Source
-      <select id="source">
-        <option value="stream">Stream (latest run)</option>
-        <option value="continual">Task sequence (results/)</option>
-      </select>
-    </label>
-    <button id="btn-start" class="btn primary">Start live stream</button>
-    <button id="btn-retrain" class="btn">Retrain now</button>
-    <button id="btn-stop" class="btn">Stop</button>
-    <span id="status-pill" class="pill">idle</span>
+    <div class="seg" id="ds-seg" role="group" aria-label="dataset">
+      <button data-v="cicids2017" class="on">CIC-IDS2017</button>
+      <button data-v="csecicids2018">CSE-CIC-IDS2018</button>
+    </div>
+    <div class="seg" id="mode-seg" role="group" aria-label="label mode">
+      <button data-v="multiclass" class="on">Multiclass</button>
+      <button data-v="binary">Binary</button>
+    </div>
+    <div class="pills">
+      <span class="pill" id="pill-api"><i class="dot"></i>API</span>
+      <span class="pill" id="pill-ml"><i class="dot"></i>ML</span>
+      <span class="pill" id="pill-db"><i class="dot"></i>DB</span>
+      <span class="pill" id="pill-stream"><i class="dot"></i><span>Stream idle</span></span>
+    </div>
+    <button class="icon-btn" id="theme-btn" title="Toggle light/dark">◐</button>
   </div>
 </header>
 
+<nav class="tabs" role="tablist">
+  <button class="tab on" data-view="overview">Overview</button>
+  <button class="tab" data-view="live">Live Stream <span class="badge hidden" id="live-badge">LIVE</span></button>
+  <button class="tab" data-view="explorer">Graph Explorer</button>
+  <button class="tab" data-view="compare">Model Comparison</button>
+  <button class="tab" data-view="drift">Drift Analysis</button>
+  <button class="tab" data-view="general">Generalisation</button>
+  <button class="tab" data-view="classify">Classify</button>
+  <button class="tab" data-view="repro">Reproducibility</button>
+</nav>
+
 <main>
-  <section class="legend-row" id="model-legend" aria-label="model legend"></section>
-
-  <section class="grid three">
-    <figure class="card">
-      <figcaption>Accuracy <span class="muted">(tasks seen so far)</span></figcaption>
-      <div class="chart-box"><canvas id="chart-accuracy"></canvas></div>
-    </figure>
-    <figure class="card">
-      <figcaption>Retention <span class="muted">(recall on first attack category)</span></figcaption>
-      <div class="chart-box"><canvas id="chart-retention"></canvas></div>
-    </figure>
-    <figure class="card">
-      <figcaption>False-positive rate <span class="muted">(benign flagged as attack)</span></figcaption>
-      <div class="chart-box"><canvas id="chart-fpr"></canvas></div>
-    </figure>
-  </section>
-
-  <section class="grid two">
-    <figure class="card">
-      <figcaption>Window error rate <span class="muted">— ▼ ADWIN drift flag (ours) · dashed line = adaptation (ours)</span></figcaption>
-      <div class="chart-box tall"><canvas id="chart-error"></canvas></div>
-    </figure>
-    <div class="stack">
-      <div class="card">
-        <div class="card-head">Current window — <span id="count-model">GNN + EWC + replay</span></div>
-        <div class="tiles">
-          <div class="tile"><div class="tile-label">Benign</div><div id="tile-benign" class="tile-value">–</div></div>
-          <div class="tile"><div class="tile-label">Known attack</div><div id="tile-known" class="tile-value">–</div></div>
-          <div class="tile"><div class="tile-label">Novel / drifted<sup>*</sup></div><div id="tile-novel" class="tile-value">–</div></div>
-        </div>
-        <p class="footnote">* prediction confidence below 0.6 — the model is unsure about these flows.</p>
-      </div>
-      <div class="card">
-        <div class="card-head">Adaptation cycles</div>
-        <table class="data-table" id="retrain-table">
-          <thead><tr><th>Model</th><th class="num">Drift flags</th><th class="num">Retrains</th></tr></thead>
-          <tbody></tbody>
-        </table>
-      </div>
-    </div>
-  </section>
-
-  <section class="grid two">
-    <figure class="card">
-      <figcaption>Current window as a graph <span class="muted" id="graph-meta"></span></figcaption>
-      <div class="graph-box"><canvas id="graph-canvas"></canvas></div>
-      <div class="graph-legend">
-        <span><i class="swatch benign"></i>benign flow</span>
-        <span><i class="swatch attack"></i>attack flow (ground truth)</span>
-        <span><i class="dot"></i>host (size = degree)</span>
-      </div>
-    </figure>
-    <div class="card">
-      <div class="card-head">Drift events</div>
-      <div class="table-scroll">
-        <table class="data-table" id="drift-table">
-          <thead><tr><th>Window</th><th>Model</th><th class="num">Error before</th><th class="num">Error after</th><th>Action</th></tr></thead>
-          <tbody></tbody>
-        </table>
-      </div>
-    </div>
-  </section>
+  <section class="view on" id="view-overview"></section>
+  <section class="view" id="view-live"></section>
+  <section class="view" id="view-explorer"></section>
+  <section class="view" id="view-compare"></section>
+  <section class="view" id="view-drift"></section>
+  <section class="view" id="view-general"></section>
+  <section class="view" id="view-classify"></section>
+  <section class="view" id="view-repro"></section>
 </main>
-<script src="app.js"></script>
+
+<script type="module" src="js/main.js"></script>
 </body>
 </html>

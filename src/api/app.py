@@ -136,7 +136,8 @@ def create_app(database_url: str | None = None, service=None, load_models: bool 
             svc = state.service
             ml = {"status": "in-process", "dataset": svc.cfg["dataset"], "label_mode": svc.cfg["label_mode"],
                   "data_available": svc.data_available, "models_loaded": sorted(svc.models),
-                  "model_errors": svc.model_errors, "device": str(svc.device)}
+                  "model_errors": svc.model_errors, "device": str(svc.device),
+                  "gpu": __import__("torch").cuda.get_device_name(0) if svc.device.type == "cuda" else None}
         return {"status": "ok" if db_ok else "degraded", "database": db_ok, "ml": ml}
 
     @router.post("/ingest")
@@ -251,11 +252,12 @@ def create_app(database_url: str | None = None, service=None, load_models: bool 
         return state.service.request_retrain()
 
     @router.get("/graph/{window_id}")
-    def graph(window_id: int, max_nodes: int = Query(150, ge=5, le=2000)):
+    def graph(window_id: int, max_nodes: int = Query(150, ge=5, le=2000), model: str | None = None):
         if state.ml_url:
-            return _remote("GET", f"/graph/{window_id}", params={"max_nodes": max_nodes})
+            params = {"max_nodes": max_nodes} | ({"model": model} if model else {})
+            return _remote("GET", f"/graph/{window_id}", params=params)
         try:
-            return state.service.graph_summary(window_id, max_nodes)
+            return state.service.graph_summary(window_id, max_nodes, model)
         except KeyError as exc:
             raise HTTPException(404, str(exc))
         except FileNotFoundError as exc:
@@ -270,6 +272,16 @@ def create_app(database_url: str | None = None, service=None, load_models: bool 
             rows = s.scalars(q.order_by(GraphWindow.id).limit(limit)).all()
         return [{"window_id": r.id, "task_id": r.task_id, "split": r.split, "n_nodes": r.n_nodes,
                  "n_edges": r.n_edges, "window_start": r.window_start.isoformat()} for r in rows]
+
+    @router.get("/windows/catalog")
+    def windows_catalog():
+        """Every cached window with task, split and attack composition (Graph Explorer)."""
+        if state.ml_url:
+            return _remote("GET", "/windows/catalog")
+        try:
+            return state.service.list_windows()
+        except FileNotFoundError as exc:
+            raise HTTPException(503, str(exc))
 
     @router.post("/demo/start")
     def demo_start(body: DemoStartIn):
@@ -295,6 +307,8 @@ def create_app(database_url: str | None = None, service=None, load_models: bool 
         d = state.service.demo
         return d.describe() if d else {"status": "idle"}
 
+    from src.api.results import router as results_router
+    router.include_router(results_router)
     app.include_router(router)
     app.include_router(router, prefix="/api")
 

@@ -215,7 +215,10 @@ class MLService:
         return out
 
     # --------------------------------------------------------------- graphs
-    def graph_summary(self, window_id: int, max_nodes: int = 150) -> dict:
+    def graph_summary(self, window_id: int, max_nodes: int = 150, model: str | None = None) -> dict:
+        """Node/edge summary of a window. With `model`, every flow is also
+        classified by that model and edges carry how many of their flows it got
+        wrong (the Graph Explorer's prediction overlay)."""
         g = self.get_window(window_id)
         if g is None:
             raise KeyError(f"window {window_id} not found")
@@ -224,28 +227,73 @@ class MLService:
         y = g.y.numpy()
         n = g.num_nodes
         deg = np.bincount(src, minlength=n) + np.bincount(dst, minlength=n)
+        out_deg = np.bincount(src, minlength=n)
+        in_deg = np.bincount(dst, minlength=n)
         attack_deg = np.bincount(src[y > 0], minlength=n) + np.bincount(dst[y > 0], minlength=n)
+
+        wrong = np.zeros(len(y), bool)
+        pred_cat = y.copy()
+        model_info = None
+        if model:
+            with self.lock:
+                learners = self.active_learners()
+                if model not in learners:
+                    raise KeyError(f"model {model} not loaded")
+                p = learners[model].predict_proba(g)
+            pred = p.argmax(1)
+            truth = (y > 0).astype(int) if self.cfg["label_mode"] == "binary" else y
+            wrong = pred != truth
+            pred_cat = pred if self.cfg["label_mode"] == "multiclass" else np.where(pred > 0, y.clip(min=1), 0)
+            model_info = {"name": model, "n_wrong": int(wrong.sum()), "accuracy": float(1 - wrong.mean()),
+                          "false_alarms": int((wrong & (y == 0)).sum()), "missed_attacks": int((wrong & (y > 0)).sum())}
+
         # keep the busiest hosts, always including hosts involved in attacks
         order = np.lexsort((-deg, -(attack_deg > 0).astype(np.int64)))
         keep = order[:max_nodes]
         keep_set = np.zeros(n, bool)
         keep_set[keep] = True
         mask = keep_set[src] & keep_set[dst]
-        pairs = pd.DataFrame({"s": src[mask], "t": dst[mask], "attack": y[mask] > 0, "cat": y[mask]})
+        pairs = pd.DataFrame({"s": src[mask], "t": dst[mask], "attack": y[mask] > 0, "cat": y[mask],
+                              "wrong": wrong[mask], "pcat": pred_cat[mask]})
         agg = pairs.groupby(["s", "t"]).agg(flows=("attack", "size"), attack_flows=("attack", "sum"),
-                                            top_cat=("cat", "max")).reset_index()
+                                            top_cat=("cat", "max"), wrong=("wrong", "sum"),
+                                            pred_cat=("pcat", "max")).reset_index()
         return {
             "window_id": int(window_id), "task_id": int(g.task_id), "split": int(g.split),
             "window_start": g.window_start, "window_end": g.window_end,
+            "task_category": self.data.task_categories[int(g.task_id)],
             "n_nodes": int(n), "n_edges": int(len(y)), "n_attack_edges": int((y > 0).sum()),
             "category_counts": {cats[i]: int(c) for i, c in enumerate(np.bincount(y, minlength=len(cats))) if c},
-            "nodes": [{"id": int(i), "degree": int(deg[i]), "attack_degree": int(attack_deg[i])} for i in keep],
+            "nodes": [{"id": int(i), "degree": int(deg[i]), "out_degree": int(out_deg[i]), "in_degree": int(in_deg[i]),
+                       "attack_degree": int(attack_deg[i])} for i in keep],
             "edges": [{"source": int(r.s), "target": int(r.t), "flows": int(r.flows),
-                       "attack_flows": int(r.attack_flows), "category": cats[int(r.top_cat)]}
+                       "attack_flows": int(r.attack_flows), "category": cats[int(r.top_cat)],
+                       "wrong": int(r.wrong), "predicted": cats[int(r.pred_cat)]}
                       for r in agg.itertuples()],
+            "model": model_info,
             "truncated": bool(n > max_nodes),
             "note": "Node ids are per-window indices; IP addresses are not exposed.",
         }
+
+    def list_windows(self) -> list[dict]:
+        """Every cached window with its task, split and attack composition (for the explorer)."""
+        if getattr(self, "_window_list", None) is None:
+            cats = self.cfg["categories"]
+            rows = []
+            for t in range(self.data.n_tasks):
+                for split in ("train", "val", "test"):
+                    for g in self.data.graphs(t, split):
+                        y = g.y.numpy()
+                        counts = np.bincount(y, minlength=len(cats))
+                        attack = counts[1:]
+                        rows.append({"window_id": int(g.window_id), "task_id": t,
+                                     "task_category": self.data.task_categories[t], "split": split,
+                                     "n_edges": int(len(y)), "n_nodes": int(g.num_nodes),
+                                     "n_attack": int(attack.sum()),
+                                     "top_attack": cats[1 + int(attack.argmax())] if attack.sum() else None,
+                                     "start": g.window_start})
+            self._window_list = sorted(rows, key=lambda r: r["window_id"])
+        return self._window_list
 
     # ------------------------------------------------------------------ demo
     def start_demo(self, delay_seconds: float = 0.5, eval_every: int = 10, max_windows: int | None = None) -> str:

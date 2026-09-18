@@ -121,3 +121,37 @@ def test_live_demo_writes_windows_events_and_metrics(client):
     assert "gnn_ewc_replay" in m["series"]
     d = client.get(f"/drift-status?run_id={run_id}").json()
     assert d["demo"]["status"] == "finished"
+
+
+def test_graph_overlay_and_window_catalog(client):
+    cat = client.get("/windows/catalog").json()
+    assert cat and {"window_id", "task_id", "split", "n_attack", "top_attack"} <= set(cat[0])
+    assert sorted(w["window_id"] for w in cat) == [w["window_id"] for w in cat]
+    wid = next(w["window_id"] for w in cat if w["n_attack"] > 0)
+    g = client.get(f"/graph/{wid}?max_nodes=50&model=gnn_ewc_replay").json()
+    m = g["model"]
+    assert m["name"] == "gnn_ewc_replay" and 0 <= m["accuracy"] <= 1
+    assert m["n_wrong"] == m["false_alarms"] + m["missed_attacks"] or m["n_wrong"] >= m["false_alarms"]
+    assert all({"wrong", "predicted"} <= set(e) for e in g["edges"])
+    assert client.get(f"/graph/{wid}?model=not_a_model").status_code == 404
+
+
+def test_results_endpoints_read_files_and_404_when_missing(client, tmp_path, monkeypatch):
+    import src.api.results as results
+    base = tmp_path / "res_root"
+    cdir = base / "cicids2017" / "multiclass" / "continual"
+    (cdir / "seed42").mkdir(parents=True)
+    import pandas as pd
+    pd.DataFrame([{"model": "gnn_ewc_replay", "ip_mode": "none", "after_task": 0, "task_category": "BruteForce",
+                   "macro_f1_seen": 0.9, "retention_rate": 1.0, "fpr_seen": 0.001}]).to_csv(cdir / "summary.csv", index=False)
+    (cdir / "seeds.json").write_text('{"seeds": [42]}')
+    (cdir / "seed42" / "forgetting_gnn_ewc_replay.json").write_text('{"bwt": -0.1, "avg_forgetting": 0.1, "final_avg": 0.9}')
+    monkeypatch.setattr(results, "RESULTS", base)
+    r = client.get("/results/continual?dataset=cicids2017&mode=multiclass").json()
+    assert r["models"] == ["gnn_ewc_replay"] and r["summary"][0]["macro_f1_seen"] == 0.9
+    assert r["forgetting"]["gnn_ewc_replay"]["bwt"] == -0.1
+    assert client.get("/results/drift?dataset=cicids2017").status_code == 404        # not run -> 404, never a number
+    assert client.get("/results/continual?dataset=evil&mode=multiclass").status_code == 422
+    assert client.get("/results/run_info?experiment=../../etc").status_code == 422
+    idx = client.get("/api/results/index").json()
+    assert idx["cicids2017"]["multiclass"]["continual"] is True
