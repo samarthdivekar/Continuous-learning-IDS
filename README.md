@@ -56,6 +56,12 @@ contribution of this project.
 Place both zips in `data/raw/`. The 2017 archive is extracted automatically; the 2018 archive is read as a
 stream directly from the zip (no 36 GB extraction).
 
+**CSE-CIC-IDS2018 is subsampled label-agnostically.** Its 63.2 M flows do not fit 24 GB RAM with 83 float
+features, so every flow is kept with probability 0.15 *regardless of its label* (seeded) — a 1-in-~7
+sampled flow export (9.48 M flows, 1,898 windows). An earlier version kept all attacks and thinned only
+benign flows; the integrity review showed that let ground-truth labels decide which edges the GNN saw
+(including in test windows), so it was replaced and every 2018 result was regenerated.
+
 ```bash
 curl -L -o data/raw/CICIDS2017_improved.zip https://intrusion-detection.distrinet-research.be/CNS2022/Datasets/CICIDS2017_improved.zip
 ```
@@ -64,11 +70,12 @@ curl -L -o data/raw/CICIDS2017_improved.zip https://intrusion-detection.distrine
 curl -L -o data/raw/CSECICIDS2018_improved.zip https://intrusion-detection.distrinet-research.be/CNS2022/Datasets/CSECICIDS2018_improved.zip
 ```
 
-**Newer datasets (2024–2026).** We looked for newer enterprise-network flow datasets. The York University
-BCCC releases (e.g. BCCC-CIC-IDS2017/2018, 2024) are re-extractions of the *same* 2017/2018 traffic with
-a different feature extractor (NTLFlowLyzer), and are distributed only through a request form. Other
-2024–2026 releases target IoT, QUIC, DNS or cloud-only DDoS, which are outside this project's LAN-gateway
-scope. None were used. The loader is dataset-agnostic (`src/ingestion/`), so an additional CICFlowMeter-style
+**Newer datasets.** Post-2018 candidates were reviewed and none were used: the BCCC releases (2024–25)
+re-extract the *same* 2017/2018 traffic and sit behind a request form; UWF-ZeekData22 (2022) is 99.97 %
+reconnaissance (effectively one attack class); LUFlow (2020–21) is real traffic but labelled only
+benign/malicious/outlier; the NetFlow-v3 datasets (2025) re-encode older captures; TII-SSRC-23 (2023) is
+the closest fit (CICFlowMeter-style flows, several attack families) and is the natural next dataset.
+Only 2017/2018 have published error-correction studies, which this project relies on. The loader is dataset-agnostic (`src/ingestion/`), so an additional CICFlowMeter-style
 dataset needs only a config overlay in `configs/` and, if its labels differ, entries in
 `src/ingestion/labels.py`.
 
@@ -138,36 +145,60 @@ IP-remap → plots → `results/RESULTS.md` → database seed. Individual steps:
 | figures | `python -m experiments.make_plots --label-mode multiclass` | `*.png` next to the CSVs |
 | report | `python -m experiments.make_report` | `results/RESULTS.md` |
 
-Add `--dataset csecicids2018` for the 2018 dataset, and `--dev` to any command for a fast 20 %-of-windows
-development run (written to `results/dev/`, never reported).
+Add `--dev` to any command for a fast 20 %-of-windows development run (written to `results/dev/`,
+never reported).
 
-Runtime on the reference machine for CIC-IDS2017: preparation ≈ 1 min; the full reproduction ≈ 3 h
-(most of it in 3 seeds × 2 label modes × 9 models).
+**CSE-CIC-IDS2018** was run with one seed and without the two joint-retraining reference models (compute
+budget), reusing the CIC-IDS2017 validation selections (`tuning_from` in `configs/csecicids2018.yaml`).
+The exact commands:
+
+```bash
+python -m experiments.prepare_data --dataset csecicids2018
+python -m experiments.run_continual --dataset csecicids2018 --label-mode multiclass --seeds 42 --models xgboost_static gnn_naive gnn_ewc_replay ffnn_ewc_replay ffnn_naive gnn_ewc gnn_replay
+python -m experiments.run_drift_stream --dataset csecicids2018 --label-mode multiclass
+python -m experiments.run_continual --dataset csecicids2018 --label-mode binary --seeds 42 --models xgboost_static gnn_naive gnn_ewc_replay ffnn_ewc_replay ffnn_naive gnn_ewc gnn_replay
+python -m experiments.run_ip_remap --dataset csecicids2018 --label-mode multiclass
+python -m experiments.run_loao --dataset csecicids2018 --label-mode binary
+```
+
+Runtime on the reference machine (GTX 1650): CIC-IDS2017 preparation ≈ 1 min and full reproduction
+≈ 3 h; CSE-CIC-IDS2018 preparation ≈ 40 min and the runs above ≈ 8 h.
 
 Every results directory contains `run_info.json`: seed, full resolved config, package versions, GPU,
 the command line and the processed-data hash.
 
 ## Running the system
 
-### Locally (SQLite, no Docker)
+### Without Docker (recommended on a laptop)
+
+`scripts/run_stack.ps1` runs the same five layers as local processes: SQLite for data, the ML service
+(port 8001), the public API (port 8000, forwarding ML calls exactly like the compose deployment) and a
+small static server with an `/api` proxy in place of nginx (port 8080):
 
 ```bash
-python -m src.db.seed --dataset cicids2017 --label-mode multiclass
+powershell -ExecutionPolicy Bypass -File scripts/run_stack.ps1
 ```
 
-```bash
-python -m uvicorn src.api.app:app --port 8000
-```
+Open **http://localhost:8080**; stop with `scripts/run_stack.ps1 -Stop`. First load the results into the
+database once with `python -m src.db.seed --dataset cicids2017 --label-mode multiclass` (the stack script
+does this unless `-SkipSeed`). A single-process variant is `python -m uvicorn src.api.app:app --port 8000`.
 
-Open http://localhost:8000 for the dashboard. **Start live stream** replays the chronological stream
-through four models at once (ours, GNN naive, FFNN + EWC + replay, static XGBoost): per-window
-predictions, ADWIN drift flags, adaptations and periodic evaluation are written to the database, and the
-charts update as it runs. **Retrain now** forces an adaptation cycle (logged as a `manual` drift event).
-The "Task sequence" source shows the committed task-sequence results.
+The console has eight tabs; every panel is fed by result files or live API data (a missing experiment
+shows "not run yet", never a number):
 
-The API loads the checkpoints written by `run_continual` (first seed) from `cache/checkpoints/`.
-Without them `/predict` reports the models as unavailable; the live demo still works because it trains
-its own models from the cached graphs.
+| Tab | What it shows |
+|---|---|
+| Overview | headline KPIs, the "adapts / remembers" verdict table computed from results, attack timeline, architecture |
+| Live Stream | replays the stream through four models; ADWIN flags, adaptations, per-window counts, drift feed, speed control, forced retrain |
+| Graph Explorer | any window graph as an interactive force layout (zoom, hover, category filters) with a per-flow **model-error overlay** |
+| Model Comparison | any metric over tasks for all models with ±1 std bands, recall heatmaps, BWT, confusion matrix after any task |
+| Drift Analysis | ADWIN vs periodic vs oracle vs never: retrain cost vs final quality, error timelines |
+| Generalisation | leave-one-attack-out detection and the IP-remap leakage test |
+| Classify | run every model on a held-out window or on pasted/uploaded flows |
+| Reproducibility | λ sweep, tuning table, EWC stability ratios, run metadata |
+
+The live stream warm-starts from the task-1 checkpoints written by `run_continual` (first seed) in
+`cache/checkpoints/`; without them it trains task 1 itself first.
 
 ### Docker Compose (PostgreSQL + TimescaleDB)
 
@@ -185,10 +216,11 @@ Dashboard: http://localhost:8080 · API: http://localhost:8000/docs. Five contai
 are bind-mounted, so run the experiments on the host (GPU) first, or use
 `docker compose --profile reproduce run --rm experiments` (CPU, slow).
 
-> ⚠️ **The Docker/PostgreSQL path has not been executed.** Docker was not available on the development
-> machine. The compose file, Dockerfile, nginx config and the TimescaleDB hypertable setup in
-> `src/db/session.py` were written against the documented APIs, but only the SQLite path is tested.
-> Expect to fix small issues on first run.
+Verified on the development machine (Docker Desktop 29.8, Compose 5.5): all five containers start,
+TimescaleDB creates the five hypertables, and every endpoint works through nginx; that run found and fixed
+two bugs (prediction storage in the split deployment, demo start-up time). Docker needs WSL 2 and hardware
+virtualisation; on a 24 GB laptop the Docker VM competes with training for RAM, which is why the
+Docker-free stack above is the day-to-day option.
 
 ### API
 
@@ -203,6 +235,9 @@ are bind-mounted, so run the experiments on the host (GPU) first, or use
 | GET | `/graph/{window_id}` | node/edge summary of a window graph (node ids only, no IPs) |
 | GET | `/stream/windows` | per-window counts (Benign / Known attack / Novel-drifted) |
 | POST | `/demo/start`, `/demo/stop`; GET `/demo/status` | live stream control |
+| GET | `/windows/catalog` | every window with task, split and attack composition |
+| GET | `/graph/{window_id}?model=…` | adds per-edge misclassification counts for the chosen model |
+| GET | `/results/{index,continual,confusion,drift,loao,ip_remap,tuning,run_info,data_summary}` | read-only access to `results/` (404 if an experiment has not run) |
 
 All routes are also served under `/api/…`. Interactive docs: `/docs`.
 
@@ -265,11 +300,18 @@ category, 512 rows per step). v2 (k-hop neighbourhoods) was not needed: 10 windo
 memory easily.
 
 ### ADWIN (`src/drift/adwin_monitor.py`, `src/evaluation/stream.py`)
-One value per incoming window: the model's error rate on that window, assuming labels arrive with a delay
-(e.g. analyst triage); a label-free confidence signal is available via `drift.signal: confidence`. Only
-an *increase* flagged by ADWIN (δ = 0.002) triggers adaptation, with a 5-window refractory period.
-Decreases are logged but trigger nothing. An adaptation cycle trains on the last 20 windows with the
-model's own strategy (EWC + replay for ours), consolidates EWC, then resets ADWIN. No flag, no retraining.
+The monitored signal is each flow's 0/1 misclassification, assuming labels arrive with a delay (e.g.
+analyst triage); a label-free confidence signal is available via `drift.signal: confidence`. Every flow
+of a window is fed to ADWIN (δ = 0.002), and before the stream starts ADWIN is calibrated on held-out
+task-1 windows so it knows the normal error level. The direction of a change is read *at each detection*
+(river 0.26.1 resets the detector completely on the update after a detection). Only an increase triggers
+adaptation, with a 5-window refractory period; decreases are logged but trigger nothing. An adaptation
+cycle trains on the last 20 windows with the model's own strategy (EWC + replay for ours) and
+consolidates EWC. No flag, no retraining.
+
+Two earlier designs failed and are documented in `tests/test_drift.py`: one mean value per window gave
+ADWIN too few, too noisy samples to ever fire on the real stream; and deciding direction once per window
+mislabelled an attack burst that started and ended inside a window as a decrease.
 
 ### IP-leakage mitigations (brief §7)
 1. Inductive GraphSAGE, no node embeddings. 2. IPs never enter any feature tensor (unit-tested).
@@ -299,11 +341,111 @@ model's own strategy (EWC + replay for ours), consolidates EWC, then resets ADWI
 
 ## Results
 
-RESULTS_PLACEHOLDER
+All numbers below are copied from [`results/RESULTS.md`](results/RESULTS.md), which is generated from
+the result CSVs. CIC-IDS2017, test split, mean ± std over seeds 42/43/44, after the final task.
+
+### 1. The core claim (multiclass, 7 attack categories learned in sequence)
+
+| Model | Macro-F1 | Retention (task-1 recall) | FPR | BWT |
+|---|---|---|---|---|
+| XGBoost static (task 1 only) | 0.231 ± 0.000 | 1.000 | 0.00 % | 0.000 |
+| GNN naive retrain | 0.289 ± 0.017 | **0.000** | 0.45 % | −0.830 |
+| **GNN + EWC + replay (ours)** | **0.964 ± 0.020** | **1.000** | 0.07 % | −0.021 |
+| FFNN + EWC + replay (ablation) | 0.928 ± 0.020 | 1.000 | 0.04 % | −0.029 |
+| GNN + replay only | 0.948 ± 0.016 | 1.000 | 0.12 % | −0.040 |
+| GNN + EWC only | 0.300 ± 0.001 | 0.000 | 0.37 % | −0.828 |
+| GNN joint retrain (non-continual reference) | 0.951 ± 0.015 | 1.000 | 0.06 % | 0.031 |
+
+* **The expected pattern holds.** The static model never learns new attacks; naive retraining forgets the
+  first attack completely (retention 0 after the second task); our model learns every new category and
+  keeps retention 1.0, matching a model retrained on all data.
+* **Replay does the work, EWC does not.** Replay alone reaches 0.948; EWC alone is indistinguishable from
+  naive retraining (BWT −0.828 vs −0.830) at *every* λ in a separately tuned sweep. This is the known
+  weakness of EWC in class-incremental learning.
+* **The graph helps, modestly.** 0.964 vs 0.928 for the FFNN ablation on the same flows and features, a
+  gap of under two standard deviations. The FFNN has the lower false-positive rate (0.04 % vs 0.07 %).
+
+### 2. Binary mode (attack vs benign)
+
+Binary is domain-incremental (the "attack" class persists across tasks), and the picture changes:
+ours 0.9993 macro-F1, FFNN + EWC + replay 0.9991, and **GNN + EWC only reaches 0.9945 with retention 1.0**
+— EWC alone works in the setting it was designed for. GNN naive keeps 0.76 retention; FFNN naive collapses
+to 0.003. The static XGBoost detects only **1.3 %** of attack flows from categories it never saw.
+
+### 3. Drift-triggered adaptation (stream of tasks 2–7, seed 42)
+
+| Policy (our model) | Retrains | Final macro-F1 | Retention |
+|---|---|---|---|
+| ADWIN (drift-triggered) | 16 (46 flags) | 0.949 | 1.000 |
+| Periodic, every 25 windows | 8 | 0.967 | 1.000 |
+| Oracle (true task boundaries) | 6 | 0.952 | 1.000 |
+| Never adapt | 0 | **0.232** | 1.000 |
+
+Adapting is essential (0.95 vs 0.23), and ADWIN finds every task boundary without being told. But the
+brief's efficiency goal is **not** met on this stream: ADWIN retrained 16 times where a fixed schedule
+needed 8 and ended marginally lower. Attack bursts inside a task keep raising the error until the
+model has adapted to them.
+
+### 4. Unseen attacks (leave-one-attack-out, binary)
+
+Each model is trained once on six categories and tested on the seventh:
+
+| Held out | XGBoost | FFNN (per-flow) | GNN (graph) |
+|---|---|---|---|
+| DoS | 0.7 % | 3.0 % | **67.7 %** |
+| WebAttack | 0.0 % | 0.0 % | **54.2 %** |
+| Infiltration | 26.9 % | 49.3 % | **67.7 %** |
+| PortScan / DDoS | ≥ 98.8 % | ≥ 98.8 % | 100 % |
+| BruteForce / Botnet | 0 % | ≤ 0.8 % | 0 % |
+
+This is the strongest evidence for the graph: host-level structure lets it flag attack types it has never
+seen, where per-flow models see nothing. No model detects an unseen Botnet or BruteForce.
+
+### 5. IP leakage (brief §7)
+
+| Model | Normal | Hosts permuted | Sources randomised |
+|---|---|---|---|
+| GNN + EWC + replay | 0.950 | 0.950 | **0.427** |
+| FFNN + EWC + replay | 0.947 | 0.947 | 0.947 |
+
+Permuting host identities changes nothing (no IP memorisation). Randomising each flow's source, which
+destroys the "attacker = one hub" structure, cuts the GNN's macro-F1 from 0.950 to 0.427 and raises its
+FPR to 1.99 %. See the limitations.
+
+### 6. CSE-CIC-IDS2018
+
+RESULTS_2018_PLACEHOLDER
+
 
 ## Known limitations and honest caveats
 
-LIMITATIONS_PLACEHOLDER
+* **The GNN leans heavily on host topology.** When source hosts are randomised it falls to 0.427
+  macro-F1 while the per-flow FFNN is unaffected. On these lab datasets each attack comes from very few
+  hosts; a real network with many or spoofed attackers could look much more like the randomised case.
+  The graph's advantage (and its unseen-attack detection) should be read with this in mind.
+* **The graph advantage is small in-distribution.** 0.964 vs 0.928 macro-F1 (multiclass) and a tie in
+  binary mode; the FFNN has a lower false-positive rate.
+* **ADWIN over-triggers on this stream** (16 retrains vs 8 periodic, 6 oracle). The refractory period and
+  adaptation window were fixed a priori, not tuned; tuning them without a separate validation stream would
+  overfit the test stream.
+* **EWC's value is setting-dependent**: useless alone in class-incremental (multiclass), sufficient alone
+  in domain-incremental (binary). Replay is what makes the multiclass result work.
+* **Small test classes.** WebAttack has 24 test flows and Botnet 73 in CIC-IDS2017; per-category numbers
+  for them are noisy (one flow = 1–4 %).
+* **Validation selections are within noise.** The chosen λ = 10, γ = 0.9 beats neighbouring settings by
+  < 0.001 validation macro-F1, driven by a handful of WebAttack/Botnet flows; GNN training is not bit-exact
+  on CUDA (±0.01 between identical runs). Other λ in the flat region would give similar test results.
+* **CSE-CIC-IDS2018 is a 15 % label-agnostic flow sample, one seed, no joint references**, with
+  hyper-parameters reused from 2017 (compute budget).
+* **Delayed-label assumption.** Drift detection uses the model's error, so it assumes ground truth arrives
+  (e.g. from analysts) shortly after traffic; the label-free confidence signal is implemented but not evaluated.
+* **Labels, not payloads.** Layer 3/4 flow features only; "Infiltration" in CIC-IDS2017 is mostly the
+  victim's internal port scan, which explains most PortScan↔Infiltration confusion.
+* **Integrity review.** An adversarial review before the final runs found and fixed: label-dependent
+  benign thinning in 2018 (would have leaked labels into GNN test graphs), an ADWIN direction bug, duplicate
+  replay entries in drift adaptation, the EWC-only ablation inheriting another model's λ, and several
+  serving bugs. All affected experiments were re-run.
+
 
 ## Repository layout
 
@@ -318,7 +460,8 @@ src/drift/          ADWIN monitor
 src/evaluation/     metrics, task-sequence harness, streaming simulation
 src/db/             SQLAlchemy schema, session (SQLite/Timescale), seeding
 src/api/            FastAPI public app, ML service app, service layer + live demo
-dashboard/          Chart.js dashboard (served by FastAPI or nginx)
+dashboard/          8-tab console (Chart.js + d3-force; served by FastAPI, nginx or scripts/dashboard_server.py)
+scripts/            run_stack.ps1 (Docker-free five-layer stack), dashboard_server.py
 experiments/        every script that produces a reported number
 results/            committed CSV/JSON/PNG outputs + RESULTS.md
 tests/              pytest suite (synthetic fixtures only)
