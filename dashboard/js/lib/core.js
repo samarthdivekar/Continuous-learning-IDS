@@ -43,6 +43,7 @@ export const MODELS = {
   ffnn_naive:      { label: "FFNN naive retrain",        short: "FFNN naive", var: "--m-ffnn-naive" },
   gnn_ewc:         { label: "GNN + EWC only",            short: "GNN EWC", var: "--m-gnn-ewc" },
   gnn_replay:      { label: "GNN + replay only",         short: "GNN replay", var: "--m-gnn-replay" },
+  gnn_ewc_replay_topo: { label: "Ours + topology augmentation", short: "Ours+topo", var: "--m-ours-topo" },
   gnn_joint:       { label: "GNN joint (upper bound)",   short: "GNN joint", var: "--m-joint", dashed: true },
   ffnn_joint:      { label: "FFNN joint (upper bound)",  short: "FFNN joint", var: "--muted", dashed: true },
 };
