@@ -369,7 +369,8 @@ the result CSVs. CIC-IDS2017, test split, mean ± std over seeds 42/43/44, after
 
 Binary is domain-incremental (the "attack" class persists across tasks), and the picture changes:
 ours 0.9993 macro-F1, FFNN + EWC + replay 0.9991, and **GNN + EWC only reaches 0.9945 with retention 1.0**
-— EWC alone works in the setting it was designed for. GNN naive keeps 0.76 retention; FFNN naive collapses
+— on CIC-IDS2017, EWC alone works in the setting it was designed for (this did **not** replicate on
+CSE-CIC-IDS2018, see §6). GNN naive keeps 0.76 retention; FFNN naive collapses
 to 0.003. The static XGBoost detects only **1.3 %** of attack flows from categories it never saw.
 
 ### 3. Drift-triggered adaptation (stream of tasks 2–7, seed 42)
@@ -414,8 +415,75 @@ FPR to 1.99 %. See the limitations.
 
 ### 6. CSE-CIC-IDS2018
 
-RESULTS_2018_PLACEHOLDER
+CSE-CIC-IDS2018: 6 tasks (BruteForce → DoS → DDoS → WebAttack → Infiltration → Botnet), 15 % label-agnostic
+flow sample, **one seed (42)**, hyper-parameters reused from CIC-IDS2017, no joint-retraining references.
 
+**Multiclass task sequence**
+
+| Model | Macro-F1 | Retention | FPR | BWT |
+|---|---|---|---|---|
+| XGBoost static | 0.282 | 1.000 | 0.00 % | 0.000 |
+| GNN naive retrain | 0.280 | 0.000 | 0.50 % | -0.998 |
+| **GNN + EWC + replay (ours)** | 0.855 | 1.000 | 0.51 % | -0.032 |
+| FFNN + EWC + replay (ablation) | 0.850 | 1.000 | 0.07 % | -0.028 |
+| GNN + replay only | 0.872 | 1.000 | 0.51 % | -0.041 |
+| GNN + EWC only | 0.286 | 0.000 | 0.00 % | -0.831 |
+| FFNN naive retrain | 0.282 | 0.000 | 0.00 % | -0.970 |
+
+**Binary task sequence**
+
+| Model | Macro-F1 | Retention | Detection | FPR |
+|---|---|---|---|---|
+| XGBoost static | 0.5136 | 1.000 | 2.8 % | 0.00 % |
+| GNN naive retrain | 0.5297 | 0.000 | 4.5 % | 0.00 % |
+| **GNN + EWC + replay (ours)** | 0.9765 | 1.000 | 100.0 % | 0.53 % |
+| FFNN + EWC + replay (ablation) | 0.9954 | 1.000 | 99.9 % | 0.10 % |
+| GNN + replay only | 0.9771 | 1.000 | 99.9 % | 0.51 % |
+| GNN + EWC only | 0.5393 | 0.000 | 5.5 % | 0.00 % |
+| FFNN naive retrain | 0.5263 | 0.000 | 4.1 % | 0.00 % |
+
+**Drift-triggered adaptation** (stream of tasks 2–6)
+
+| Model / policy | Drift flags | Retrains | Final macro-F1 | Retention |
+|---|---|---|---|---|
+| GNN + EWC + replay (ours) / adwin | 50 | 24 | 0.943 | 1.000 |
+| GNN + EWC + replay (ours) / periodic | 0 | 48 | 0.825 | 1.000 |
+| GNN + EWC + replay (ours) / oracle | 0 | 5 | 0.999 | 1.000 |
+| GNN + EWC + replay (ours) / never | 0 | 0 | 0.155 | 1.000 |
+| GNN naive retrain / adwin | 39 | 20 | 0.281 | 0.000 |
+| FFNN + EWC + replay (ablation) / adwin | 63 | 33 | 0.801 | 1.000 |
+| XGBoost static / never | 0 | 0 | 0.282 | 1.000 |
+
+**IP-remap** (macro-F1 of the same trained model)
+
+| Model | Normal | Hosts permuted | Sources randomised |
+|---|---|---|---|
+| GNN + EWC + replay (ours) | 0.948 | 0.948 | 0.754 |
+| GNN naive retrain | 0.281 | 0.281 | 0.277 |
+| FFNN + EWC + replay (ablation) | 0.850 | 0.850 | 0.850 |
+
+**What 2018 confirms, and what it does not.**
+
+* **Forgetting prevention replicates.** Every replay-based model keeps retention 1.0; naive retraining,
+  FFNN naive and EWC-only drop to 0 (BWT −0.83 to −1.00), exactly as on CIC-IDS2017.
+* **EWC alone fails in both label modes here.** On 2017 binary, EWC-only reached 0.9945; on 2018 binary it
+  scores 0.539 with retention 0. The 2017 binary result does not replicate, so replay, not EWC, is the
+  component that reliably prevents forgetting.
+* **ADWIN pays off on this stream.** 24 drift-triggered retrains beat a periodic schedule (48 retrains,
+  0.825) on both cost and quality (0.943), and the model without adaptation collapses to 0.155. On
+  CIC-IDS2017 the same detector over-triggered (16 vs 8 periodic). The efficiency claim therefore holds
+  on one dataset and not the other.
+* **GNN vs FFNN is inconclusive on 2018.** Single-seed results tie in multiclass (0.855 vs 0.850) and favour
+  the FFNN in binary (0.995 vs 0.977) with a lower false-positive rate.
+* **The GNN is unstable on Infiltration.** The IP-remap experiment re-trains the identical configuration
+  (same seed, same data). Its "normal" column scores **0.948** where the task-sequence run scored **0.855**.
+  The whole gap is one class: the task-sequence run flagged **9,196** benign flows as Infiltration
+  (FPR 0.51 %), the IP-remap run **3** (FPR 0.0014 %), with the same ~97–99 % Infiltration recall. Nothing
+  differs between the runs except CUDA's non-deterministic scatter operations, so the GNN's decision
+  boundary between benign traffic and the NMAP-style Infiltration traffic is fragile. Single-seed 2018
+  numbers for the GNN should be read as one draw from a wide distribution.
+* **Topology dependence replicates, less severely.** Randomising source hosts drops the GNN from 0.948 to
+  0.754 (2017: 0.950 → 0.427) while the FFNN is unaffected; host permutation changes nothing.
 
 ## Known limitations and honest caveats
 
@@ -423,13 +491,21 @@ RESULTS_2018_PLACEHOLDER
   macro-F1 while the per-flow FFNN is unaffected. On these lab datasets each attack comes from very few
   hosts; a real network with many or spoofed attackers could look much more like the randomised case.
   The graph's advantage (and its unseen-attack detection) should be read with this in mind.
-* **The graph advantage is small in-distribution.** 0.964 vs 0.928 macro-F1 (multiclass) and a tie in
-  binary mode; the FFNN has a lower false-positive rate.
-* **ADWIN over-triggers on this stream** (16 retrains vs 8 periodic, 6 oracle). The refractory period and
-  adaptation window were fixed a priori, not tuned; tuning them without a separate validation stream would
-  overfit the test stream.
-* **EWC's value is setting-dependent**: useless alone in class-incremental (multiclass), sufficient alone
-  in domain-incremental (binary). Replay is what makes the multiclass result work.
+* **The graph advantage is small in-distribution and does not replicate on 2018.** 0.964 vs 0.928
+  macro-F1 on CIC-IDS2017 multiclass; a tie in 2017 binary; a tie (0.855 vs 0.850) in 2018 multiclass and
+  the FFNN ahead in 2018 binary (0.995 vs 0.977). The FFNN has the lower false-positive rate throughout.
+  The GNN's clearest advantage is detecting *unseen* attack types (§4).
+* **The GNN is unstable on 2018 Infiltration.** Two runs of the identical configuration differ by 0.09
+  macro-F1 because one flags 9,196 benign flows as Infiltration and the other 3 (§6). CUDA scatter
+  non-determinism is enough to tip it; 2018 was run with one seed, so its GNN numbers carry that
+  uncertainty. More seeds on 2018 are the first thing to add.
+* **ADWIN's efficiency is dataset-dependent.** On CIC-IDS2017 it over-triggers (16 retrains vs 8 periodic,
+  6 oracle, with slightly lower quality); on CSE-CIC-IDS2018 it beats the periodic schedule on both cost
+  and quality (24 vs 48 retrains, 0.943 vs 0.825). The refractory period and adaptation window were fixed
+  a priori, not tuned; tuning them without a separate validation stream would overfit the test stream.
+* **EWC alone is not reliable.** It fails in class-incremental (multiclass) on both datasets; in
+  domain-incremental (binary) it worked on CIC-IDS2017 but failed on CSE-CIC-IDS2018. Replay is the
+  component that consistently prevents forgetting; EWC adds little on top of it.
 * **Small test classes.** WebAttack has 24 test flows and Botnet 73 in CIC-IDS2017; per-category numbers
   for them are noisy (one flow = 1–4 %).
 * **Validation selections are within noise.** The chosen λ = 10, γ = 0.9 beats neighbouring settings by
