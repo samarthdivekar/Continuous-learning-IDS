@@ -523,8 +523,18 @@ After each task, the next task's attack category is still unknown. The detector 
 | CIC-IDS2017 | GNN + EWC + replay (ours) | energy | 0.875 | 0.644–0.998 (n=6) |
 | CIC-IDS2017 | GNN + EWC + replay (ours) | msp | 0.766 | 0.423–0.999 (n=6) |
 | CIC-IDS2017 | GNN + EWC + replay (ours) | prototype | 0.749 | 0.177–0.997 (n=6) |
+| CSE-CIC-IDS2018 | FFNN + EWC + replay | energy | 0.678 | 0.055–0.948 (n=5) |
+| CSE-CIC-IDS2018 | FFNN + EWC + replay | msp | 0.627 | 0.486–0.996 (n=5) |
+| CSE-CIC-IDS2018 | FFNN + EWC + replay | prototype | 0.780 | 0.460–1.000 (n=5) |
+| CSE-CIC-IDS2018 | GNN + EWC + replay (ours) | energy | 0.842 | 0.271–0.999 (n=5) |
+| CSE-CIC-IDS2018 | GNN + EWC + replay (ours) | msp | 0.834 | 0.477–0.997 (n=5) |
+| CSE-CIC-IDS2018 | GNN + EWC + replay (ours) | prototype | 0.950 | 0.842–1.000 (n=5) |
 
-Flows flagged as novel are clustered (k chosen by silhouette) to propose a new category. On CIC-IDS2017 the largest GNN cluster is the true new attack for DoS (87 % pure), Infiltration (97 % pure), DDoS (100 % pure). For WebAttack, Botnet, PortScan the largest cluster is benign traffic, so the novelty signal there was mostly false alarms.
+On CIC-IDS2017, clustering the flows flagged as novel (k chosen by silhouette) proposes the true new attack as the largest GNN cluster for DoS (87 % pure), Infiltration (97 % pure), DDoS (100 % pure). For WebAttack, Botnet, PortScan the largest cluster is benign traffic, so the novelty signal there was mostly false alarms.
+
+On CSE-CIC-IDS2018, clustering the flows flagged as novel (k chosen by silhouette) proposes the true new attack as the largest GNN cluster for DoS (100 % pure), DDoS (100 % pure). For WebAttack, Infiltration, Botnet the largest cluster is benign traffic, so the novelty signal there was mostly false alarms.
+
+The GNN's advantage holds on CSE-CIC-IDS2018 for all three scores. The exception is unseen **Infiltration**, which both models score as *less* novel than known traffic (energy AUROC 0.27 for the GNN, 0.06 for the FFNN). That traffic resembles benign traffic, and no score here would flag it.
 
 **Does it know when not to decide?** (class-conditional conformal prediction)
 The model abstains, handing the flow to an analyst, when its conformal prediction set is not a single class. Thresholds are calibrated per class on validation windows.
@@ -562,6 +572,22 @@ Flagged flows of the same predicted category are joined into connected attacker/
 
 On CIC-IDS2017, about 100,000 flow alerts reduce to 50 incidents for the GNN. The budget does not change the GNN's numbers: its false alarms are confident enough to survive every threshold, which is consistent with the conformal result above. For the FFNN the budget matters, taking it from 106 incidents at 54 % precision to 51 at 98 %.
 
+**Will analysts drown in alerts?** (alert → incident grouping, CSE-CIC-IDS2018 test windows)
+Flagged flows of the same predicted category are joined into connected attacker/victim components. The false-alarm budget raises the confidence threshold until the validation false-positive rate fits the budget.
+
+| Model | Budget | Flow alerts | Incidents | Real incidents | Attack traffic inside real incidents |
+|---|---|---|---|---|---|
+| GNN + EWC + replay (ours) | 0 | 112,315 | 105 | 81 % | 99.9 % |
+| GNN + EWC + replay (ours) | 0.001 | 104,977 | 90 | 94 % | 99.8 % |
+| GNN + EWC + replay (ours) | 0.0001 | 104,235 | 89 | 96 % | 99.8 % |
+| GNN + EWC + replay (ours) | 1e-05 | 104,235 | 89 | 96 % | 99.8 % |
+| FFNN + EWC + replay | 0 | 104,429 | 834 | 12 % | 100.0 % |
+| FFNN + EWC + replay | 0.001 | 104,429 | 834 | 12 % | 100.0 % |
+| FFNN + EWC + replay | 0.0001 | 103,277 | 215 | 44 % | 99.9 % |
+| FFNN + EWC + replay | 1e-05 | 102,054 | 102 | 92 % | 98.9 % |
+
+On CSE-CIC-IDS2018 the budget helps both models. The GNN goes from 105 incidents at 81 % precision to 89 at 96 %, and the FFNN from 834 incidents at 12 % to 102 at 92 %. Without a budget, the FFNN's scattered false alarms would give an analyst 738 false incidents to dismiss.
+
 **Can the GNN be made less dependent on host identity?** (topology augmentation, CIC-IDS2017, seed 42; 3-seed confirmation pending)
 During training, with probability 0.5 per window, every flow's source is reassigned to a random host from a pool of 65,536. This is the same perturbation as the `random_src` test. Macro-F1 after the last task:
 
@@ -570,6 +596,21 @@ During training, with probability 0.5 per window, every flow's source is reassig
 | GNN + EWC + replay (ours) | 0.950 | 0.950 | 0.427 |
 | … + topology augmentation | 0.969 | 0.969 | 0.914 |
 | FFNN + EWC + replay | 0.947 | 0.947 | 0.947 |
+
+**Can it adapt safely on a small label budget?** (CIC-IDS2017, drift stream as in §3)
+
+| Variant | Updates | Rolled back | Labels used | Final macro-F1 | FPR |
+|---|---|---|---|---|---|
+| ADWIN, all labels (baseline, §3) | 16 | – | all | 0.949 | 0.026 % |
+| ADWIN + safety gate (snapshot / rollback) | 16 | 1 | all | 0.962 | 0.086 % |
+| ADWIN + 100 actively chosen labels per update | 20 | 0 | 2,000 | 0.438 | 0.049 % |
+| ADWIN + 20 actively chosen labels per update | 23 | 0 | 460 | 0.283 | 0.001 % |
+| confidence-based trigger (no labels) + 100 labels per update | 2 | 0 | 200 | 0.338 | 0.066 % |
+
+What this shows (single seed):
+* **The safety gate works as a guard.** It rejected and rolled back an update that raised the validation false-positive rate. Final quality is similar to the ungated stream, so the gate costs little. It is not a quality improvement.
+* **Pure uncertainty sampling is not enough.** With 100 or 20 labels per update, chosen as the flows with the smallest top-2 margin, final macro-F1 collapses although detection stays high. A new attack that the model confidently assigns to an old category is never among the uncertain flows, so it is never labelled and never learned.
+* **A label-free trigger misses most drift.** Monitoring prediction confidence instead of error fired on very few windows, because the model stays confident when it meets new attacks. Delayed labels, even a few, remain necessary to *detect* drift.
 
 **Explanations and response.** For any flagged flow, `GET /explain/{window}/{edge}` returns a gradient × input attribution over the flow's own features and the share of evidence that came from neighbouring flows. It also reports structural facts (fan-out, fan-in, distinct target ports) and a one-paragraph summary generated by rules, with no language model. `GET /incidents/{window}` groups alerts and proposes a containment action (block source, rate-limit to victim, or isolate host) with the exact iptables / Windows Firewall rule. `POST /actions/{id}/decision` records an analyst's approve / reject. **Nothing is ever executed:** approval is stored as a dry run. The *Incident queue* tab of the console is built on these endpoints.
 

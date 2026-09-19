@@ -1,0 +1,2 @@
+model,policy,stream_windows,retrains,true_task_boundaries,drift_flags,final_accuracy_seen,final_macro_f1_seen,final_retention_rate,final_fpr_seen,mean_stream_error,rollbacks,labels_used,label_budget
+gnn_ewc_replay,adwin,200,2,5,4,0.8087615049094018,0.33813986308848176,1.0,0.0006603060374938993,0.34694699999999995,0,200,100

@@ -1,0 +1,1018 @@
+{
+  "gnn_ewc_replay@0.0": [
+    {
+      "category": "DoS",
+      "category_id": 2,
+      "n_flows": 4714,
+      "n_sources": 1,
+      "n_destinations": 1,
+      "key_host": "18.219.193.20",
+      "key_role": "source",
+      "key_host_flows": 4714,
+      "mean_confidence": 1.0,
+      "severity": 8.458504195067558,
+      "true_attack_share": 1.0,
+      "incident_id": 1,
+      "window_id": 466,
+      "proposed": {
+        "action": "block_source",
+        "target": "18.219.193.20",
+        "rationale": "18.219.193.20 originated 4714 flagged DoS flows to 1 host(s); block it at the perimeter pending investigation.",
+        "rules": {
+          "linux": "iptables -I INPUT -s 18.219.193.20 -j DROP",
+          "windows": "New-NetFirewallRule -DisplayName \"GNN-IDS block 18.219.193.20\" -Direction Inbound -RemoteAddress 18.219.193.20 -Action Block"
+        },
+        "dry_run": true
+      }
+    },
+    {
+      "category": "DoS",
+      "category_id": 2,
+      "n_flows": 4682,
+      "n_sources": 1,
+      "n_destinations": 1,
+      "key_host": "18.219.193.20",
+      "key_role": "source",
+      "key_host_flows": 4682,
+      "mean_confidence": 1.0,
+      "severity": 8.451694209183541,
+      "true_attack_share": 1.0,
+      "incident_id": 1,
+      "window_id": 460,
+      "proposed": {
+        "action": "block_source",
+        "target": "18.219.193.20",
+        "rationale": "18.219.193.20 originated 4682 flagged DoS flows to 1 host(s); block it at the perimeter pending investigation.",
+        "rules": {
+          "linux": "iptables -I INPUT -s 18.219.193.20 -j DROP",
+          "windows": "New-NetFirewallRule -DisplayName \"GNN-IDS block 18.219.193.20\" -Direction Inbound -RemoteAddress 18.219.193.20 -Action Block"
+        },
+        "dry_run": true
+      }
+    },
+    {
+      "category": "DoS",
+      "category_id": 2,
+      "n_flows": 4668,
+      "n_sources": 1,
+      "n_destinations": 1,
+      "key_host": "18.219.193.20",
+      "key_role": "source",
+      "key_host_flows": 4668,
+      "mean_confidence": 1.0,
+      "severity": 8.448700194970938,
+      "true_attack_share": 1.0,
+      "incident_id": 1,
+      "window_id": 446,
+      "proposed": {
+        "action": "block_source",
+        "target": "18.219.193.20",
+        "rationale": "18.219.193.20 originated 4668 flagged DoS flows to 1 host(s); block it at the perimeter pending investigation.",
+        "rules": {
+          "linux": "iptables -I INPUT -s 18.219.193.20 -j DROP",
+          "windows": "New-NetFirewallRule -DisplayName \"GNN-IDS block 18.219.193.20\" -Direction Inbound -RemoteAddress 18.219.193.20 -Action Block"
+        },
+        "dry_run": true
+      }
+    },
+    {
+      "category": "DoS",
+      "category_id": 2,
+      "n_flows": 4657,
+      "n_sources": 1,
+      "n_destinations": 1,
+      "key_host": "18.219.193.20",
+      "key_role": "source",
+      "key_host_flows": 4657,
+      "mean_confidence": 1.0,
+      "severity": 8.446341450444287,
+      "true_attack_share": 1.0,
+      "incident_id": 1,
+      "window_id": 440,
+      "proposed": {
+        "action": "block_source",
+        "target": "18.219.193.20",
+        "rationale": "18.219.193.20 originated 4657 flagged DoS flows to 1 host(s); block it at the perimeter pending investigation.",
+        "rules": {
+          "linux": "iptables -I INPUT -s 18.219.193.20 -j DROP",
+          "windows": "New-NetFirewallRule -DisplayName \"GNN-IDS block 18.219.193.20\" -Direction Inbound -RemoteAddress 18.219.193.20 -Action Block"
+        },
+        "dry_run": true
+      }
+    },
+    {
+      "category": "DoS",
+      "category_id": 2,
+      "n_flows": 4651,
+      "n_sources": 1,
+      "n_destinations": 1,
+      "key_host": "18.219.193.20",
+      "key_role": "source",
+      "key_host_flows": 4651,
+      "mean_confidence": 1.0,
+      "severity": 8.445052513638554,
+      "true_attack_share": 1.0,
+      "incident_id": 1,
+      "window_id": 476,
+      "proposed": {
+        "action": "block_source",
+        "target": "18.219.193.20",
+        "rationale": "18.219.193.20 originated 4651 flagged DoS flows to 1 host(s); block it at the perimeter pending investigation.",
+        "rules": {
+          "linux": "iptables -I INPUT -s 18.219.193.20 -j DROP",
+          "windows": "New-NetFirewallRule -DisplayName \"GNN-IDS block 18.219.193.20\" -Direction Inbound -RemoteAddress 18.219.193.20 -Action Block"
+        },
+        "dry_run": true
+      }
+    }
+  ],
+  "gnn_ewc_replay@0.001": [
+    {
+      "category": "DoS",
+      "category_id": 2,
+      "n_flows": 4714,
+      "n_sources": 1,
+      "n_destinations": 1,
+      "key_host": "18.219.193.20",
+      "key_role": "source",
+      "key_host_flows": 4714,
+      "mean_confidence": 1.0,
+      "severity": 8.458504195067558,
+      "true_attack_share": 1.0,
+      "incident_id": 1,
+      "window_id": 466,
+      "proposed": {
+        "action": "block_source",
+        "target": "18.219.193.20",
+        "rationale": "18.219.193.20 originated 4714 flagged DoS flows to 1 host(s); block it at the perimeter pending investigation.",
+        "rules": {
+          "linux": "iptables -I INPUT -s 18.219.193.20 -j DROP",
+          "windows": "New-NetFirewallRule -DisplayName \"GNN-IDS block 18.219.193.20\" -Direction Inbound -RemoteAddress 18.219.193.20 -Action Block"
+        },
+        "dry_run": true
+      }
+    },
+    {
+      "category": "DoS",
+      "category_id": 2,
+      "n_flows": 4682,
+      "n_sources": 1,
+      "n_destinations": 1,
+      "key_host": "18.219.193.20",
+      "key_role": "source",
+      "key_host_flows": 4682,
+      "mean_confidence": 1.0,
+      "severity": 8.451694209183541,
+      "true_attack_share": 1.0,
+      "incident_id": 1,
+      "window_id": 460,
+      "proposed": {
+        "action": "block_source",
+        "target": "18.219.193.20",
+        "rationale": "18.219.193.20 originated 4682 flagged DoS flows to 1 host(s); block it at the perimeter pending investigation.",
+        "rules": {
+          "linux": "iptables -I INPUT -s 18.219.193.20 -j DROP",
+          "windows": "New-NetFirewallRule -DisplayName \"GNN-IDS block 18.219.193.20\" -Direction Inbound -RemoteAddress 18.219.193.20 -Action Block"
+        },
+        "dry_run": true
+      }
+    },
+    {
+      "category": "DoS",
+      "category_id": 2,
+      "n_flows": 4668,
+      "n_sources": 1,
+      "n_destinations": 1,
+      "key_host": "18.219.193.20",
+      "key_role": "source",
+      "key_host_flows": 4668,
+      "mean_confidence": 1.0,
+      "severity": 8.448700194970938,
+      "true_attack_share": 1.0,
+      "incident_id": 1,
+      "window_id": 446,
+      "proposed": {
+        "action": "block_source",
+        "target": "18.219.193.20",
+        "rationale": "18.219.193.20 originated 4668 flagged DoS flows to 1 host(s); block it at the perimeter pending investigation.",
+        "rules": {
+          "linux": "iptables -I INPUT -s 18.219.193.20 -j DROP",
+          "windows": "New-NetFirewallRule -DisplayName \"GNN-IDS block 18.219.193.20\" -Direction Inbound -RemoteAddress 18.219.193.20 -Action Block"
+        },
+        "dry_run": true
+      }
+    },
+    {
+      "category": "DoS",
+      "category_id": 2,
+      "n_flows": 4657,
+      "n_sources": 1,
+      "n_destinations": 1,
+      "key_host": "18.219.193.20",
+      "key_role": "source",
+      "key_host_flows": 4657,
+      "mean_confidence": 1.0,
+      "severity": 8.446341450444287,
+      "true_attack_share": 1.0,
+      "incident_id": 1,
+      "window_id": 440,
+      "proposed": {
+        "action": "block_source",
+        "target": "18.219.193.20",
+        "rationale": "18.219.193.20 originated 4657 flagged DoS flows to 1 host(s); block it at the perimeter pending investigation.",
+        "rules": {
+          "linux": "iptables -I INPUT -s 18.219.193.20 -j DROP",
+          "windows": "New-NetFirewallRule -DisplayName \"GNN-IDS block 18.219.193.20\" -Direction Inbound -RemoteAddress 18.219.193.20 -Action Block"
+        },
+        "dry_run": true
+      }
+    },
+    {
+      "category": "DoS",
+      "category_id": 2,
+      "n_flows": 4651,
+      "n_sources": 1,
+      "n_destinations": 1,
+      "key_host": "18.219.193.20",
+      "key_role": "source",
+      "key_host_flows": 4651,
+      "mean_confidence": 1.0,
+      "severity": 8.445052513638554,
+      "true_attack_share": 1.0,
+      "incident_id": 1,
+      "window_id": 476,
+      "proposed": {
+        "action": "block_source",
+        "target": "18.219.193.20",
+        "rationale": "18.219.193.20 originated 4651 flagged DoS flows to 1 host(s); block it at the perimeter pending investigation.",
+        "rules": {
+          "linux": "iptables -I INPUT -s 18.219.193.20 -j DROP",
+          "windows": "New-NetFirewallRule -DisplayName \"GNN-IDS block 18.219.193.20\" -Direction Inbound -RemoteAddress 18.219.193.20 -Action Block"
+        },
+        "dry_run": true
+      }
+    }
+  ],
+  "gnn_ewc_replay@0.0001": [
+    {
+      "category": "DoS",
+      "category_id": 2,
+      "n_flows": 4714,
+      "n_sources": 1,
+      "n_destinations": 1,
+      "key_host": "18.219.193.20",
+      "key_role": "source",
+      "key_host_flows": 4714,
+      "mean_confidence": 1.0,
+      "severity": 8.458504195067558,
+      "true_attack_share": 1.0,
+      "incident_id": 1,
+      "window_id": 466,
+      "proposed": {
+        "action": "block_source",
+        "target": "18.219.193.20",
+        "rationale": "18.219.193.20 originated 4714 flagged DoS flows to 1 host(s); block it at the perimeter pending investigation.",
+        "rules": {
+          "linux": "iptables -I INPUT -s 18.219.193.20 -j DROP",
+          "windows": "New-NetFirewallRule -DisplayName \"GNN-IDS block 18.219.193.20\" -Direction Inbound -RemoteAddress 18.219.193.20 -Action Block"
+        },
+        "dry_run": true
+      }
+    },
+    {
+      "category": "DoS",
+      "category_id": 2,
+      "n_flows": 4682,
+      "n_sources": 1,
+      "n_destinations": 1,
+      "key_host": "18.219.193.20",
+      "key_role": "source",
+      "key_host_flows": 4682,
+      "mean_confidence": 1.0,
+      "severity": 8.451694209183541,
+      "true_attack_share": 1.0,
+      "incident_id": 1,
+      "window_id": 460,
+      "proposed": {
+        "action": "block_source",
+        "target": "18.219.193.20",
+        "rationale": "18.219.193.20 originated 4682 flagged DoS flows to 1 host(s); block it at the perimeter pending investigation.",
+        "rules": {
+          "linux": "iptables -I INPUT -s 18.219.193.20 -j DROP",
+          "windows": "New-NetFirewallRule -DisplayName \"GNN-IDS block 18.219.193.20\" -Direction Inbound -RemoteAddress 18.219.193.20 -Action Block"
+        },
+        "dry_run": true
+      }
+    },
+    {
+      "category": "DoS",
+      "category_id": 2,
+      "n_flows": 4668,
+      "n_sources": 1,
+      "n_destinations": 1,
+      "key_host": "18.219.193.20",
+      "key_role": "source",
+      "key_host_flows": 4668,
+      "mean_confidence": 1.0,
+      "severity": 8.448700194970938,
+      "true_attack_share": 1.0,
+      "incident_id": 1,
+      "window_id": 446,
+      "proposed": {
+        "action": "block_source",
+        "target": "18.219.193.20",
+        "rationale": "18.219.193.20 originated 4668 flagged DoS flows to 1 host(s); block it at the perimeter pending investigation.",
+        "rules": {
+          "linux": "iptables -I INPUT -s 18.219.193.20 -j DROP",
+          "windows": "New-NetFirewallRule -DisplayName \"GNN-IDS block 18.219.193.20\" -Direction Inbound -RemoteAddress 18.219.193.20 -Action Block"
+        },
+        "dry_run": true
+      }
+    },
+    {
+      "category": "DoS",
+      "category_id": 2,
+      "n_flows": 4657,
+      "n_sources": 1,
+      "n_destinations": 1,
+      "key_host": "18.219.193.20",
+      "key_role": "source",
+      "key_host_flows": 4657,
+      "mean_confidence": 1.0,
+      "severity": 8.446341450444287,
+      "true_attack_share": 1.0,
+      "incident_id": 1,
+      "window_id": 440,
+      "proposed": {
+        "action": "block_source",
+        "target": "18.219.193.20",
+        "rationale": "18.219.193.20 originated 4657 flagged DoS flows to 1 host(s); block it at the perimeter pending investigation.",
+        "rules": {
+          "linux": "iptables -I INPUT -s 18.219.193.20 -j DROP",
+          "windows": "New-NetFirewallRule -DisplayName \"GNN-IDS block 18.219.193.20\" -Direction Inbound -RemoteAddress 18.219.193.20 -Action Block"
+        },
+        "dry_run": true
+      }
+    },
+    {
+      "category": "DoS",
+      "category_id": 2,
+      "n_flows": 4651,
+      "n_sources": 1,
+      "n_destinations": 1,
+      "key_host": "18.219.193.20",
+      "key_role": "source",
+      "key_host_flows": 4651,
+      "mean_confidence": 1.0,
+      "severity": 8.445052513638554,
+      "true_attack_share": 1.0,
+      "incident_id": 1,
+      "window_id": 476,
+      "proposed": {
+        "action": "block_source",
+        "target": "18.219.193.20",
+        "rationale": "18.219.193.20 originated 4651 flagged DoS flows to 1 host(s); block it at the perimeter pending investigation.",
+        "rules": {
+          "linux": "iptables -I INPUT -s 18.219.193.20 -j DROP",
+          "windows": "New-NetFirewallRule -DisplayName \"GNN-IDS block 18.219.193.20\" -Direction Inbound -RemoteAddress 18.219.193.20 -Action Block"
+        },
+        "dry_run": true
+      }
+    }
+  ],
+  "gnn_ewc_replay@1e-05": [
+    {
+      "category": "DoS",
+      "category_id": 2,
+      "n_flows": 4714,
+      "n_sources": 1,
+      "n_destinations": 1,
+      "key_host": "18.219.193.20",
+      "key_role": "source",
+      "key_host_flows": 4714,
+      "mean_confidence": 1.0,
+      "severity": 8.458504195067558,
+      "true_attack_share": 1.0,
+      "incident_id": 1,
+      "window_id": 466,
+      "proposed": {
+        "action": "block_source",
+        "target": "18.219.193.20",
+        "rationale": "18.219.193.20 originated 4714 flagged DoS flows to 1 host(s); block it at the perimeter pending investigation.",
+        "rules": {
+          "linux": "iptables -I INPUT -s 18.219.193.20 -j DROP",
+          "windows": "New-NetFirewallRule -DisplayName \"GNN-IDS block 18.219.193.20\" -Direction Inbound -RemoteAddress 18.219.193.20 -Action Block"
+        },
+        "dry_run": true
+      }
+    },
+    {
+      "category": "DoS",
+      "category_id": 2,
+      "n_flows": 4682,
+      "n_sources": 1,
+      "n_destinations": 1,
+      "key_host": "18.219.193.20",
+      "key_role": "source",
+      "key_host_flows": 4682,
+      "mean_confidence": 1.0,
+      "severity": 8.451694209183541,
+      "true_attack_share": 1.0,
+      "incident_id": 1,
+      "window_id": 460,
+      "proposed": {
+        "action": "block_source",
+        "target": "18.219.193.20",
+        "rationale": "18.219.193.20 originated 4682 flagged DoS flows to 1 host(s); block it at the perimeter pending investigation.",
+        "rules": {
+          "linux": "iptables -I INPUT -s 18.219.193.20 -j DROP",
+          "windows": "New-NetFirewallRule -DisplayName \"GNN-IDS block 18.219.193.20\" -Direction Inbound -RemoteAddress 18.219.193.20 -Action Block"
+        },
+        "dry_run": true
+      }
+    },
+    {
+      "category": "DoS",
+      "category_id": 2,
+      "n_flows": 4668,
+      "n_sources": 1,
+      "n_destinations": 1,
+      "key_host": "18.219.193.20",
+      "key_role": "source",
+      "key_host_flows": 4668,
+      "mean_confidence": 1.0,
+      "severity": 8.448700194970938,
+      "true_attack_share": 1.0,
+      "incident_id": 1,
+      "window_id": 446,
+      "proposed": {
+        "action": "block_source",
+        "target": "18.219.193.20",
+        "rationale": "18.219.193.20 originated 4668 flagged DoS flows to 1 host(s); block it at the perimeter pending investigation.",
+        "rules": {
+          "linux": "iptables -I INPUT -s 18.219.193.20 -j DROP",
+          "windows": "New-NetFirewallRule -DisplayName \"GNN-IDS block 18.219.193.20\" -Direction Inbound -RemoteAddress 18.219.193.20 -Action Block"
+        },
+        "dry_run": true
+      }
+    },
+    {
+      "category": "DoS",
+      "category_id": 2,
+      "n_flows": 4657,
+      "n_sources": 1,
+      "n_destinations": 1,
+      "key_host": "18.219.193.20",
+      "key_role": "source",
+      "key_host_flows": 4657,
+      "mean_confidence": 1.0,
+      "severity": 8.446341450444287,
+      "true_attack_share": 1.0,
+      "incident_id": 1,
+      "window_id": 440,
+      "proposed": {
+        "action": "block_source",
+        "target": "18.219.193.20",
+        "rationale": "18.219.193.20 originated 4657 flagged DoS flows to 1 host(s); block it at the perimeter pending investigation.",
+        "rules": {
+          "linux": "iptables -I INPUT -s 18.219.193.20 -j DROP",
+          "windows": "New-NetFirewallRule -DisplayName \"GNN-IDS block 18.219.193.20\" -Direction Inbound -RemoteAddress 18.219.193.20 -Action Block"
+        },
+        "dry_run": true
+      }
+    },
+    {
+      "category": "DoS",
+      "category_id": 2,
+      "n_flows": 4651,
+      "n_sources": 1,
+      "n_destinations": 1,
+      "key_host": "18.219.193.20",
+      "key_role": "source",
+      "key_host_flows": 4651,
+      "mean_confidence": 1.0,
+      "severity": 8.445052513638554,
+      "true_attack_share": 1.0,
+      "incident_id": 1,
+      "window_id": 476,
+      "proposed": {
+        "action": "block_source",
+        "target": "18.219.193.20",
+        "rationale": "18.219.193.20 originated 4651 flagged DoS flows to 1 host(s); block it at the perimeter pending investigation.",
+        "rules": {
+          "linux": "iptables -I INPUT -s 18.219.193.20 -j DROP",
+          "windows": "New-NetFirewallRule -DisplayName \"GNN-IDS block 18.219.193.20\" -Direction Inbound -RemoteAddress 18.219.193.20 -Action Block"
+        },
+        "dry_run": true
+      }
+    }
+  ],
+  "ffnn_ewc_replay@0.0": [
+    {
+      "category": "DoS",
+      "category_id": 2,
+      "n_flows": 4714,
+      "n_sources": 1,
+      "n_destinations": 1,
+      "key_host": "18.219.193.20",
+      "key_role": "source",
+      "key_host_flows": 4714,
+      "mean_confidence": 1.0,
+      "severity": 8.458504195067558,
+      "true_attack_share": 1.0,
+      "incident_id": 1,
+      "window_id": 466,
+      "proposed": {
+        "action": "block_source",
+        "target": "18.219.193.20",
+        "rationale": "18.219.193.20 originated 4714 flagged DoS flows to 1 host(s); block it at the perimeter pending investigation.",
+        "rules": {
+          "linux": "iptables -I INPUT -s 18.219.193.20 -j DROP",
+          "windows": "New-NetFirewallRule -DisplayName \"GNN-IDS block 18.219.193.20\" -Direction Inbound -RemoteAddress 18.219.193.20 -Action Block"
+        },
+        "dry_run": true
+      }
+    },
+    {
+      "category": "DoS",
+      "category_id": 2,
+      "n_flows": 4682,
+      "n_sources": 1,
+      "n_destinations": 1,
+      "key_host": "18.219.193.20",
+      "key_role": "source",
+      "key_host_flows": 4682,
+      "mean_confidence": 1.0,
+      "severity": 8.451694209183541,
+      "true_attack_share": 1.0,
+      "incident_id": 1,
+      "window_id": 460,
+      "proposed": {
+        "action": "block_source",
+        "target": "18.219.193.20",
+        "rationale": "18.219.193.20 originated 4682 flagged DoS flows to 1 host(s); block it at the perimeter pending investigation.",
+        "rules": {
+          "linux": "iptables -I INPUT -s 18.219.193.20 -j DROP",
+          "windows": "New-NetFirewallRule -DisplayName \"GNN-IDS block 18.219.193.20\" -Direction Inbound -RemoteAddress 18.219.193.20 -Action Block"
+        },
+        "dry_run": true
+      }
+    },
+    {
+      "category": "DoS",
+      "category_id": 2,
+      "n_flows": 4668,
+      "n_sources": 1,
+      "n_destinations": 1,
+      "key_host": "18.219.193.20",
+      "key_role": "source",
+      "key_host_flows": 4668,
+      "mean_confidence": 1.0,
+      "severity": 8.448700194970938,
+      "true_attack_share": 1.0,
+      "incident_id": 1,
+      "window_id": 446,
+      "proposed": {
+        "action": "block_source",
+        "target": "18.219.193.20",
+        "rationale": "18.219.193.20 originated 4668 flagged DoS flows to 1 host(s); block it at the perimeter pending investigation.",
+        "rules": {
+          "linux": "iptables -I INPUT -s 18.219.193.20 -j DROP",
+          "windows": "New-NetFirewallRule -DisplayName \"GNN-IDS block 18.219.193.20\" -Direction Inbound -RemoteAddress 18.219.193.20 -Action Block"
+        },
+        "dry_run": true
+      }
+    },
+    {
+      "category": "DoS",
+      "category_id": 2,
+      "n_flows": 4657,
+      "n_sources": 1,
+      "n_destinations": 1,
+      "key_host": "18.219.193.20",
+      "key_role": "source",
+      "key_host_flows": 4657,
+      "mean_confidence": 1.0,
+      "severity": 8.446341450444287,
+      "true_attack_share": 1.0,
+      "incident_id": 1,
+      "window_id": 440,
+      "proposed": {
+        "action": "block_source",
+        "target": "18.219.193.20",
+        "rationale": "18.219.193.20 originated 4657 flagged DoS flows to 1 host(s); block it at the perimeter pending investigation.",
+        "rules": {
+          "linux": "iptables -I INPUT -s 18.219.193.20 -j DROP",
+          "windows": "New-NetFirewallRule -DisplayName \"GNN-IDS block 18.219.193.20\" -Direction Inbound -RemoteAddress 18.219.193.20 -Action Block"
+        },
+        "dry_run": true
+      }
+    },
+    {
+      "category": "DoS",
+      "category_id": 2,
+      "n_flows": 4651,
+      "n_sources": 1,
+      "n_destinations": 1,
+      "key_host": "18.219.193.20",
+      "key_role": "source",
+      "key_host_flows": 4651,
+      "mean_confidence": 1.0,
+      "severity": 8.445052513638554,
+      "true_attack_share": 1.0,
+      "incident_id": 1,
+      "window_id": 476,
+      "proposed": {
+        "action": "block_source",
+        "target": "18.219.193.20",
+        "rationale": "18.219.193.20 originated 4651 flagged DoS flows to 1 host(s); block it at the perimeter pending investigation.",
+        "rules": {
+          "linux": "iptables -I INPUT -s 18.219.193.20 -j DROP",
+          "windows": "New-NetFirewallRule -DisplayName \"GNN-IDS block 18.219.193.20\" -Direction Inbound -RemoteAddress 18.219.193.20 -Action Block"
+        },
+        "dry_run": true
+      }
+    }
+  ],
+  "ffnn_ewc_replay@0.001": [
+    {
+      "category": "DoS",
+      "category_id": 2,
+      "n_flows": 4714,
+      "n_sources": 1,
+      "n_destinations": 1,
+      "key_host": "18.219.193.20",
+      "key_role": "source",
+      "key_host_flows": 4714,
+      "mean_confidence": 1.0,
+      "severity": 8.458504195067558,
+      "true_attack_share": 1.0,
+      "incident_id": 1,
+      "window_id": 466,
+      "proposed": {
+        "action": "block_source",
+        "target": "18.219.193.20",
+        "rationale": "18.219.193.20 originated 4714 flagged DoS flows to 1 host(s); block it at the perimeter pending investigation.",
+        "rules": {
+          "linux": "iptables -I INPUT -s 18.219.193.20 -j DROP",
+          "windows": "New-NetFirewallRule -DisplayName \"GNN-IDS block 18.219.193.20\" -Direction Inbound -RemoteAddress 18.219.193.20 -Action Block"
+        },
+        "dry_run": true
+      }
+    },
+    {
+      "category": "DoS",
+      "category_id": 2,
+      "n_flows": 4682,
+      "n_sources": 1,
+      "n_destinations": 1,
+      "key_host": "18.219.193.20",
+      "key_role": "source",
+      "key_host_flows": 4682,
+      "mean_confidence": 1.0,
+      "severity": 8.451694209183541,
+      "true_attack_share": 1.0,
+      "incident_id": 1,
+      "window_id": 460,
+      "proposed": {
+        "action": "block_source",
+        "target": "18.219.193.20",
+        "rationale": "18.219.193.20 originated 4682 flagged DoS flows to 1 host(s); block it at the perimeter pending investigation.",
+        "rules": {
+          "linux": "iptables -I INPUT -s 18.219.193.20 -j DROP",
+          "windows": "New-NetFirewallRule -DisplayName \"GNN-IDS block 18.219.193.20\" -Direction Inbound -RemoteAddress 18.219.193.20 -Action Block"
+        },
+        "dry_run": true
+      }
+    },
+    {
+      "category": "DoS",
+      "category_id": 2,
+      "n_flows": 4668,
+      "n_sources": 1,
+      "n_destinations": 1,
+      "key_host": "18.219.193.20",
+      "key_role": "source",
+      "key_host_flows": 4668,
+      "mean_confidence": 1.0,
+      "severity": 8.448700194970938,
+      "true_attack_share": 1.0,
+      "incident_id": 1,
+      "window_id": 446,
+      "proposed": {
+        "action": "block_source",
+        "target": "18.219.193.20",
+        "rationale": "18.219.193.20 originated 4668 flagged DoS flows to 1 host(s); block it at the perimeter pending investigation.",
+        "rules": {
+          "linux": "iptables -I INPUT -s 18.219.193.20 -j DROP",
+          "windows": "New-NetFirewallRule -DisplayName \"GNN-IDS block 18.219.193.20\" -Direction Inbound -RemoteAddress 18.219.193.20 -Action Block"
+        },
+        "dry_run": true
+      }
+    },
+    {
+      "category": "DoS",
+      "category_id": 2,
+      "n_flows": 4657,
+      "n_sources": 1,
+      "n_destinations": 1,
+      "key_host": "18.219.193.20",
+      "key_role": "source",
+      "key_host_flows": 4657,
+      "mean_confidence": 1.0,
+      "severity": 8.446341450444287,
+      "true_attack_share": 1.0,
+      "incident_id": 1,
+      "window_id": 440,
+      "proposed": {
+        "action": "block_source",
+        "target": "18.219.193.20",
+        "rationale": "18.219.193.20 originated 4657 flagged DoS flows to 1 host(s); block it at the perimeter pending investigation.",
+        "rules": {
+          "linux": "iptables -I INPUT -s 18.219.193.20 -j DROP",
+          "windows": "New-NetFirewallRule -DisplayName \"GNN-IDS block 18.219.193.20\" -Direction Inbound -RemoteAddress 18.219.193.20 -Action Block"
+        },
+        "dry_run": true
+      }
+    },
+    {
+      "category": "DoS",
+      "category_id": 2,
+      "n_flows": 4651,
+      "n_sources": 1,
+      "n_destinations": 1,
+      "key_host": "18.219.193.20",
+      "key_role": "source",
+      "key_host_flows": 4651,
+      "mean_confidence": 1.0,
+      "severity": 8.445052513638554,
+      "true_attack_share": 1.0,
+      "incident_id": 1,
+      "window_id": 476,
+      "proposed": {
+        "action": "block_source",
+        "target": "18.219.193.20",
+        "rationale": "18.219.193.20 originated 4651 flagged DoS flows to 1 host(s); block it at the perimeter pending investigation.",
+        "rules": {
+          "linux": "iptables -I INPUT -s 18.219.193.20 -j DROP",
+          "windows": "New-NetFirewallRule -DisplayName \"GNN-IDS block 18.219.193.20\" -Direction Inbound -RemoteAddress 18.219.193.20 -Action Block"
+        },
+        "dry_run": true
+      }
+    }
+  ],
+  "ffnn_ewc_replay@0.0001": [
+    {
+      "category": "DoS",
+      "category_id": 2,
+      "n_flows": 4714,
+      "n_sources": 1,
+      "n_destinations": 1,
+      "key_host": "18.219.193.20",
+      "key_role": "source",
+      "key_host_flows": 4714,
+      "mean_confidence": 1.0,
+      "severity": 8.458504195067558,
+      "true_attack_share": 1.0,
+      "incident_id": 1,
+      "window_id": 466,
+      "proposed": {
+        "action": "block_source",
+        "target": "18.219.193.20",
+        "rationale": "18.219.193.20 originated 4714 flagged DoS flows to 1 host(s); block it at the perimeter pending investigation.",
+        "rules": {
+          "linux": "iptables -I INPUT -s 18.219.193.20 -j DROP",
+          "windows": "New-NetFirewallRule -DisplayName \"GNN-IDS block 18.219.193.20\" -Direction Inbound -RemoteAddress 18.219.193.20 -Action Block"
+        },
+        "dry_run": true
+      }
+    },
+    {
+      "category": "DoS",
+      "category_id": 2,
+      "n_flows": 4682,
+      "n_sources": 1,
+      "n_destinations": 1,
+      "key_host": "18.219.193.20",
+      "key_role": "source",
+      "key_host_flows": 4682,
+      "mean_confidence": 1.0,
+      "severity": 8.451694209183541,
+      "true_attack_share": 1.0,
+      "incident_id": 1,
+      "window_id": 460,
+      "proposed": {
+        "action": "block_source",
+        "target": "18.219.193.20",
+        "rationale": "18.219.193.20 originated 4682 flagged DoS flows to 1 host(s); block it at the perimeter pending investigation.",
+        "rules": {
+          "linux": "iptables -I INPUT -s 18.219.193.20 -j DROP",
+          "windows": "New-NetFirewallRule -DisplayName \"GNN-IDS block 18.219.193.20\" -Direction Inbound -RemoteAddress 18.219.193.20 -Action Block"
+        },
+        "dry_run": true
+      }
+    },
+    {
+      "category": "DoS",
+      "category_id": 2,
+      "n_flows": 4668,
+      "n_sources": 1,
+      "n_destinations": 1,
+      "key_host": "18.219.193.20",
+      "key_role": "source",
+      "key_host_flows": 4668,
+      "mean_confidence": 1.0,
+      "severity": 8.448700194970938,
+      "true_attack_share": 1.0,
+      "incident_id": 1,
+      "window_id": 446,
+      "proposed": {
+        "action": "block_source",
+        "target": "18.219.193.20",
+        "rationale": "18.219.193.20 originated 4668 flagged DoS flows to 1 host(s); block it at the perimeter pending investigation.",
+        "rules": {
+          "linux": "iptables -I INPUT -s 18.219.193.20 -j DROP",
+          "windows": "New-NetFirewallRule -DisplayName \"GNN-IDS block 18.219.193.20\" -Direction Inbound -RemoteAddress 18.219.193.20 -Action Block"
+        },
+        "dry_run": true
+      }
+    },
+    {
+      "category": "DoS",
+      "category_id": 2,
+      "n_flows": 4657,
+      "n_sources": 1,
+      "n_destinations": 1,
+      "key_host": "18.219.193.20",
+      "key_role": "source",
+      "key_host_flows": 4657,
+      "mean_confidence": 1.0,
+      "severity": 8.446341450444287,
+      "true_attack_share": 1.0,
+      "incident_id": 1,
+      "window_id": 440,
+      "proposed": {
+        "action": "block_source",
+        "target": "18.219.193.20",
+        "rationale": "18.219.193.20 originated 4657 flagged DoS flows to 1 host(s); block it at the perimeter pending investigation.",
+        "rules": {
+          "linux": "iptables -I INPUT -s 18.219.193.20 -j DROP",
+          "windows": "New-NetFirewallRule -DisplayName \"GNN-IDS block 18.219.193.20\" -Direction Inbound -RemoteAddress 18.219.193.20 -Action Block"
+        },
+        "dry_run": true
+      }
+    },
+    {
+      "category": "DoS",
+      "category_id": 2,
+      "n_flows": 4651,
+      "n_sources": 1,
+      "n_destinations": 1,
+      "key_host": "18.219.193.20",
+      "key_role": "source",
+      "key_host_flows": 4651,
+      "mean_confidence": 1.0,
+      "severity": 8.445052513638554,
+      "true_attack_share": 1.0,
+      "incident_id": 1,
+      "window_id": 476,
+      "proposed": {
+        "action": "block_source",
+        "target": "18.219.193.20",
+        "rationale": "18.219.193.20 originated 4651 flagged DoS flows to 1 host(s); block it at the perimeter pending investigation.",
+        "rules": {
+          "linux": "iptables -I INPUT -s 18.219.193.20 -j DROP",
+          "windows": "New-NetFirewallRule -DisplayName \"GNN-IDS block 18.219.193.20\" -Direction Inbound -RemoteAddress 18.219.193.20 -Action Block"
+        },
+        "dry_run": true
+      }
+    }
+  ],
+  "ffnn_ewc_replay@1e-05": [
+    {
+      "category": "DoS",
+      "category_id": 2,
+      "n_flows": 4714,
+      "n_sources": 1,
+      "n_destinations": 1,
+      "key_host": "18.219.193.20",
+      "key_role": "source",
+      "key_host_flows": 4714,
+      "mean_confidence": 1.0,
+      "severity": 8.458504195067558,
+      "true_attack_share": 1.0,
+      "incident_id": 1,
+      "window_id": 466,
+      "proposed": {
+        "action": "block_source",
+        "target": "18.219.193.20",
+        "rationale": "18.219.193.20 originated 4714 flagged DoS flows to 1 host(s); block it at the perimeter pending investigation.",
+        "rules": {
+          "linux": "iptables -I INPUT -s 18.219.193.20 -j DROP",
+          "windows": "New-NetFirewallRule -DisplayName \"GNN-IDS block 18.219.193.20\" -Direction Inbound -RemoteAddress 18.219.193.20 -Action Block"
+        },
+        "dry_run": true
+      }
+    },
+    {
+      "category": "DoS",
+      "category_id": 2,
+      "n_flows": 4682,
+      "n_sources": 1,
+      "n_destinations": 1,
+      "key_host": "18.219.193.20",
+      "key_role": "source",
+      "key_host_flows": 4682,
+      "mean_confidence": 1.0,
+      "severity": 8.451694209183541,
+      "true_attack_share": 1.0,
+      "incident_id": 1,
+      "window_id": 460,
+      "proposed": {
+        "action": "block_source",
+        "target": "18.219.193.20",
+        "rationale": "18.219.193.20 originated 4682 flagged DoS flows to 1 host(s); block it at the perimeter pending investigation.",
+        "rules": {
+          "linux": "iptables -I INPUT -s 18.219.193.20 -j DROP",
+          "windows": "New-NetFirewallRule -DisplayName \"GNN-IDS block 18.219.193.20\" -Direction Inbound -RemoteAddress 18.219.193.20 -Action Block"
+        },
+        "dry_run": true
+      }
+    },
+    {
+      "category": "DoS",
+      "category_id": 2,
+      "n_flows": 4668,
+      "n_sources": 1,
+      "n_destinations": 1,
+      "key_host": "18.219.193.20",
+      "key_role": "source",
+      "key_host_flows": 4668,
+      "mean_confidence": 1.0,
+      "severity": 8.448700194970938,
+      "true_attack_share": 1.0,
+      "incident_id": 1,
+      "window_id": 446,
+      "proposed": {
+        "action": "block_source",
+        "target": "18.219.193.20",
+        "rationale": "18.219.193.20 originated 4668 flagged DoS flows to 1 host(s); block it at the perimeter pending investigation.",
+        "rules": {
+          "linux": "iptables -I INPUT -s 18.219.193.20 -j DROP",
+          "windows": "New-NetFirewallRule -DisplayName \"GNN-IDS block 18.219.193.20\" -Direction Inbound -RemoteAddress 18.219.193.20 -Action Block"
+        },
+        "dry_run": true
+      }
+    },
+    {
+      "category": "DoS",
+      "category_id": 2,
+      "n_flows": 4657,
+      "n_sources": 1,
+      "n_destinations": 1,
+      "key_host": "18.219.193.20",
+      "key_role": "source",
+      "key_host_flows": 4657,
+      "mean_confidence": 1.0,
+      "severity": 8.446341450444287,
+      "true_attack_share": 1.0,
+      "incident_id": 1,
+      "window_id": 440,
+      "proposed": {
+        "action": "block_source",
+        "target": "18.219.193.20",
+        "rationale": "18.219.193.20 originated 4657 flagged DoS flows to 1 host(s); block it at the perimeter pending investigation.",
+        "rules": {
+          "linux": "iptables -I INPUT -s 18.219.193.20 -j DROP",
+          "windows": "New-NetFirewallRule -DisplayName \"GNN-IDS block 18.219.193.20\" -Direction Inbound -RemoteAddress 18.219.193.20 -Action Block"
+        },
+        "dry_run": true
+      }
+    },
+    {
+      "category": "DoS",
+      "category_id": 2,
+      "n_flows": 4651,
+      "n_sources": 1,
+      "n_destinations": 1,
+      "key_host": "18.219.193.20",
+      "key_role": "source",
+      "key_host_flows": 4651,
+      "mean_confidence": 1.0,
+      "severity": 8.445052513638554,
+      "true_attack_share": 1.0,
+      "incident_id": 1,
+      "window_id": 476,
+      "proposed": {
+        "action": "block_source",
+        "target": "18.219.193.20",
+        "rationale": "18.219.193.20 originated 4651 flagged DoS flows to 1 host(s); block it at the perimeter pending investigation.",
+        "rules": {
+          "linux": "iptables -I INPUT -s 18.219.193.20 -j DROP",
+          "windows": "New-NetFirewallRule -DisplayName \"GNN-IDS block 18.219.193.20\" -Direction Inbound -RemoteAddress 18.219.193.20 -Action Block"
+        },
+        "dry_run": true
+      }
+    }
+  ]
+}

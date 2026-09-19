@@ -1,0 +1,5 @@
+stream_index,window_id,ts,detector,prev_error,new_error,triggered_retrain,reason,n_detections,model,policy
+10,153,2017-07-05T13:15:48.345465,ADWIN,6.832614141449029e-05,0.0001129350079552122,True,error increased,1,gnn_ewc_replay,adwin
+11,155,2017-07-05T13:25:10.453300,ADWIN,0.003382539384517853,0.00012939092458078734,False,error decreased,1,gnn_ewc_replay,adwin
+77,249,2017-07-06T13:06:47.480861,ADWIN,4.268066007542823e-05,4.192505883527419e-05,False,error decreased,1,gnn_ewc_replay,adwin
+196,418,2017-07-07T19:15:38.304116,ADWIN,2.3814230570718235e-05,2.676164118507931e-05,True,error increased,1,gnn_ewc_replay,adwin
