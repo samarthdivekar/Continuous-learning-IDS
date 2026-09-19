@@ -119,6 +119,17 @@ class GraphReplayBuffer:
             out.extend(picks)
         return out
 
+    def snapshot(self) -> dict:
+        """Cheap copy of the buffer's state (graphs are shared by reference, never mutated)."""
+        return {"pools": {c: list(v) for c, v in self.pools.items()}, "seen": dict(self.seen),
+                "offered": set(self.offered), "rng": self.rng.getstate()}
+
+    def restore(self, snap: dict) -> None:
+        self.pools = defaultdict(list, {c: list(v) for c, v in snap["pools"].items()})
+        self.seen = defaultdict(int, snap["seen"])
+        self.offered = set(snap["offered"])
+        self.rng.setstate(snap["rng"])
+
     def summary(self) -> dict:
         return {int(c): {"stored": len(p), "seen": int(self.seen[c])} for c, p in self.pools.items()}
 
@@ -188,6 +199,16 @@ class TabularReplayBuffer:
             xs.append(self.X[cat][idx])
             ys.append(self.y_cat[cat][idx])
         return np.concatenate(xs), np.concatenate(ys)
+
+    def snapshot(self) -> dict:
+        return {"X": {c: v.copy() for c, v in self.X.items()}, "y": {c: v.copy() for c, v in self.y_cat.items()},
+                "seen": dict(self.seen), "rng": self.rng.bit_generator.state}
+
+    def restore(self, snap: dict) -> None:
+        self.X = {c: v.copy() for c, v in snap["X"].items()}
+        self.y_cat = {c: v.copy() for c, v in snap["y"].items()}
+        self.seen = defaultdict(int, snap["seen"])
+        self.rng.bit_generator.state = snap["rng"]
 
     def summary(self) -> dict:
         return {int(c): {"stored": len(self.X[c]), "seen": int(self.seen[c])} for c in self.categories}

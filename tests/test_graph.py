@@ -77,3 +77,31 @@ def test_neighbor_sampling_respects_fanout_and_targets():
     cfg_ns["max_edges_full"] = 100
     subs = list(iter_training_subgraphs(g, cfg_ns, rng))
     assert len(subs) == 4 and sum(int(s.target_mask.sum()) for s in subs) == n_e
+
+
+def test_label_mask_flows_through_sampling_and_remap():
+    rng = np.random.default_rng(0)
+    g = _toy()
+    g.label_mask = torch.tensor([True, False, False, True, False])
+    whole = next(iter_training_subgraphs(g, {"enabled": False, "max_edges_full": 10, "fanouts": [5], "batch_edges": 2}, rng))
+    assert torch.equal(whole.label_mask, g.label_mask)
+    subs = list(iter_training_subgraphs(g, {"enabled": True, "max_edges_full": 1, "fanouts": [5], "batch_edges": 2}, rng))
+    assert sum(int((s.label_mask & s.target_mask).sum()) for s in subs) == 2
+    r = reassign_sources(g, pool_size=100, seed=0)
+    assert torch.equal(r.label_mask, g.label_mask)
+
+
+def test_topology_augmented_learner_trains_and_masks_labels(cfg):
+    from src.training.learners import make_learner
+    torch.manual_seed(0)
+    gs = []
+    for w in range(3):
+        g = _toy(); g.window_id = w
+        g.label_mask = torch.tensor([True, True, False, False, True])
+        gs.append(g)
+    cfg = dict(cfg, graph={**cfg["graph"], "topology_augment": {"prob": 1.0, "pool_size": 50}})
+    L = make_learner("gnn_ewc_replay_topo", cfg, n_features=2, num_classes=8, device=torch.device("cpu"))
+    stats = L.learn(gs, tag="t")
+    assert stats.steps > 0 and np.isfinite(stats.final_loss)
+    logits, z = L.predict_details(gs[0])
+    assert logits.shape == (5, 8) and z.shape[0] == 5

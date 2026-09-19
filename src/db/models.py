@@ -128,6 +128,27 @@ class WindowStat(Base):
     retrained: Mapped[bool] = mapped_column(Boolean)
 
 
+class ResponseAction(Base):
+    """Improvement 15: a proposed containment action awaiting (or after) human decision.
+    Execution is always a dry run — approval is recorded, nothing is applied."""
+    __tablename__ = "response_actions"
+    id: Mapped[int] = mapped_column(PK, primary_key=True, autoincrement=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    window_id: Mapped[int] = mapped_column(Integer)
+    incident_id: Mapped[int] = mapped_column(Integer)
+    model_name: Mapped[str] = mapped_column(String(64))
+    category: Mapped[str] = mapped_column(String(32))
+    action: Mapped[str] = mapped_column(String(32))
+    target: Mapped[str] = mapped_column(String(64))
+    rationale: Mapped[str] = mapped_column(Text)
+    rule_linux: Mapped[str | None] = mapped_column(Text, nullable=True)
+    rule_windows: Mapped[str | None] = mapped_column(Text, nullable=True)
+    status: Mapped[str] = mapped_column(String(24), default="proposed")  # proposed | approved | rejected
+    decided_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    decided_by: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    note: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+
 # Tables converted to Timescale hypertables on Postgres, with their time column.
 HYPERTABLES = {"flow_records": "ts", "predictions": "ts", "metrics": "ts", "drift_events": "ts",
                "window_stats": "ts"}

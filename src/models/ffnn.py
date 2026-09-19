@@ -21,3 +21,8 @@ class FFNN(nn.Module):
 
     def forward(self, x):
         return self.net(x)
+
+    def forward_with_embedding(self, x):
+        """(logits, embedding): embedding = the last hidden layer (after ReLU)."""
+        z = self.net[:-1](x)
+        return self.net[-1](z), z

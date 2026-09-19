@@ -155,3 +155,24 @@ def test_results_endpoints_read_files_and_404_when_missing(client, tmp_path, mon
     assert client.get("/results/run_info?experiment=../../etc").status_code == 422
     idx = client.get("/api/results/index").json()
     assert idx["cicids2017"]["multiclass"]["continual"] is True
+
+
+def test_incidents_explain_and_action_workflow(client):
+    cat = client.get("/windows/catalog").json()
+    wid = next(w["window_id"] for w in cat if w["n_attack"] > 0)
+    inc = client.get(f"/incidents/{wid}?model=gnn_ewc_replay").json()
+    assert {"incidents", "metrics", "flagged_flows"} <= set(inc)
+    edge = 0
+    ex = client.get(f"/explain/{wid}/{edge}?model=gnn_ewc_replay").json()
+    assert {"summary", "features", "structure", "src_ip", "dst_ip", "predicted_label"} <= set(ex)
+    assert client.get(f"/explain/{wid}/999999?model=gnn_ewc_replay").status_code == 404
+    assert client.get(f"/explain/{wid}/0?model=xgboost_static").status_code == 404   # trees: no gradients
+    if inc["incidents"]:
+        iid = inc["incidents"][0]["incident_id"]
+        a = client.post("/actions", json={"window_id": wid, "incident_id": iid, "model": "gnn_ewc_replay"}).json()
+        assert a["status"] == "proposed" and a["dry_run"] is True
+        d = client.post(f"/actions/{a['id']}/decision", json={"decision": "approve", "analyst": "tester"}).json()
+        assert d["status"] == "approved" and d["decided_by"] == "tester"
+        assert client.post(f"/actions/{a['id']}/decision", json={"decision": "reject"}).status_code == 409
+        assert client.post(f"/actions/{a['id']}/decision", json={"decision": "execute"}).status_code == 422
+        assert any(x["id"] == a["id"] for x in client.get("/actions?status=approved").json())

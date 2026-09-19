@@ -54,3 +54,9 @@ def test_flow_sampling_is_label_agnostic(tmp_path):
     # attack share is preserved (label-free sampling), unlike benign-only thinning
     assert abs(frac(sampled) - frac(full)) < 0.01
     assert stats[0]["sampled_out"] > 0
+
+
+def test_variant_inherits_base_selection(cfg, tmp_path):
+    _write_selections(cfg, tmp_path)
+    out = apply_selection(cfg)
+    assert out["model_overrides"]["gnn_ewc_replay_topo"] == out["model_overrides"]["gnn_ewc_replay"]

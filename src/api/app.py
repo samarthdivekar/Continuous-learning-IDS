@@ -23,7 +23,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 from sqlalchemy import case, desc, func, select, text
 
-from src.db.models import DriftEventRow, FlowRecord, GraphWindow, Metric, Prediction, WindowStat
+from src.db.models import DriftEventRow, FlowRecord, GraphWindow, Metric, Prediction, ResponseAction, WindowStat
 from src.db.session import get_sessionmaker
 from src.utils.config import REPO_ROOT
 
@@ -50,6 +50,18 @@ class PredictIn(BaseModel):
     window_id: int | None = Field(default=None, description="classify a cached window graph")
     models: list[str] | None = None
     store: bool = True
+
+
+class ProposeIn(BaseModel):
+    window_id: int
+    incident_id: int
+    model: str = "gnn_ewc_replay"
+
+
+class DecisionIn(BaseModel):
+    decision: str = Field(pattern="^(approve|reject)$")
+    analyst: str = Field(default="analyst", max_length=64)
+    note: str | None = Field(default=None, max_length=1000)
 
 
 class DemoStartIn(BaseModel):
@@ -85,6 +97,14 @@ def series_key(model: str, policy: str | None) -> str:
     gets its own 'model:policy' series so different runs are never merged."""
     default = "never" if model == "xgboost_static" else "adwin"
     return model if policy in (None, default) else f"{model}:{policy}"
+
+
+def _action_dict(r) -> dict:
+    return {"id": r.id, "created_at": r.created_at.isoformat() if r.created_at else None, "window_id": r.window_id,
+            "incident_id": r.incident_id, "model": r.model_name, "category": r.category, "action": r.action,
+            "target": r.target, "rationale": r.rationale, "rule_linux": r.rule_linux, "rule_windows": r.rule_windows,
+            "status": r.status, "decided_at": r.decided_at.isoformat() if r.decided_at else None,
+            "decided_by": r.decided_by, "note": r.note, "dry_run": True}
 
 
 def store_predictions(Session, flow_ids: list[int], result: dict) -> int:
@@ -272,6 +292,66 @@ def create_app(database_url: str | None = None, service=None, load_models: bool 
             rows = s.scalars(q.order_by(GraphWindow.id).limit(limit)).all()
         return [{"window_id": r.id, "task_id": r.task_id, "split": r.split, "n_nodes": r.n_nodes,
                  "n_edges": r.n_edges, "window_start": r.window_start.isoformat()} for r in rows]
+
+    @router.get("/incidents/{window_id}")
+    def incidents(window_id: int, model: str = "gnn_ewc_replay", threshold: float = Query(0.0, ge=0.0, le=1.0)):
+        """Improvement 3: the window's flagged flows grouped into incidents, each with a proposed action."""
+        if state.ml_url:
+            return _remote("GET", f"/incidents/{window_id}", params={"model": model, "threshold": threshold})
+        try:
+            return state.service.incidents(window_id, model, threshold)
+        except KeyError as exc:
+            raise HTTPException(404, str(exc)) from exc
+
+    @router.get("/explain/{window_id}/{edge}")
+    def explain(window_id: int, edge: int, model: str = "gnn_ewc_replay"):
+        """Improvement 2: feature, neighbourhood and structural evidence for one flow's verdict."""
+        if state.ml_url:
+            return _remote("GET", f"/explain/{window_id}/{edge}", params={"model": model})
+        try:
+            return state.service.explain(window_id, edge, model)
+        except KeyError as exc:
+            raise HTTPException(404, str(exc)) from exc
+
+    @router.post("/actions")
+    def propose(body: ProposeIn):
+        """Improvement 15: record the proposed containment action for an incident (dry run)."""
+        inc = incidents(body.window_id, body.model, 0.0)
+        match = next((i for i in inc["incidents"] if i["incident_id"] == body.incident_id), None)
+        if match is None:
+            raise HTTPException(404, "incident not found")
+        pr = match["proposed"]
+        row = ResponseAction(window_id=body.window_id, incident_id=body.incident_id, model_name=body.model,
+                             category=match["category"], action=pr["action"], target=pr["target"],
+                             rationale=pr["rationale"], rule_linux=pr["rules"].get("linux"),
+                             rule_windows=pr["rules"].get("windows"), status="proposed")
+        with state.Session() as s:
+            s.add(row)
+            s.commit()
+            return _action_dict(row)
+
+    @router.post("/actions/{action_id}/decision")
+    def decide(action_id: int, body: DecisionIn):
+        """An analyst approves or rejects. Nothing is ever executed: approval is recorded as a dry run."""
+        with state.Session() as s:
+            row = s.get(ResponseAction, action_id)
+            if row is None:
+                raise HTTPException(404, "action not found")
+            if row.status != "proposed":
+                raise HTTPException(409, f"already {row.status}")
+            row.status = "approved" if body.decision == "approve" else "rejected"
+            row.decided_at = datetime.now(timezone.utc)
+            row.decided_by, row.note = body.analyst, body.note
+            s.commit()
+            return _action_dict(row)
+
+    @router.get("/actions")
+    def actions(status: str | None = None, limit: int = Query(100, le=1000)):
+        with state.Session() as s:
+            q = select(ResponseAction)
+            if status:
+                q = q.where(ResponseAction.status == status)
+            return [_action_dict(r) for r in s.scalars(q.order_by(desc(ResponseAction.id)).limit(limit)).all()]
 
     @router.get("/windows/catalog")
     def windows_catalog():

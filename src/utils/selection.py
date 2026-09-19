@@ -40,6 +40,7 @@ def tuning_overrides(cfg: dict, dev: bool = False) -> tuple[list[str], str | Non
 
 def selected_ewc_overrides(cfg: dict, dev: bool = False, cli_keys: set[str] | None = None) -> dict:
     """{"source": path|None, "overrides": {model_name: [k=v, ...]}}, exact model names only."""
+    from src.training.learners import MODEL_SPECS  # local import: learners imports config utilities
     cli_keys = cli_keys or set()
     base = _selection_root(cfg, dev)
     for mode in (cfg["label_mode"], "multiclass"):
@@ -52,6 +53,11 @@ def selected_ewc_overrides(cfg: dict, dev: bool = False, cli_keys: set[str] | No
                 kv = [x for x in kv if x.split("=")[0] not in cli_keys]
                 if kv:
                     out[model] = kv
+            # variants of a selected model (e.g. gnn_ewc_replay_topo) inherit its λ/γ,
+            # so the only difference in the comparison is the variant itself
+            for m, spec in MODEL_SPECS.items():
+                if spec.get("base") in out and m not in out:
+                    out[m] = list(out[spec["base"]])
             return {"source": str(f), "overrides": out, "skipped_cli_keys": sorted(cli_keys & set(EWC_KEYS))}
     return {"source": None, "overrides": {}, "skipped_cli_keys": []}
 

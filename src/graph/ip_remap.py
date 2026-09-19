@@ -31,7 +31,7 @@ from src.graph.window_builder import node_features
 
 
 def _copy_meta(src: Data, dst: Data) -> Data:
-    for k in ("window_id", "task_id", "split", "window_start", "window_end", "flow_idx"):
+    for k in ("window_id", "task_id", "split", "window_start", "window_end", "flow_idx", "label_mask"):
         if k in src:
             dst[k] = src[k]
     return dst

@@ -1,0 +1,13 @@
+n_flagged,k,largest_cluster_share,purity_largest,majority_category,weighted_purity,model,after_task,novel_category
+25766,2,0.6673,0.8723962235875918,DoS,0.80185,gnn_ewc_replay,0,DoS
+1427,5,0.4281709880868956,1.0,Benign,0.9831814996496145,gnn_ewc_replay,1,WebAttack
+11525,2,0.9395227765726681,0.967676394532693,Infiltration,0.9554013015184382,gnn_ewc_replay,2,Infiltration
+1552,6,0.22422680412371135,1.0,Benign,1.0,gnn_ewc_replay,3,Botnet
+1352,6,0.39201183431952663,1.0,Benign,0.9985207100591716,gnn_ewc_replay,4,PortScan
+14381,2,0.9823378068284542,1.0,DDoS,1.0,gnn_ewc_replay,5,DDoS
+3798,2,0.5118483412322274,0.6553497942386831,Benign,0.6924697209057399,ffnn_ewc_replay,0,DoS
+1394,2,0.7489239598278336,1.0,Benign,0.9827833572453372,ffnn_ewc_replay,1,WebAttack
+1410,2,0.8673758865248227,0.9836467702371219,Benign,0.9609929078014184,ffnn_ewc_replay,2,Infiltration
+1681,2,0.7816775728732898,1.0,Benign,1.0,ffnn_ewc_replay,3,Botnet
+1274,6,0.2990580847723705,1.0,Benign,1.0,ffnn_ewc_replay,4,PortScan
+321,4,0.42679127725856697,1.0,Benign,1.0,ffnn_ewc_replay,5,DDoS

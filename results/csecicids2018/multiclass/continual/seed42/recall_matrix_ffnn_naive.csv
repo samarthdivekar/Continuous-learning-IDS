@@ -1,0 +1,7 @@
+,task0_BruteForce,task1_DoS,task2_DDoS,task3_WebAttack,task4_Infiltration,task5_Botnet
+after_task0,1.0,0.0,0.0,0.0,0.0,0.0
+after_task1,0.0,0.9996457008596416,0.0,0.0,0.0,0.0
+after_task2,0.0,0.0,1.0,0.0,0.0,0.0
+after_task3,0.0,0.0,0.0,0.8571428571428571,0.0,0.0
+after_task4,0.0,0.0,0.0,0.0,0.9955012853470437,0.0
+after_task5,0.0,0.0,0.0,0.0,0.0,1.0

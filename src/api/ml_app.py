@@ -62,6 +62,22 @@ def predict(body: PredictBody):
         raise HTTPException(404, str(exc))
 
 
+@app.get("/incidents/{window_id}")
+def incidents(window_id: int, model: str = "gnn_ewc_replay", threshold: float = 0.0):
+    try:
+        return svc.incidents(window_id, model, threshold)
+    except KeyError as exc:
+        raise HTTPException(404, str(exc)) from exc
+
+
+@app.get("/explain/{window_id}/{edge}")
+def explain(window_id: int, edge: int, model: str = "gnn_ewc_replay"):
+    try:
+        return svc.explain(window_id, edge, model)
+    except KeyError as exc:
+        raise HTTPException(404, str(exc)) from exc
+
+
 @app.get("/windows/catalog")
 def windows_catalog():
     return svc.list_windows()

@@ -31,17 +31,18 @@ def main():
     p.add_argument("--runs", nargs="*", default=[f"{m}:{pol}" for m, pol in DEFAULT_RUNS],
                    help="model:policy pairs")
     p.add_argument("--eval-every", type=int, default=10)
+    p.add_argument("--out-name", default="drift", help="results sub-folder (keeps variants apart from the main run)")
     args = p.parse_args()
     cfg = apply_selection(config_from_args(args), args)
     prepare_dataset(cfg)
     data = load_processed(cfg)
-    out = results_dir(cfg, args, "drift")
+    out = results_dir(cfg, args, args.out_name)
     out.mkdir(parents=True, exist_ok=True)
     write_run_info(out / "run_info.json", cfg, {"runs": args.runs, "task_categories": data.task_categories})
     device = get_device(cfg["train"]["device"])
     node_in = data.graphs(0, "train")[0].x.shape[1]
 
-    windows, evals, events, summary = [], [], [], []
+    windows, evals, events, summary, gates = [], [], [], [], []
     for run in args.runs:
         model, policy = run.split(":")
         set_seed(cfg["seed"])
@@ -64,12 +65,17 @@ def main():
             "final_accuracy_seen": final["accuracy_seen"], "final_macro_f1_seen": final["macro_f1_seen"],
             "final_retention_rate": final["retention_rate"], "final_fpr_seen": final["fpr_seen"],
             "mean_stream_error": w["error_rate"].mean(),
+            "rollbacks": runner.rollbacks, "labels_used": runner.labels_used,
+            "label_budget": int(cfg["drift"].get("label_budget", 0) or 0),
         })
         pd.concat(windows).to_csv(out / "stream_windows.csv", index=False)
         pd.concat(evals).to_csv(out / "stream_eval.csv", index=False)
         if events:
             pd.concat(events).to_csv(out / "drift_events.csv", index=False)
         pd.DataFrame(summary).to_csv(out / "summary.csv", index=False)
+        gates.extend(runner.gate_log)
+        if gates:
+            pd.DataFrame(gates).to_csv(out / "gate_log.csv", index=False)
     print(pd.DataFrame(summary).to_string(index=False))
 
 

@@ -1,0 +1,1018 @@
+{
+  "gnn_ewc_replay@0.0": [
+    {
+      "category": "PortScan",
+      "category_id": 6,
+      "n_flows": 4986,
+      "n_sources": 1,
+      "n_destinations": 1,
+      "key_host": "172.16.0.1",
+      "key_role": "source",
+      "key_host_flows": 4986,
+      "mean_confidence": 0.9999489784240723,
+      "severity": 8.514155377755866,
+      "true_attack_share": 1.0,
+      "incident_id": 1,
+      "window_id": 363,
+      "proposed": {
+        "action": "block_source",
+        "target": "172.16.0.1",
+        "rationale": "172.16.0.1 originated 4986 flagged PortScan flows to 1 host(s); block it at the perimeter pending investigation.",
+        "rules": {
+          "linux": "iptables -I INPUT -s 172.16.0.1 -j DROP",
+          "windows": "New-NetFirewallRule -DisplayName \"GNN-IDS block 172.16.0.1\" -Direction Inbound -RemoteAddress 172.16.0.1 -Action Block"
+        },
+        "dry_run": true
+      }
+    },
+    {
+      "category": "PortScan",
+      "category_id": 6,
+      "n_flows": 4970,
+      "n_sources": 1,
+      "n_destinations": 1,
+      "key_host": "172.16.0.1",
+      "key_role": "source",
+      "key_host_flows": 4970,
+      "mean_confidence": 0.99996018409729,
+      "severity": 8.511037417963742,
+      "true_attack_share": 1.0,
+      "incident_id": 1,
+      "window_id": 373,
+      "proposed": {
+        "action": "block_source",
+        "target": "172.16.0.1",
+        "rationale": "172.16.0.1 originated 4970 flagged PortScan flows to 1 host(s); block it at the perimeter pending investigation.",
+        "rules": {
+          "linux": "iptables -I INPUT -s 172.16.0.1 -j DROP",
+          "windows": "New-NetFirewallRule -DisplayName \"GNN-IDS block 172.16.0.1\" -Direction Inbound -RemoteAddress 172.16.0.1 -Action Block"
+        },
+        "dry_run": true
+      }
+    },
+    {
+      "category": "PortScan",
+      "category_id": 6,
+      "n_flows": 4967,
+      "n_sources": 1,
+      "n_destinations": 1,
+      "key_host": "172.16.0.1",
+      "key_role": "source",
+      "key_host_flows": 4967,
+      "mean_confidence": 0.9999498724937439,
+      "severity": 8.51034599980538,
+      "true_attack_share": 1.0,
+      "incident_id": 1,
+      "window_id": 359,
+      "proposed": {
+        "action": "block_source",
+        "target": "172.16.0.1",
+        "rationale": "172.16.0.1 originated 4967 flagged PortScan flows to 1 host(s); block it at the perimeter pending investigation.",
+        "rules": {
+          "linux": "iptables -I INPUT -s 172.16.0.1 -j DROP",
+          "windows": "New-NetFirewallRule -DisplayName \"GNN-IDS block 172.16.0.1\" -Direction Inbound -RemoteAddress 172.16.0.1 -Action Block"
+        },
+        "dry_run": true
+      }
+    },
+    {
+      "category": "PortScan",
+      "category_id": 6,
+      "n_flows": 4954,
+      "n_sources": 2,
+      "n_destinations": 1,
+      "key_host": "192.168.10.50",
+      "key_role": "destination",
+      "key_host_flows": 4954,
+      "mean_confidence": 0.9999484419822693,
+      "severity": 8.507713783289383,
+      "true_attack_share": 0.9997981429148163,
+      "incident_id": 1,
+      "window_id": 379,
+      "proposed": {
+        "action": "isolate_host",
+        "target": "192.168.10.50",
+        "rationale": "192.168.10.50 is the focal host of a PortScan incident; isolate it for forensic review.",
+        "rules": {
+          "linux": "iptables -I FORWARD -s 192.168.10.50 -j DROP && iptables -I FORWARD -d 192.168.10.50 -j DROP",
+          "windows": "New-NetFirewallRule -DisplayName \"GNN-IDS isolate 192.168.10.50\" -Direction Outbound -RemoteAddress 192.168.10.50 -Action Block"
+        },
+        "dry_run": true
+      }
+    },
+    {
+      "category": "PortScan",
+      "category_id": 6,
+      "n_flows": 4851,
+      "n_sources": 1,
+      "n_destinations": 1,
+      "key_host": "172.16.0.1",
+      "key_role": "source",
+      "key_host_flows": 4851,
+      "mean_confidence": 0.9999122023582458,
+      "severity": 8.486401118636206,
+      "true_attack_share": 1.0,
+      "incident_id": 1,
+      "window_id": 369,
+      "proposed": {
+        "action": "block_source",
+        "target": "172.16.0.1",
+        "rationale": "172.16.0.1 originated 4851 flagged PortScan flows to 1 host(s); block it at the perimeter pending investigation.",
+        "rules": {
+          "linux": "iptables -I INPUT -s 172.16.0.1 -j DROP",
+          "windows": "New-NetFirewallRule -DisplayName \"GNN-IDS block 172.16.0.1\" -Direction Inbound -RemoteAddress 172.16.0.1 -Action Block"
+        },
+        "dry_run": true
+      }
+    }
+  ],
+  "gnn_ewc_replay@0.001": [
+    {
+      "category": "PortScan",
+      "category_id": 6,
+      "n_flows": 4986,
+      "n_sources": 1,
+      "n_destinations": 1,
+      "key_host": "172.16.0.1",
+      "key_role": "source",
+      "key_host_flows": 4986,
+      "mean_confidence": 0.9999489784240723,
+      "severity": 8.514155377755866,
+      "true_attack_share": 1.0,
+      "incident_id": 1,
+      "window_id": 363,
+      "proposed": {
+        "action": "block_source",
+        "target": "172.16.0.1",
+        "rationale": "172.16.0.1 originated 4986 flagged PortScan flows to 1 host(s); block it at the perimeter pending investigation.",
+        "rules": {
+          "linux": "iptables -I INPUT -s 172.16.0.1 -j DROP",
+          "windows": "New-NetFirewallRule -DisplayName \"GNN-IDS block 172.16.0.1\" -Direction Inbound -RemoteAddress 172.16.0.1 -Action Block"
+        },
+        "dry_run": true
+      }
+    },
+    {
+      "category": "PortScan",
+      "category_id": 6,
+      "n_flows": 4970,
+      "n_sources": 1,
+      "n_destinations": 1,
+      "key_host": "172.16.0.1",
+      "key_role": "source",
+      "key_host_flows": 4970,
+      "mean_confidence": 0.99996018409729,
+      "severity": 8.511037417963742,
+      "true_attack_share": 1.0,
+      "incident_id": 1,
+      "window_id": 373,
+      "proposed": {
+        "action": "block_source",
+        "target": "172.16.0.1",
+        "rationale": "172.16.0.1 originated 4970 flagged PortScan flows to 1 host(s); block it at the perimeter pending investigation.",
+        "rules": {
+          "linux": "iptables -I INPUT -s 172.16.0.1 -j DROP",
+          "windows": "New-NetFirewallRule -DisplayName \"GNN-IDS block 172.16.0.1\" -Direction Inbound -RemoteAddress 172.16.0.1 -Action Block"
+        },
+        "dry_run": true
+      }
+    },
+    {
+      "category": "PortScan",
+      "category_id": 6,
+      "n_flows": 4967,
+      "n_sources": 1,
+      "n_destinations": 1,
+      "key_host": "172.16.0.1",
+      "key_role": "source",
+      "key_host_flows": 4967,
+      "mean_confidence": 0.9999498724937439,
+      "severity": 8.51034599980538,
+      "true_attack_share": 1.0,
+      "incident_id": 1,
+      "window_id": 359,
+      "proposed": {
+        "action": "block_source",
+        "target": "172.16.0.1",
+        "rationale": "172.16.0.1 originated 4967 flagged PortScan flows to 1 host(s); block it at the perimeter pending investigation.",
+        "rules": {
+          "linux": "iptables -I INPUT -s 172.16.0.1 -j DROP",
+          "windows": "New-NetFirewallRule -DisplayName \"GNN-IDS block 172.16.0.1\" -Direction Inbound -RemoteAddress 172.16.0.1 -Action Block"
+        },
+        "dry_run": true
+      }
+    },
+    {
+      "category": "PortScan",
+      "category_id": 6,
+      "n_flows": 4954,
+      "n_sources": 2,
+      "n_destinations": 1,
+      "key_host": "192.168.10.50",
+      "key_role": "destination",
+      "key_host_flows": 4954,
+      "mean_confidence": 0.9999484419822693,
+      "severity": 8.507713783289383,
+      "true_attack_share": 0.9997981429148163,
+      "incident_id": 1,
+      "window_id": 379,
+      "proposed": {
+        "action": "isolate_host",
+        "target": "192.168.10.50",
+        "rationale": "192.168.10.50 is the focal host of a PortScan incident; isolate it for forensic review.",
+        "rules": {
+          "linux": "iptables -I FORWARD -s 192.168.10.50 -j DROP && iptables -I FORWARD -d 192.168.10.50 -j DROP",
+          "windows": "New-NetFirewallRule -DisplayName \"GNN-IDS isolate 192.168.10.50\" -Direction Outbound -RemoteAddress 192.168.10.50 -Action Block"
+        },
+        "dry_run": true
+      }
+    },
+    {
+      "category": "PortScan",
+      "category_id": 6,
+      "n_flows": 4851,
+      "n_sources": 1,
+      "n_destinations": 1,
+      "key_host": "172.16.0.1",
+      "key_role": "source",
+      "key_host_flows": 4851,
+      "mean_confidence": 0.9999122023582458,
+      "severity": 8.486401118636206,
+      "true_attack_share": 1.0,
+      "incident_id": 1,
+      "window_id": 369,
+      "proposed": {
+        "action": "block_source",
+        "target": "172.16.0.1",
+        "rationale": "172.16.0.1 originated 4851 flagged PortScan flows to 1 host(s); block it at the perimeter pending investigation.",
+        "rules": {
+          "linux": "iptables -I INPUT -s 172.16.0.1 -j DROP",
+          "windows": "New-NetFirewallRule -DisplayName \"GNN-IDS block 172.16.0.1\" -Direction Inbound -RemoteAddress 172.16.0.1 -Action Block"
+        },
+        "dry_run": true
+      }
+    }
+  ],
+  "gnn_ewc_replay@0.0001": [
+    {
+      "category": "PortScan",
+      "category_id": 6,
+      "n_flows": 4986,
+      "n_sources": 1,
+      "n_destinations": 1,
+      "key_host": "172.16.0.1",
+      "key_role": "source",
+      "key_host_flows": 4986,
+      "mean_confidence": 0.9999489784240723,
+      "severity": 8.514155377755866,
+      "true_attack_share": 1.0,
+      "incident_id": 1,
+      "window_id": 363,
+      "proposed": {
+        "action": "block_source",
+        "target": "172.16.0.1",
+        "rationale": "172.16.0.1 originated 4986 flagged PortScan flows to 1 host(s); block it at the perimeter pending investigation.",
+        "rules": {
+          "linux": "iptables -I INPUT -s 172.16.0.1 -j DROP",
+          "windows": "New-NetFirewallRule -DisplayName \"GNN-IDS block 172.16.0.1\" -Direction Inbound -RemoteAddress 172.16.0.1 -Action Block"
+        },
+        "dry_run": true
+      }
+    },
+    {
+      "category": "PortScan",
+      "category_id": 6,
+      "n_flows": 4970,
+      "n_sources": 1,
+      "n_destinations": 1,
+      "key_host": "172.16.0.1",
+      "key_role": "source",
+      "key_host_flows": 4970,
+      "mean_confidence": 0.99996018409729,
+      "severity": 8.511037417963742,
+      "true_attack_share": 1.0,
+      "incident_id": 1,
+      "window_id": 373,
+      "proposed": {
+        "action": "block_source",
+        "target": "172.16.0.1",
+        "rationale": "172.16.0.1 originated 4970 flagged PortScan flows to 1 host(s); block it at the perimeter pending investigation.",
+        "rules": {
+          "linux": "iptables -I INPUT -s 172.16.0.1 -j DROP",
+          "windows": "New-NetFirewallRule -DisplayName \"GNN-IDS block 172.16.0.1\" -Direction Inbound -RemoteAddress 172.16.0.1 -Action Block"
+        },
+        "dry_run": true
+      }
+    },
+    {
+      "category": "PortScan",
+      "category_id": 6,
+      "n_flows": 4967,
+      "n_sources": 1,
+      "n_destinations": 1,
+      "key_host": "172.16.0.1",
+      "key_role": "source",
+      "key_host_flows": 4967,
+      "mean_confidence": 0.9999498724937439,
+      "severity": 8.51034599980538,
+      "true_attack_share": 1.0,
+      "incident_id": 1,
+      "window_id": 359,
+      "proposed": {
+        "action": "block_source",
+        "target": "172.16.0.1",
+        "rationale": "172.16.0.1 originated 4967 flagged PortScan flows to 1 host(s); block it at the perimeter pending investigation.",
+        "rules": {
+          "linux": "iptables -I INPUT -s 172.16.0.1 -j DROP",
+          "windows": "New-NetFirewallRule -DisplayName \"GNN-IDS block 172.16.0.1\" -Direction Inbound -RemoteAddress 172.16.0.1 -Action Block"
+        },
+        "dry_run": true
+      }
+    },
+    {
+      "category": "PortScan",
+      "category_id": 6,
+      "n_flows": 4954,
+      "n_sources": 2,
+      "n_destinations": 1,
+      "key_host": "192.168.10.50",
+      "key_role": "destination",
+      "key_host_flows": 4954,
+      "mean_confidence": 0.9999484419822693,
+      "severity": 8.507713783289383,
+      "true_attack_share": 0.9997981429148163,
+      "incident_id": 1,
+      "window_id": 379,
+      "proposed": {
+        "action": "isolate_host",
+        "target": "192.168.10.50",
+        "rationale": "192.168.10.50 is the focal host of a PortScan incident; isolate it for forensic review.",
+        "rules": {
+          "linux": "iptables -I FORWARD -s 192.168.10.50 -j DROP && iptables -I FORWARD -d 192.168.10.50 -j DROP",
+          "windows": "New-NetFirewallRule -DisplayName \"GNN-IDS isolate 192.168.10.50\" -Direction Outbound -RemoteAddress 192.168.10.50 -Action Block"
+        },
+        "dry_run": true
+      }
+    },
+    {
+      "category": "PortScan",
+      "category_id": 6,
+      "n_flows": 4851,
+      "n_sources": 1,
+      "n_destinations": 1,
+      "key_host": "172.16.0.1",
+      "key_role": "source",
+      "key_host_flows": 4851,
+      "mean_confidence": 0.9999122023582458,
+      "severity": 8.486401118636206,
+      "true_attack_share": 1.0,
+      "incident_id": 1,
+      "window_id": 369,
+      "proposed": {
+        "action": "block_source",
+        "target": "172.16.0.1",
+        "rationale": "172.16.0.1 originated 4851 flagged PortScan flows to 1 host(s); block it at the perimeter pending investigation.",
+        "rules": {
+          "linux": "iptables -I INPUT -s 172.16.0.1 -j DROP",
+          "windows": "New-NetFirewallRule -DisplayName \"GNN-IDS block 172.16.0.1\" -Direction Inbound -RemoteAddress 172.16.0.1 -Action Block"
+        },
+        "dry_run": true
+      }
+    }
+  ],
+  "gnn_ewc_replay@1e-05": [
+    {
+      "category": "PortScan",
+      "category_id": 6,
+      "n_flows": 4986,
+      "n_sources": 1,
+      "n_destinations": 1,
+      "key_host": "172.16.0.1",
+      "key_role": "source",
+      "key_host_flows": 4986,
+      "mean_confidence": 0.9999489784240723,
+      "severity": 8.514155377755866,
+      "true_attack_share": 1.0,
+      "incident_id": 1,
+      "window_id": 363,
+      "proposed": {
+        "action": "block_source",
+        "target": "172.16.0.1",
+        "rationale": "172.16.0.1 originated 4986 flagged PortScan flows to 1 host(s); block it at the perimeter pending investigation.",
+        "rules": {
+          "linux": "iptables -I INPUT -s 172.16.0.1 -j DROP",
+          "windows": "New-NetFirewallRule -DisplayName \"GNN-IDS block 172.16.0.1\" -Direction Inbound -RemoteAddress 172.16.0.1 -Action Block"
+        },
+        "dry_run": true
+      }
+    },
+    {
+      "category": "PortScan",
+      "category_id": 6,
+      "n_flows": 4970,
+      "n_sources": 1,
+      "n_destinations": 1,
+      "key_host": "172.16.0.1",
+      "key_role": "source",
+      "key_host_flows": 4970,
+      "mean_confidence": 0.99996018409729,
+      "severity": 8.511037417963742,
+      "true_attack_share": 1.0,
+      "incident_id": 1,
+      "window_id": 373,
+      "proposed": {
+        "action": "block_source",
+        "target": "172.16.0.1",
+        "rationale": "172.16.0.1 originated 4970 flagged PortScan flows to 1 host(s); block it at the perimeter pending investigation.",
+        "rules": {
+          "linux": "iptables -I INPUT -s 172.16.0.1 -j DROP",
+          "windows": "New-NetFirewallRule -DisplayName \"GNN-IDS block 172.16.0.1\" -Direction Inbound -RemoteAddress 172.16.0.1 -Action Block"
+        },
+        "dry_run": true
+      }
+    },
+    {
+      "category": "PortScan",
+      "category_id": 6,
+      "n_flows": 4967,
+      "n_sources": 1,
+      "n_destinations": 1,
+      "key_host": "172.16.0.1",
+      "key_role": "source",
+      "key_host_flows": 4967,
+      "mean_confidence": 0.9999498724937439,
+      "severity": 8.51034599980538,
+      "true_attack_share": 1.0,
+      "incident_id": 1,
+      "window_id": 359,
+      "proposed": {
+        "action": "block_source",
+        "target": "172.16.0.1",
+        "rationale": "172.16.0.1 originated 4967 flagged PortScan flows to 1 host(s); block it at the perimeter pending investigation.",
+        "rules": {
+          "linux": "iptables -I INPUT -s 172.16.0.1 -j DROP",
+          "windows": "New-NetFirewallRule -DisplayName \"GNN-IDS block 172.16.0.1\" -Direction Inbound -RemoteAddress 172.16.0.1 -Action Block"
+        },
+        "dry_run": true
+      }
+    },
+    {
+      "category": "PortScan",
+      "category_id": 6,
+      "n_flows": 4954,
+      "n_sources": 2,
+      "n_destinations": 1,
+      "key_host": "192.168.10.50",
+      "key_role": "destination",
+      "key_host_flows": 4954,
+      "mean_confidence": 0.9999484419822693,
+      "severity": 8.507713783289383,
+      "true_attack_share": 0.9997981429148163,
+      "incident_id": 1,
+      "window_id": 379,
+      "proposed": {
+        "action": "isolate_host",
+        "target": "192.168.10.50",
+        "rationale": "192.168.10.50 is the focal host of a PortScan incident; isolate it for forensic review.",
+        "rules": {
+          "linux": "iptables -I FORWARD -s 192.168.10.50 -j DROP && iptables -I FORWARD -d 192.168.10.50 -j DROP",
+          "windows": "New-NetFirewallRule -DisplayName \"GNN-IDS isolate 192.168.10.50\" -Direction Outbound -RemoteAddress 192.168.10.50 -Action Block"
+        },
+        "dry_run": true
+      }
+    },
+    {
+      "category": "PortScan",
+      "category_id": 6,
+      "n_flows": 4851,
+      "n_sources": 1,
+      "n_destinations": 1,
+      "key_host": "172.16.0.1",
+      "key_role": "source",
+      "key_host_flows": 4851,
+      "mean_confidence": 0.9999122023582458,
+      "severity": 8.486401118636206,
+      "true_attack_share": 1.0,
+      "incident_id": 1,
+      "window_id": 369,
+      "proposed": {
+        "action": "block_source",
+        "target": "172.16.0.1",
+        "rationale": "172.16.0.1 originated 4851 flagged PortScan flows to 1 host(s); block it at the perimeter pending investigation.",
+        "rules": {
+          "linux": "iptables -I INPUT -s 172.16.0.1 -j DROP",
+          "windows": "New-NetFirewallRule -DisplayName \"GNN-IDS block 172.16.0.1\" -Direction Inbound -RemoteAddress 172.16.0.1 -Action Block"
+        },
+        "dry_run": true
+      }
+    }
+  ],
+  "ffnn_ewc_replay@0.0": [
+    {
+      "category": "PortScan",
+      "category_id": 6,
+      "n_flows": 4953,
+      "n_sources": 1,
+      "n_destinations": 1,
+      "key_host": "172.16.0.1",
+      "key_role": "source",
+      "key_host_flows": 4953,
+      "mean_confidence": 0.9999995231628418,
+      "severity": 8.507946553142313,
+      "true_attack_share": 1.0,
+      "incident_id": 1,
+      "window_id": 379,
+      "proposed": {
+        "action": "block_source",
+        "target": "172.16.0.1",
+        "rationale": "172.16.0.1 originated 4953 flagged PortScan flows to 1 host(s); block it at the perimeter pending investigation.",
+        "rules": {
+          "linux": "iptables -I INPUT -s 172.16.0.1 -j DROP",
+          "windows": "New-NetFirewallRule -DisplayName \"GNN-IDS block 172.16.0.1\" -Direction Inbound -RemoteAddress 172.16.0.1 -Action Block"
+        },
+        "dry_run": true
+      }
+    },
+    {
+      "category": "PortScan",
+      "category_id": 6,
+      "n_flows": 4957,
+      "n_sources": 1,
+      "n_destinations": 1,
+      "key_host": "172.16.0.1",
+      "key_role": "source",
+      "key_host_flows": 4957,
+      "mean_confidence": 0.9996763467788696,
+      "severity": 8.506003825753636,
+      "true_attack_share": 1.0,
+      "incident_id": 1,
+      "window_id": 373,
+      "proposed": {
+        "action": "block_source",
+        "target": "172.16.0.1",
+        "rationale": "172.16.0.1 originated 4957 flagged PortScan flows to 1 host(s); block it at the perimeter pending investigation.",
+        "rules": {
+          "linux": "iptables -I INPUT -s 172.16.0.1 -j DROP",
+          "windows": "New-NetFirewallRule -DisplayName \"GNN-IDS block 172.16.0.1\" -Direction Inbound -RemoteAddress 172.16.0.1 -Action Block"
+        },
+        "dry_run": true
+      }
+    },
+    {
+      "category": "PortScan",
+      "category_id": 6,
+      "n_flows": 4851,
+      "n_sources": 1,
+      "n_destinations": 1,
+      "key_host": "172.16.0.1",
+      "key_role": "source",
+      "key_host_flows": 4851,
+      "mean_confidence": 0.9999954700469971,
+      "severity": 8.487107823690208,
+      "true_attack_share": 1.0,
+      "incident_id": 1,
+      "window_id": 369,
+      "proposed": {
+        "action": "block_source",
+        "target": "172.16.0.1",
+        "rationale": "172.16.0.1 originated 4851 flagged PortScan flows to 1 host(s); block it at the perimeter pending investigation.",
+        "rules": {
+          "linux": "iptables -I INPUT -s 172.16.0.1 -j DROP",
+          "windows": "New-NetFirewallRule -DisplayName \"GNN-IDS block 172.16.0.1\" -Direction Inbound -RemoteAddress 172.16.0.1 -Action Block"
+        },
+        "dry_run": true
+      }
+    },
+    {
+      "category": "DoS",
+      "category_id": 2,
+      "n_flows": 4832,
+      "n_sources": 1,
+      "n_destinations": 1,
+      "key_host": "172.16.0.1",
+      "key_role": "source",
+      "key_host_flows": 4832,
+      "mean_confidence": 0.9999995827674866,
+      "severity": 8.483219132368767,
+      "true_attack_share": 1.0,
+      "incident_id": 1,
+      "window_id": 167,
+      "proposed": {
+        "action": "block_source",
+        "target": "172.16.0.1",
+        "rationale": "172.16.0.1 originated 4832 flagged DoS flows to 1 host(s); block it at the perimeter pending investigation.",
+        "rules": {
+          "linux": "iptables -I INPUT -s 172.16.0.1 -j DROP",
+          "windows": "New-NetFirewallRule -DisplayName \"GNN-IDS block 172.16.0.1\" -Direction Inbound -RemoteAddress 172.16.0.1 -Action Block"
+        },
+        "dry_run": true
+      }
+    },
+    {
+      "category": "DoS",
+      "category_id": 2,
+      "n_flows": 4824,
+      "n_sources": 1,
+      "n_destinations": 1,
+      "key_host": "172.16.0.1",
+      "key_role": "source",
+      "key_host_flows": 4824,
+      "mean_confidence": 0.9999994039535522,
+      "severity": 8.481560958365792,
+      "true_attack_share": 1.0,
+      "incident_id": 1,
+      "window_id": 161,
+      "proposed": {
+        "action": "block_source",
+        "target": "172.16.0.1",
+        "rationale": "172.16.0.1 originated 4824 flagged DoS flows to 1 host(s); block it at the perimeter pending investigation.",
+        "rules": {
+          "linux": "iptables -I INPUT -s 172.16.0.1 -j DROP",
+          "windows": "New-NetFirewallRule -DisplayName \"GNN-IDS block 172.16.0.1\" -Direction Inbound -RemoteAddress 172.16.0.1 -Action Block"
+        },
+        "dry_run": true
+      }
+    }
+  ],
+  "ffnn_ewc_replay@0.001": [
+    {
+      "category": "PortScan",
+      "category_id": 6,
+      "n_flows": 4953,
+      "n_sources": 1,
+      "n_destinations": 1,
+      "key_host": "172.16.0.1",
+      "key_role": "source",
+      "key_host_flows": 4953,
+      "mean_confidence": 0.9999995231628418,
+      "severity": 8.507946553142313,
+      "true_attack_share": 1.0,
+      "incident_id": 1,
+      "window_id": 379,
+      "proposed": {
+        "action": "block_source",
+        "target": "172.16.0.1",
+        "rationale": "172.16.0.1 originated 4953 flagged PortScan flows to 1 host(s); block it at the perimeter pending investigation.",
+        "rules": {
+          "linux": "iptables -I INPUT -s 172.16.0.1 -j DROP",
+          "windows": "New-NetFirewallRule -DisplayName \"GNN-IDS block 172.16.0.1\" -Direction Inbound -RemoteAddress 172.16.0.1 -Action Block"
+        },
+        "dry_run": true
+      }
+    },
+    {
+      "category": "PortScan",
+      "category_id": 6,
+      "n_flows": 4957,
+      "n_sources": 1,
+      "n_destinations": 1,
+      "key_host": "172.16.0.1",
+      "key_role": "source",
+      "key_host_flows": 4957,
+      "mean_confidence": 0.9996763467788696,
+      "severity": 8.506003825753636,
+      "true_attack_share": 1.0,
+      "incident_id": 1,
+      "window_id": 373,
+      "proposed": {
+        "action": "block_source",
+        "target": "172.16.0.1",
+        "rationale": "172.16.0.1 originated 4957 flagged PortScan flows to 1 host(s); block it at the perimeter pending investigation.",
+        "rules": {
+          "linux": "iptables -I INPUT -s 172.16.0.1 -j DROP",
+          "windows": "New-NetFirewallRule -DisplayName \"GNN-IDS block 172.16.0.1\" -Direction Inbound -RemoteAddress 172.16.0.1 -Action Block"
+        },
+        "dry_run": true
+      }
+    },
+    {
+      "category": "PortScan",
+      "category_id": 6,
+      "n_flows": 4851,
+      "n_sources": 1,
+      "n_destinations": 1,
+      "key_host": "172.16.0.1",
+      "key_role": "source",
+      "key_host_flows": 4851,
+      "mean_confidence": 0.9999954700469971,
+      "severity": 8.487107823690208,
+      "true_attack_share": 1.0,
+      "incident_id": 1,
+      "window_id": 369,
+      "proposed": {
+        "action": "block_source",
+        "target": "172.16.0.1",
+        "rationale": "172.16.0.1 originated 4851 flagged PortScan flows to 1 host(s); block it at the perimeter pending investigation.",
+        "rules": {
+          "linux": "iptables -I INPUT -s 172.16.0.1 -j DROP",
+          "windows": "New-NetFirewallRule -DisplayName \"GNN-IDS block 172.16.0.1\" -Direction Inbound -RemoteAddress 172.16.0.1 -Action Block"
+        },
+        "dry_run": true
+      }
+    },
+    {
+      "category": "DoS",
+      "category_id": 2,
+      "n_flows": 4832,
+      "n_sources": 1,
+      "n_destinations": 1,
+      "key_host": "172.16.0.1",
+      "key_role": "source",
+      "key_host_flows": 4832,
+      "mean_confidence": 0.9999995827674866,
+      "severity": 8.483219132368767,
+      "true_attack_share": 1.0,
+      "incident_id": 1,
+      "window_id": 167,
+      "proposed": {
+        "action": "block_source",
+        "target": "172.16.0.1",
+        "rationale": "172.16.0.1 originated 4832 flagged DoS flows to 1 host(s); block it at the perimeter pending investigation.",
+        "rules": {
+          "linux": "iptables -I INPUT -s 172.16.0.1 -j DROP",
+          "windows": "New-NetFirewallRule -DisplayName \"GNN-IDS block 172.16.0.1\" -Direction Inbound -RemoteAddress 172.16.0.1 -Action Block"
+        },
+        "dry_run": true
+      }
+    },
+    {
+      "category": "DoS",
+      "category_id": 2,
+      "n_flows": 4824,
+      "n_sources": 1,
+      "n_destinations": 1,
+      "key_host": "172.16.0.1",
+      "key_role": "source",
+      "key_host_flows": 4824,
+      "mean_confidence": 0.9999994039535522,
+      "severity": 8.481560958365792,
+      "true_attack_share": 1.0,
+      "incident_id": 1,
+      "window_id": 161,
+      "proposed": {
+        "action": "block_source",
+        "target": "172.16.0.1",
+        "rationale": "172.16.0.1 originated 4824 flagged DoS flows to 1 host(s); block it at the perimeter pending investigation.",
+        "rules": {
+          "linux": "iptables -I INPUT -s 172.16.0.1 -j DROP",
+          "windows": "New-NetFirewallRule -DisplayName \"GNN-IDS block 172.16.0.1\" -Direction Inbound -RemoteAddress 172.16.0.1 -Action Block"
+        },
+        "dry_run": true
+      }
+    }
+  ],
+  "ffnn_ewc_replay@0.0001": [
+    {
+      "category": "PortScan",
+      "category_id": 6,
+      "n_flows": 4953,
+      "n_sources": 1,
+      "n_destinations": 1,
+      "key_host": "172.16.0.1",
+      "key_role": "source",
+      "key_host_flows": 4953,
+      "mean_confidence": 0.9999995231628418,
+      "severity": 8.507946553142313,
+      "true_attack_share": 1.0,
+      "incident_id": 1,
+      "window_id": 379,
+      "proposed": {
+        "action": "block_source",
+        "target": "172.16.0.1",
+        "rationale": "172.16.0.1 originated 4953 flagged PortScan flows to 1 host(s); block it at the perimeter pending investigation.",
+        "rules": {
+          "linux": "iptables -I INPUT -s 172.16.0.1 -j DROP",
+          "windows": "New-NetFirewallRule -DisplayName \"GNN-IDS block 172.16.0.1\" -Direction Inbound -RemoteAddress 172.16.0.1 -Action Block"
+        },
+        "dry_run": true
+      }
+    },
+    {
+      "category": "PortScan",
+      "category_id": 6,
+      "n_flows": 4947,
+      "n_sources": 1,
+      "n_destinations": 1,
+      "key_host": "172.16.0.1",
+      "key_role": "source",
+      "key_host_flows": 4947,
+      "mean_confidence": 0.9999982118606567,
+      "severity": 8.506723522278167,
+      "true_attack_share": 1.0,
+      "incident_id": 1,
+      "window_id": 373,
+      "proposed": {
+        "action": "block_source",
+        "target": "172.16.0.1",
+        "rationale": "172.16.0.1 originated 4947 flagged PortScan flows to 1 host(s); block it at the perimeter pending investigation.",
+        "rules": {
+          "linux": "iptables -I INPUT -s 172.16.0.1 -j DROP",
+          "windows": "New-NetFirewallRule -DisplayName \"GNN-IDS block 172.16.0.1\" -Direction Inbound -RemoteAddress 172.16.0.1 -Action Block"
+        },
+        "dry_run": true
+      }
+    },
+    {
+      "category": "PortScan",
+      "category_id": 6,
+      "n_flows": 4849,
+      "n_sources": 1,
+      "n_destinations": 1,
+      "key_host": "172.16.0.1",
+      "key_role": "source",
+      "key_host_flows": 4849,
+      "mean_confidence": 0.9999988675117493,
+      "severity": 8.486724372805005,
+      "true_attack_share": 1.0,
+      "incident_id": 1,
+      "window_id": 369,
+      "proposed": {
+        "action": "block_source",
+        "target": "172.16.0.1",
+        "rationale": "172.16.0.1 originated 4849 flagged PortScan flows to 1 host(s); block it at the perimeter pending investigation.",
+        "rules": {
+          "linux": "iptables -I INPUT -s 172.16.0.1 -j DROP",
+          "windows": "New-NetFirewallRule -DisplayName \"GNN-IDS block 172.16.0.1\" -Direction Inbound -RemoteAddress 172.16.0.1 -Action Block"
+        },
+        "dry_run": true
+      }
+    },
+    {
+      "category": "DoS",
+      "category_id": 2,
+      "n_flows": 4832,
+      "n_sources": 1,
+      "n_destinations": 1,
+      "key_host": "172.16.0.1",
+      "key_role": "source",
+      "key_host_flows": 4832,
+      "mean_confidence": 0.9999995827674866,
+      "severity": 8.483219132368767,
+      "true_attack_share": 1.0,
+      "incident_id": 1,
+      "window_id": 167,
+      "proposed": {
+        "action": "block_source",
+        "target": "172.16.0.1",
+        "rationale": "172.16.0.1 originated 4832 flagged DoS flows to 1 host(s); block it at the perimeter pending investigation.",
+        "rules": {
+          "linux": "iptables -I INPUT -s 172.16.0.1 -j DROP",
+          "windows": "New-NetFirewallRule -DisplayName \"GNN-IDS block 172.16.0.1\" -Direction Inbound -RemoteAddress 172.16.0.1 -Action Block"
+        },
+        "dry_run": true
+      }
+    },
+    {
+      "category": "DoS",
+      "category_id": 2,
+      "n_flows": 4824,
+      "n_sources": 1,
+      "n_destinations": 1,
+      "key_host": "172.16.0.1",
+      "key_role": "source",
+      "key_host_flows": 4824,
+      "mean_confidence": 0.9999994039535522,
+      "severity": 8.481560958365792,
+      "true_attack_share": 1.0,
+      "incident_id": 1,
+      "window_id": 161,
+      "proposed": {
+        "action": "block_source",
+        "target": "172.16.0.1",
+        "rationale": "172.16.0.1 originated 4824 flagged DoS flows to 1 host(s); block it at the perimeter pending investigation.",
+        "rules": {
+          "linux": "iptables -I INPUT -s 172.16.0.1 -j DROP",
+          "windows": "New-NetFirewallRule -DisplayName \"GNN-IDS block 172.16.0.1\" -Direction Inbound -RemoteAddress 172.16.0.1 -Action Block"
+        },
+        "dry_run": true
+      }
+    }
+  ],
+  "ffnn_ewc_replay@1e-05": [
+    {
+      "category": "PortScan",
+      "category_id": 6,
+      "n_flows": 4941,
+      "n_sources": 1,
+      "n_destinations": 1,
+      "key_host": "172.16.0.1",
+      "key_role": "source",
+      "key_host_flows": 4941,
+      "mean_confidence": 1.0,
+      "severity": 8.505525386548555,
+      "true_attack_share": 1.0,
+      "incident_id": 1,
+      "window_id": 379,
+      "proposed": {
+        "action": "block_source",
+        "target": "172.16.0.1",
+        "rationale": "172.16.0.1 originated 4941 flagged PortScan flows to 1 host(s); block it at the perimeter pending investigation.",
+        "rules": {
+          "linux": "iptables -I INPUT -s 172.16.0.1 -j DROP",
+          "windows": "New-NetFirewallRule -DisplayName \"GNN-IDS block 172.16.0.1\" -Direction Inbound -RemoteAddress 172.16.0.1 -Action Block"
+        },
+        "dry_run": true
+      }
+    },
+    {
+      "category": "PortScan",
+      "category_id": 6,
+      "n_flows": 4933,
+      "n_sources": 1,
+      "n_destinations": 1,
+      "key_host": "172.16.0.1",
+      "key_role": "source",
+      "key_host_flows": 4933,
+      "mean_confidence": 1.0,
+      "severity": 8.503905297089302,
+      "true_attack_share": 1.0,
+      "incident_id": 1,
+      "window_id": 373,
+      "proposed": {
+        "action": "block_source",
+        "target": "172.16.0.1",
+        "rationale": "172.16.0.1 originated 4933 flagged PortScan flows to 1 host(s); block it at the perimeter pending investigation.",
+        "rules": {
+          "linux": "iptables -I INPUT -s 172.16.0.1 -j DROP",
+          "windows": "New-NetFirewallRule -DisplayName \"GNN-IDS block 172.16.0.1\" -Direction Inbound -RemoteAddress 172.16.0.1 -Action Block"
+        },
+        "dry_run": true
+      }
+    },
+    {
+      "category": "PortScan",
+      "category_id": 6,
+      "n_flows": 4824,
+      "n_sources": 1,
+      "n_destinations": 1,
+      "key_host": "172.16.0.1",
+      "key_role": "source",
+      "key_host_flows": 4824,
+      "mean_confidence": 1.0,
+      "severity": 8.481566013773087,
+      "true_attack_share": 1.0,
+      "incident_id": 1,
+      "window_id": 369,
+      "proposed": {
+        "action": "block_source",
+        "target": "172.16.0.1",
+        "rationale": "172.16.0.1 originated 4824 flagged PortScan flows to 1 host(s); block it at the perimeter pending investigation.",
+        "rules": {
+          "linux": "iptables -I INPUT -s 172.16.0.1 -j DROP",
+          "windows": "New-NetFirewallRule -DisplayName \"GNN-IDS block 172.16.0.1\" -Direction Inbound -RemoteAddress 172.16.0.1 -Action Block"
+        },
+        "dry_run": true
+      }
+    },
+    {
+      "category": "DoS",
+      "category_id": 2,
+      "n_flows": 4787,
+      "n_sources": 1,
+      "n_destinations": 1,
+      "key_host": "172.16.0.1",
+      "key_role": "source",
+      "key_host_flows": 4787,
+      "mean_confidence": 1.0,
+      "severity": 8.473868066677865,
+      "true_attack_share": 1.0,
+      "incident_id": 1,
+      "window_id": 167,
+      "proposed": {
+        "action": "block_source",
+        "target": "172.16.0.1",
+        "rationale": "172.16.0.1 originated 4787 flagged DoS flows to 1 host(s); block it at the perimeter pending investigation.",
+        "rules": {
+          "linux": "iptables -I INPUT -s 172.16.0.1 -j DROP",
+          "windows": "New-NetFirewallRule -DisplayName \"GNN-IDS block 172.16.0.1\" -Direction Inbound -RemoteAddress 172.16.0.1 -Action Block"
+        },
+        "dry_run": true
+      }
+    },
+    {
+      "category": "DoS",
+      "category_id": 2,
+      "n_flows": 4782,
+      "n_sources": 1,
+      "n_destinations": 1,
+      "key_host": "172.16.0.1",
+      "key_role": "source",
+      "key_host_flows": 4782,
+      "mean_confidence": 1.0,
+      "severity": 8.472823243680297,
+      "true_attack_share": 1.0,
+      "incident_id": 1,
+      "window_id": 161,
+      "proposed": {
+        "action": "block_source",
+        "target": "172.16.0.1",
+        "rationale": "172.16.0.1 originated 4782 flagged DoS flows to 1 host(s); block it at the perimeter pending investigation.",
+        "rules": {
+          "linux": "iptables -I INPUT -s 172.16.0.1 -j DROP",
+          "windows": "New-NetFirewallRule -DisplayName \"GNN-IDS block 172.16.0.1\" -Direction Inbound -RemoteAddress 172.16.0.1 -Action Block"
+        },
+        "dry_run": true
+      }
+    }
+  ]
+}

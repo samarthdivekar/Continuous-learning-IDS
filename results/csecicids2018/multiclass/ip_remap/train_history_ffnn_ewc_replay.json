@@ -1,0 +1,216 @@
+[
+  {
+    "tag": "task0",
+    "seconds": 63.309030532836914,
+    "steps": 6070,
+    "final_loss": 1.892929759605977e-07,
+    "extra": {
+      "ewc": {
+        "tag": "task0",
+        "consolidation": 1,
+        "fisher_max": 1.0,
+        "fisher_mean": 0.001874535228125751,
+        "stability_ratio": 0.009999999776482582
+      },
+      "buffer": {
+        "0": {
+          "stored": 5000,
+          "seen": 611877
+        },
+        "1": {
+          "stored": 5000,
+          "seen": 9545
+        }
+      }
+    }
+  },
+  {
+    "tag": "task1",
+    "seconds": 312.5215153694153,
+    "steps": 13140,
+    "final_loss": 0.00013659187243320048,
+    "extra": {
+      "ewc": {
+        "tag": "task1",
+        "consolidation": 2,
+        "fisher_max": 1.36068594455719,
+        "fisher_mean": 0.002249720273539424,
+        "stability_ratio": 0.013606859371066093
+      },
+      "buffer": {
+        "0": {
+          "stored": 5000,
+          "seen": 1764000
+        },
+        "1": {
+          "stored": 5000,
+          "seen": 9545
+        },
+        "2": {
+          "stored": 5000,
+          "seen": 193325
+        }
+      }
+    }
+  },
+  {
+    "tag": "task2",
+    "seconds": 394.132226228714,
+    "steps": 16480,
+    "final_loss": 0.0005454210913740098,
+    "extra": {
+      "ewc": {
+        "tag": "task2",
+        "consolidation": 3,
+        "fisher_max": 1.6903998851776123,
+        "fisher_mean": 0.0027865979354828596,
+        "stability_ratio": 0.01690399833023548
+      },
+      "buffer": {
+        "0": {
+          "stored": 5000,
+          "seen": 3307652
+        },
+        "1": {
+          "stored": 5000,
+          "seen": 9545
+        },
+        "2": {
+          "stored": 5000,
+          "seen": 193325
+        },
+        "3": {
+          "stored": 4,
+          "seen": 4
+        },
+        "7": {
+          "stored": 5000,
+          "seen": 143741
+        }
+      }
+    }
+  },
+  {
+    "tag": "task3",
+    "seconds": 223.3031027317047,
+    "steps": 9240,
+    "final_loss": 0.0009149090619757771,
+    "extra": {
+      "ewc": {
+        "tag": "task3",
+        "consolidation": 4,
+        "fisher_max": 1.7417116165161133,
+        "fisher_mean": 0.0037003918550908566,
+        "stability_ratio": 0.017417116090655327
+      },
+      "buffer": {
+        "0": {
+          "stored": 5000,
+          "seen": 4253233
+        },
+        "1": {
+          "stored": 5000,
+          "seen": 9545
+        },
+        "2": {
+          "stored": 5000,
+          "seen": 193325
+        },
+        "3": {
+          "stored": 27,
+          "seen": 27
+        },
+        "7": {
+          "stored": 5000,
+          "seen": 143741
+        }
+      }
+    }
+  },
+  {
+    "tag": "task4",
+    "seconds": 322.69565057754517,
+    "steps": 13460,
+    "final_loss": 0.005877266172319651,
+    "extra": {
+      "ewc": {
+        "tag": "task4",
+        "consolidation": 5,
+        "fisher_max": 1.6983217000961304,
+        "fisher_mean": 0.003647835925221443,
+        "stability_ratio": 0.016983216628432274
+      },
+      "buffer": {
+        "0": {
+          "stored": 5000,
+          "seen": 5621732
+        },
+        "1": {
+          "stored": 5000,
+          "seen": 9545
+        },
+        "2": {
+          "stored": 5000,
+          "seen": 193325
+        },
+        "3": {
+          "stored": 27,
+          "seen": 27
+        },
+        "4": {
+          "stored": 5000,
+          "seen": 9704
+        },
+        "7": {
+          "stored": 5000,
+          "seen": 143741
+        }
+      }
+    }
+  },
+  {
+    "tag": "task5",
+    "seconds": 156.8903567790985,
+    "steps": 6460,
+    "final_loss": 0.003462533699348569,
+    "extra": {
+      "ewc": {
+        "tag": "task5",
+        "consolidation": 6,
+        "fisher_max": 2.103787899017334,
+        "fisher_mean": 0.003866632468998432,
+        "stability_ratio": 0.021037878468632698
+      },
+      "buffer": {
+        "0": {
+          "stored": 5000,
+          "seen": 6267570
+        },
+        "1": {
+          "stored": 5000,
+          "seen": 9545
+        },
+        "2": {
+          "stored": 5000,
+          "seen": 193325
+        },
+        "3": {
+          "stored": 27,
+          "seen": 27
+        },
+        "4": {
+          "stored": 5000,
+          "seen": 9704
+        },
+        "5": {
+          "stored": 5000,
+          "seen": 15299
+        },
+        "7": {
+          "stored": 5000,
+          "seen": 143741
+        }
+      }
+    }
+  }
+]

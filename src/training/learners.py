@@ -49,6 +49,8 @@ MODEL_SPECS = {
     "gnn_replay":       {"family": "gnn", "ewc": False, "replay": True},
     "gnn_ewc_replay":   {"family": "gnn", "ewc": True,  "replay": True},
     "gnn_joint":        {"family": "gnn", "ewc": False, "replay": False, "joint": True},
+    # improvement 7: identical to gnn_ewc_replay + topology augmentation during training
+    "gnn_ewc_replay_topo": {"family": "gnn", "ewc": True, "replay": True, "topo_aug": True, "base": "gnn_ewc_replay"},
     "ffnn_naive":       {"family": "ffnn", "ewc": False, "replay": False},
     "ffnn_ewc":         {"family": "ffnn", "ewc": True,  "replay": False},
     "ffnn_replay":      {"family": "ffnn", "ewc": False, "replay": True},
@@ -140,6 +142,33 @@ class XGBLearner(BaseLearner):
 class _TorchLearner(BaseLearner):
     """Shared optimiser / EWC / replay plumbing for GNN and FFNN learners."""
 
+    # ---- snapshot / rollback (improvement 8: safe adaptation gate) ------------
+    def snapshot_state(self) -> dict:
+        """Everything learn() mutates: weights, optimiser moments, EWC anchors/Fisher,
+        replay buffer contents and the per-learner RNG."""
+        return {
+            "model": {k: v.detach().clone() for k, v in self.model.state_dict().items()},
+            "optimizer": copy.deepcopy(self.optimizer.state_dict()),
+            "ewc": copy.deepcopy(self.ewc.state_dict()) if getattr(self, "ewc", None) is not None else None,
+            "buffer": self.buffer.snapshot() if getattr(self, "buffer", None) is not None else None,
+            "buffered_windows": set(getattr(self, "buffered_windows", set())),
+            "rng": copy.deepcopy(self.rng.bit_generator.state),
+            "n_learn_calls": self.n_learn_calls, "history_len": len(self.history),
+        }
+
+    def restore_state(self, st: dict) -> None:
+        self.model.load_state_dict(st["model"])
+        self.optimizer.load_state_dict(st["optimizer"])
+        if st["ewc"] is not None:
+            self.ewc.load_state_dict(st["ewc"], self.device)
+        if st["buffer"] is not None:
+            self.buffer.restore(st["buffer"])
+        if hasattr(self, "buffered_windows"):
+            self.buffered_windows = set(st["buffered_windows"])
+        self.rng.bit_generator.state = st["rng"]
+        self.n_learn_calls = st["n_learn_calls"]
+        del self.history[st["history_len"]:]
+
     def _post_init(self, model: torch.nn.Module):
         self.model = model.to(self.device)
         tcfg = self.cfg["train"]
@@ -188,10 +217,25 @@ class GNNLearner(_TorchLearner):
     def _labels(self, g) -> torch.Tensor:
         return edge_labels(g, self.label_mode)
 
+    def _augment(self, g: Data) -> Data:
+        """Improvement 7 — topology augmentation. With probability p the window's
+        source hosts are reassigned at random (as in the IP-remap test), so the
+        attacker is no longer a single hub and the model must rely on behaviour."""
+        if not self.spec.get("topo_aug"):
+            return g
+        acfg = self.cfg["graph"].get("topology_augment", {"prob": 0.5, "pool_size": 65536})
+        if self.rng.random() >= float(acfg["prob"]):
+            return g
+        from src.graph.ip_remap import reassign_sources
+        return reassign_sources(g, int(acfg["pool_size"]), int(self.rng.integers(2**31)),
+                                self.cfg["graph"]["node_features"])
+
     def _loss_on(self, sub: Data, weight: torch.Tensor, category_balanced: bool = False) -> torch.Tensor:
         sub = sub.to(self.device)
         logits = self.model(sub.x, sub.edge_index, sub.edge_attr)
-        mask = sub.target_mask
+        mask = sub.target_mask & sub.label_mask if "label_mask" in sub else sub.target_mask
+        if not bool(mask.any()):                 # no labelled target in this (sub)graph
+            return logits.sum() * 0.0
         if not category_balanced:
             return F.cross_entropy(logits[mask], self._labels(sub)[mask], weight=weight)
         # Category-balanced replay loss: mean CE per category, then mean over
@@ -225,20 +269,22 @@ class GNNLearner(_TorchLearner):
         else:
             train_graphs = graphs
 
-        labels = torch.cat([self._labels(g) for g in train_graphs]).numpy()
+        # class weights from LABELLED flows only (active learning labels a few flows per window)
+        labels = torch.cat([self._labels(g)[g.label_mask] if "label_mask" in g else self._labels(g)
+                            for g in train_graphs]).numpy()
         weight = class_weights(labels, self.num_classes, tcfg["class_weight_power"],
                                tcfg["class_weight_clip"]).to(self.device)
         self.model.train()
         steps, last = 0, float("nan")
         for _ in range(epochs):
             for gi in self.rng.permutation(len(train_graphs)):
-                for sub in iter_training_subgraphs(train_graphs[gi], ns, self.rng):
+                for sub in iter_training_subgraphs(self._augment(train_graphs[gi]), ns, self.rng):
                     loss = self._loss_on(sub, weight)
                     replay_loss = torch.zeros((), device=self.device)
                     if self.buffer is not None and self.buffer.categories:
                         # Fixed replay budget per step (see replay_buffer.py). Stored
                         # windows are batched into one disjoint-union graph.
-                        replayed = [next(iter_training_subgraphs(r, ns, self.rng))
+                        replayed = [next(iter_training_subgraphs(self._augment(r), ns, self.rng))
                                     for r in self.buffer.sample()]
                         if replayed:
                             rb = Batch.from_data_list(replayed)
@@ -273,6 +319,14 @@ class GNNLearner(_TorchLearner):
         logits = self.model(g.x.to(self.device), g.edge_index.to(self.device), g.edge_attr.to(self.device))
         return torch.softmax(logits, dim=-1).cpu().numpy()
 
+    @torch.no_grad()
+    def predict_details(self, g: Data) -> tuple[np.ndarray, np.ndarray]:
+        """(logits, embeddings) per flow — for novelty scoring and embedding drift."""
+        self.model.eval()
+        logits, z = self.model.forward_with_embedding(g.x.to(self.device), g.edge_index.to(self.device),
+                                                      g.edge_attr.to(self.device))
+        return logits.cpu().numpy(), z.cpu().numpy()
+
 
 # ---------------------------------------------------------------------------
 class FFNNLearner(_TorchLearner):
@@ -300,8 +354,11 @@ class FFNNLearner(_TorchLearner):
             return LearnStats(tag, 0.0, 0, float("nan"), {"skipped": "no graphs"})
         tcfg, rcfg = self.cfg["train"], self.cfg["replay"]
         epochs = epochs or tcfg["ffnn_epochs"]
-        X_new = torch.cat([g.edge_attr for g in graphs]).numpy()
-        ycat_new = torch.cat([g.y for g in graphs]).numpy()
+        # only LABELLED flows train the per-flow model (active learning labels a few per window)
+        X_new = torch.cat([g.edge_attr[g.label_mask] if "label_mask" in g else g.edge_attr for g in graphs]).numpy()
+        ycat_new = torch.cat([g.y[g.label_mask] if "label_mask" in g else g.y for g in graphs]).numpy()
+        if len(ycat_new) == 0:
+            return LearnStats(tag, 0.0, 0, float("nan"), {"skipped": "no labelled flows"})
         if self.spec.get("joint"):
             self.joint_X.append(X_new)
             self.joint_y.append(ycat_new)
@@ -353,8 +410,9 @@ class FFNNLearner(_TorchLearner):
             # Offer each window's flows to the reservoir once (drift adaptations overlap).
             fresh = [g for g in graphs if int(g.window_id) not in self.buffered_windows]
             if fresh:
-                self.buffer.add(torch.cat([g.edge_attr for g in fresh]).numpy(),
-                                torch.cat([g.y for g in fresh]).numpy())
+                sel = lambda g, t: t[g.label_mask] if "label_mask" in g else t  # noqa: E731
+                self.buffer.add(torch.cat([sel(g, g.edge_attr) for g in fresh]).numpy(),
+                                torch.cat([sel(g, g.y) for g in fresh]).numpy())
                 self.buffered_windows.update(int(g.window_id) for g in fresh)
             extra["buffer"] = self.buffer.summary()
         self.n_learn_calls += 1
@@ -370,6 +428,33 @@ class FFNNLearner(_TorchLearner):
         for s in range(0, len(X), 65536):
             out.append(torch.softmax(self.model(X[s:s + 65536].to(self.device)), dim=-1).cpu())
         return torch.cat(out).numpy()
+
+    @torch.no_grad()
+    def predict_details(self, g: Data) -> tuple[np.ndarray, np.ndarray]:
+        """(logits, embeddings) per flow — for novelty scoring and embedding drift."""
+        self.model.eval()
+        L, Z = [], []
+        X = g.edge_attr
+        for s in range(0, len(X), 65536):
+            lo, z = self.model.forward_with_embedding(X[s:s + 65536].to(self.device))
+            L.append(lo.cpu()); Z.append(z.cpu())
+        return torch.cat(L).numpy(), torch.cat(Z).numpy()
+
+
+def load_learner_checkpoint(learner: BaseLearner, path) -> BaseLearner:
+    """Restore model weights (and EWC state) from a run_continual checkpoint."""
+    import pickle
+    from pathlib import Path
+    path = Path(path)
+    if learner.family == "xgb":
+        with open(path.with_suffix(".pkl"), "rb") as fh:
+            learner.model = pickle.load(fh)
+        return learner
+    state = torch.load(path, map_location=learner.device, weights_only=False)
+    learner.model.load_state_dict(state["model"])
+    if getattr(learner, "ewc", None) is not None and "ewc" in state:
+        learner.ewc.load_state_dict(state["ewc"], learner.device)
+    return learner
 
 
 def make_learner(name: str, cfg: dict, n_features: int, num_classes: int, device: torch.device,

@@ -64,6 +64,12 @@ graph:
   layers: 2
   dropout: 0.2
   edge_skip: true           # classifier also sees the edge's own (projected) features
+  # Improvement 7 (model gnn_ewc_replay_topo only): with this probability a training
+  # window's source hosts are reassigned at random, so the model cannot rely on
+  # "attacker = one hub" and must learn behaviour. Evaluated by the IP-remap test.
+  topology_augment:
+    prob: 0.5
+    pool_size: 65536
   neighbor_sampling:
     enabled: auto           # auto | true | false  (auto = only for windows larger than max_edges_full)
     max_edges_full: 20000

@@ -1,0 +1,10 @@
+overrides:
+- replay.category_balanced_loss=false
+- train.ffnn_epochs=10
+- train.gnn_epochs=10
+per_model:
+  ffnn_ewc_replay:
+  - train.ffnn_epochs=10
+  gnn_ewc_replay:
+  - train.gnn_epochs=10
+  - replay.category_balanced_loss=false

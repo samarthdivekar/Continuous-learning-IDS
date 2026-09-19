@@ -45,6 +45,12 @@ class FeatureScaler:
             out[s:s + chunk] = np.clip(Z, -self.clip_value, self.clip_value)
         return out
 
+    def inverse_transform(self, Z: np.ndarray) -> np.ndarray:
+        """Approximate original units (exact unless the value was clipped). Used to
+        show analysts real feature values, e.g. 'SYN Flag Count = 1'."""
+        L = np.asarray(Z, dtype=np.float64) * self.scale_ + self.mean_
+        return np.sign(L) * np.expm1(np.abs(L))
+
     def save(self, path: Path) -> None:
         with open(path, "w", encoding="utf-8") as fh:
             json.dump({"clip_value": self.clip_value, "mean": self.mean_.tolist(),

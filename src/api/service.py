@@ -275,6 +275,59 @@ class MLService:
             "note": "Node ids are per-window indices; IP addresses are not exposed.",
         }
 
+    # ------------------------------------------------ incidents / explanations
+    def _ips(self):
+        if getattr(self, "_ip_cols", None) is None:
+            d = pd.read_parquet(processed_dir(self.cfg) / "flows.parquet", columns=["src_ip", "dst_ip", "ts"])
+            self._ip_cols = (d["src_ip"].astype(str).to_numpy(), d["dst_ip"].astype(str).to_numpy(), d["ts"].to_numpy())
+        return self._ip_cols
+
+    def incidents(self, window_id: int, model: str = "gnn_ewc_replay", threshold: float = 0.0) -> dict:
+        """Improvement 3: flagged flows of a window grouped into incidents (with IPs)."""
+        from src.product.incidents import build_incidents, incident_metrics
+        from src.product.response import propose_action
+        g = self.get_window(window_id)
+        if g is None:
+            raise KeyError(f"window {window_id} not found")
+        with self.lock:
+            learners = self.active_learners()
+            if model not in learners:
+                raise KeyError(f"model {model} not loaded")
+            probs = learners[model].predict_proba(g)
+        src, dst, ts = self._ips()
+        fi = g.flow_idx.numpy()
+        names = class_names(self.cfg)
+        inc = build_incidents(src[fi], dst[fi], probs, names, threshold=threshold, ts=ts[fi], y_cat=g.y.numpy())
+        metrics = incident_metrics(inc, g.y.numpy())         # uses ground truth: evaluation info for the demo
+        for i in inc:
+            i["proposed"] = propose_action(i)
+            i["sample_edges"] = i["flow_indices"][:5]           # window-local edge ids, for /explain
+            del i["flow_indices"]
+        return {"window_id": int(window_id), "model": model, "threshold": threshold,
+                "n_flows": int(len(fi)), "flagged_flows": int(sum(i["n_flows"] for i in inc)),
+                "metrics": metrics, "incidents": inc}
+
+    def explain(self, window_id: int, edge: int, model: str = "gnn_ewc_replay") -> dict:
+        """Improvement 2: why was this flow classified the way it was?"""
+        from src.explain.explain import explain_edge, summarize
+        g = self.get_window(window_id)
+        if g is None:
+            raise KeyError(f"window {window_id} not found")
+        if not 0 <= edge < g.edge_index.shape[1]:
+            raise KeyError(f"edge {edge} out of range")
+        with self.lock:
+            learners = self.active_learners()
+            if model not in learners or learners[model].family == "xgb":
+                raise KeyError(f"model {model} cannot be explained (needs a neural model)")
+            exp = explain_edge(learners[model], g, int(edge), self.data.feature_columns, self.scaler)
+        names = class_names(self.cfg)
+        src, dst, _ = self._ips()
+        fi = int(g.flow_idx[edge])
+        exp.update({"summary": summarize(exp, names), "predicted_label": names[exp["predicted_class"]],
+                    "true_label": self.cfg["categories"][int(g.y[edge])], "src_ip": src[fi], "dst_ip": dst[fi],
+                    "window_id": int(window_id), "model": model})
+        return exp
+
     def list_windows(self) -> list[dict]:
         """Every cached window with its task, split and attack composition (for the explorer)."""
         if getattr(self, "_window_list", None) is None:

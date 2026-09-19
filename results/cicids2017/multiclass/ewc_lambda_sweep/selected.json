@@ -1,0 +1,14 @@
+{
+  "ffnn_ewc_replay": {
+    "lambda": 10.0,
+    "gamma": 0.9
+  },
+  "gnn_ewc": {
+    "lambda": 100.0,
+    "gamma": 0.9
+  },
+  "gnn_ewc_replay": {
+    "lambda": 10.0,
+    "gamma": 0.9
+  }
+}

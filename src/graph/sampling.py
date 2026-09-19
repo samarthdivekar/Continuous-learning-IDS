@@ -76,6 +76,8 @@ def sample_subgraph(g: Data, target_edges: np.ndarray, fanouts: list[int],
         num_nodes=len(nodes),
     )
     sub.target_mask = torch.from_numpy(target_mask)
+    # which flows carry a label (active learning labels only a few per window)
+    sub.label_mask = g.label_mask[torch.from_numpy(edges)] if "label_mask" in g else torch.ones(len(edges), dtype=torch.bool)
     return sub
 
 
@@ -91,6 +93,7 @@ def iter_training_subgraphs(g: Data, cfg_ns: dict, rng: np.random.Generator, shu
     if not use:
         out = Data(x=g.x, edge_index=g.edge_index, edge_attr=g.edge_attr, y=g.y, num_nodes=g.num_nodes)
         out.target_mask = torch.ones(n_e, dtype=torch.bool)
+        out.label_mask = g.label_mask if "label_mask" in g else torch.ones(n_e, dtype=torch.bool)
         yield out
         return
     index = IncidenceIndex(g.edge_index, g.num_nodes)

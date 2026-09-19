@@ -31,6 +31,7 @@ from typing import Callable
 
 import numpy as np
 import pandas as pd
+import torch
 
 from src.drift.adwin_monitor import ADWINMonitor
 from src.evaluation.continual import _concat, predict_graphs
@@ -55,6 +56,9 @@ class StreamRunner:
     eval_rows: list = field(default_factory=list)
     drift_events: list = field(default_factory=list)
     retrains: int = 0
+    rollbacks: int = 0
+    labels_used: int = 0
+    gate_log: list = field(default_factory=list)
 
     def __post_init__(self):
         d = self.cfg["drift"]
@@ -85,10 +89,78 @@ class StreamRunner:
             self.on_eval(row)
         return row
 
+    # ------------------------------------------------------------------ adaptation
+    @property
+    def uses_adwin(self) -> bool:
+        return self.policy.startswith("adwin")
+
+    @property
+    def gated(self) -> bool:
+        return "gate" in self.policy.split("_") or bool(self.cfg["drift"].get("gate", {}).get("enabled"))
+
+    def _select_labels(self, graphs: list) -> list:
+        """Improvement 1 — active learning. With `drift.label_budget` = N > 0, an
+        adaptation cycle obtains labels for only the N most uncertain flows
+        (smallest top-1 minus top-2 probability margin) across its windows, as an
+        analyst would label a short queue. Unlabelled flows stay in the graphs as
+        message-passing context but carry no loss."""
+        from torch_geometric.data import Data
+        budget = int(self.cfg["drift"].get("label_budget", 0) or 0)
+        if budget <= 0:
+            return list(graphs)
+        margins = []
+        for gi, g in enumerate(graphs):
+            p = np.sort(self.learner.predict_proba(g), axis=1)
+            margins.append(np.c_[np.full(len(p), gi), np.arange(len(p)), p[:, -1] - p[:, -2]])
+        m = np.concatenate(margins)
+        pick = m[np.argsort(m[:, 2], kind="stable")[:budget]]
+        out = []
+        for gi, g in enumerate(graphs):
+            mask = torch.zeros(g.edge_index.shape[1], dtype=torch.bool)
+            mask[pick[pick[:, 0] == gi, 1].astype(np.int64)] = True
+            h = Data(x=g.x, edge_index=g.edge_index, edge_attr=g.edge_attr, y=g.y, num_nodes=g.num_nodes)
+            for k in ("window_id", "task_id", "split", "window_start", "window_end"):
+                h[k] = g[k]
+            h.label_mask = mask
+            out.append(h)
+        self.labels_used += int(len(pick))
+        return out
+
+    def _gate_metrics(self) -> dict:
+        """Held-out check used by the gate: VALIDATION windows of every task seen so far."""
+        graphs = [g for t in sorted(self.seen_tasks) for g in self.data.graphs(t, "val")]
+        p = _concat([predict_graphs(self.learner, graphs, self.mode)])
+        m = core_metrics(p["y_true"], p["y_pred"], self.mode)
+        return {"macro_f1": m["macro_f1"], "fpr": m["fpr"],
+                "retention": category_recall(p["y_cat"], p["y_pred"], self.task0_cat, self.mode)}
+
     def adapt(self, graphs: list, tag: str) -> None:
+        train = self._select_labels(graphs)
+        if self.gated and self.learner.adapts:
+            before = self._gate_metrics()
+            snap = self.learner.snapshot_state()
         # epochs=None -> the learner's tuned per-task epochs
-        self.learner.learn(list(graphs), tag=tag, epochs=self.cfg["drift"].get("adapt_epochs"))
+        self.learner.learn(train, tag=tag, epochs=self.cfg["drift"].get("adapt_epochs"))
         self.retrains += 1
+        if self.gated and self.learner.adapts:
+            # Improvement 8 — safe adaptation gate: the adapted model is a CANDIDATE.
+            after = self._gate_metrics()
+            g = self.cfg["drift"].get("gate", {})
+            reasons = []
+            if after["macro_f1"] < before["macro_f1"] - float(g.get("f1_tol", 0.01)):
+                reasons.append("macro-F1 dropped")
+            if after["fpr"] > before["fpr"] + float(g.get("fpr_tol", 0.002)):
+                reasons.append("false-positive rate rose")
+            if after["retention"] < before["retention"] - float(g.get("retention_tol", 0.05)):
+                reasons.append("retention dropped")
+            accepted = not reasons
+            if not accepted:
+                self.learner.restore_state(snap)
+                self.rollbacks += 1
+            self.gate_log.append({"model": self.learner.name, "policy": self.policy, "tag": tag,
+                                  "accepted": accepted, "reasons": "; ".join(reasons),
+                                  **{f"before_{k}": v for k, v in before.items()},
+                                  **{f"after_{k}": v for k, v in after.items()}})
         self.monitor.notify_adapted()
 
     def run(self, max_windows: int | None = None) -> None:
@@ -107,7 +179,7 @@ class StreamRunner:
         if not pretrained:
             self.learner.learn(self.data.graphs(0, "train"), tag="initial_task0")
         # Baseline for ADWIN: the model's signal on held-out task-0 windows.
-        if self.policy == "adwin" and self.learner.adapts:
+        if self.uses_adwin and self.learner.adapts:
             for g in self.data.graphs(0, "val"):
                 probs = self.learner.predict_proba(g)
                 self.monitor.calibrate(self._flow_signal(g, probs))
@@ -160,7 +232,7 @@ class StreamRunner:
 
         # 3) policy decides whether to adapt
         trigger = False
-        if self.policy == "adwin" and self.learner.adapts:
+        if self.uses_adwin and self.learner.adapts:
             if self.cfg["drift"].get("granularity", "flow") == "flow":
                 ev = self.monitor.update_window(self._flow_signal(g, probs), k, int(g.window_id), g.window_start)
             else:
@@ -178,6 +250,7 @@ class StreamRunner:
             self.adapt(self.recent, tag=f"{self.policy}_w{int(g.window_id)}")
             row["retrained"] = True
         row["retrains_so_far"] = self.retrains
+        row["rollbacks_so_far"] = self.rollbacks
         self.window_rows.append(row)
         if self.on_window:
             self.on_window(row)

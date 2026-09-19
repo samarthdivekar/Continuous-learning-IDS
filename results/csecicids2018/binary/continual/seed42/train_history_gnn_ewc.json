@@ -1,0 +1,92 @@
+[
+  {
+    "tag": "task0",
+    "seconds": 43.9017276763916,
+    "steps": 1250,
+    "final_loss": 1.931185433790006e-09,
+    "extra": {
+      "ewc": {
+        "tag": "task0",
+        "consolidation": 1,
+        "fisher_max": 1.0,
+        "fisher_mean": 0.001073890714906156,
+        "stability_ratio": 0.10000000149011612
+      }
+    }
+  },
+  {
+    "tag": "task1",
+    "seconds": 152.27919030189514,
+    "steps": 2690,
+    "final_loss": 0.0020277181174606085,
+    "extra": {
+      "ewc": {
+        "tag": "task1",
+        "consolidation": 2,
+        "fisher_max": 1.2255885601043701,
+        "fisher_mean": 0.0020046874415129423,
+        "stability_ratio": 0.12255885452032089
+      }
+    }
+  },
+  {
+    "tag": "task2",
+    "seconds": 202.59561228752136,
+    "steps": 3380,
+    "final_loss": 0.0002798181085381657,
+    "extra": {
+      "ewc": {
+        "tag": "task2",
+        "consolidation": 3,
+        "fisher_max": 2.103029727935791,
+        "fisher_mean": 0.0026351879350841045,
+        "stability_ratio": 0.21030297875404358
+      }
+    }
+  },
+  {
+    "tag": "task3",
+    "seconds": 108.71211314201355,
+    "steps": 1890,
+    "final_loss": 0.0007135162595659494,
+    "extra": {
+      "ewc": {
+        "tag": "task3",
+        "consolidation": 4,
+        "fisher_max": 2.022632360458374,
+        "fisher_mean": 0.002828719327226281,
+        "stability_ratio": 0.2022632360458374
+      }
+    }
+  },
+  {
+    "tag": "task4",
+    "seconds": 148.78433775901794,
+    "steps": 2760,
+    "final_loss": 0.00650467723608017,
+    "extra": {
+      "ewc": {
+        "tag": "task4",
+        "consolidation": 5,
+        "fisher_max": 1.978062629699707,
+        "fisher_mean": 0.0028708844911307096,
+        "stability_ratio": 0.19780626893043518
+      }
+    }
+  },
+  {
+    "tag": "task5",
+    "seconds": 83.81499242782593,
+    "steps": 1330,
+    "final_loss": 0.0018616969464346766,
+    "extra": {
+      "ewc": {
+        "tag": "task5",
+        "consolidation": 6,
+        "fisher_max": 2.7802562713623047,
+        "fisher_mean": 0.003354984801262617,
+        "stability_ratio": 0.27802562713623047
+      }
+    }
+  }
+]

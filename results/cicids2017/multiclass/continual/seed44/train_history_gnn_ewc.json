@@ -1,0 +1,107 @@
+[
+  {
+    "tag": "task0",
+    "seconds": 34.46581983566284,
+    "steps": 970,
+    "final_loss": 4.6900925099180313e-07,
+    "extra": {
+      "ewc": {
+        "tag": "task0",
+        "consolidation": 1,
+        "fisher_max": 1.0,
+        "fisher_mean": 0.00038508223951794207,
+        "stability_ratio": 0.10000000149011612
+      }
+    }
+  },
+  {
+    "tag": "task1",
+    "seconds": 43.0665283203125,
+    "steps": 700,
+    "final_loss": 0.004398352466523647,
+    "extra": {
+      "ewc": {
+        "tag": "task1",
+        "consolidation": 2,
+        "fisher_max": 1.6456685066223145,
+        "fisher_mean": 0.0010243895230814815,
+        "stability_ratio": 0.16456685960292816
+      }
+    }
+  },
+  {
+    "tag": "task2",
+    "seconds": 10.606756210327148,
+    "steps": 180,
+    "final_loss": 0.006485373247414827,
+    "extra": {
+      "ewc": {
+        "tag": "task2",
+        "consolidation": 3,
+        "fisher_max": 1.5911937952041626,
+        "fisher_mean": 0.0014751406852155924,
+        "stability_ratio": 0.1591193825006485
+      }
+    }
+  },
+  {
+    "tag": "task3",
+    "seconds": 20.472996950149536,
+    "steps": 340,
+    "final_loss": 0.007117045111954212,
+    "extra": {
+      "ewc": {
+        "tag": "task3",
+        "consolidation": 4,
+        "fisher_max": 1.5872622728347778,
+        "fisher_mean": 0.0017635097028687596,
+        "stability_ratio": 0.15872623026371002
+      }
+    }
+  },
+  {
+    "tag": "task4",
+    "seconds": 12.04584813117981,
+    "steps": 200,
+    "final_loss": 0.025667984038591385,
+    "extra": {
+      "ewc": {
+        "tag": "task4",
+        "consolidation": 5,
+        "fisher_max": 2.036369800567627,
+        "fisher_mean": 0.0020537637174129486,
+        "stability_ratio": 0.2036369889974594
+      }
+    }
+  },
+  {
+    "tag": "task5",
+    "seconds": 23.855931997299194,
+    "steps": 380,
+    "final_loss": 0.006721509620547295,
+    "extra": {
+      "ewc": {
+        "tag": "task5",
+        "consolidation": 6,
+        "fisher_max": 2.043109655380249,
+        "fisher_mean": 0.002131406683474779,
+        "stability_ratio": 0.20431096851825714
+      }
+    }
+  },
+  {
+    "tag": "task6",
+    "seconds": 12.238823175430298,
+    "steps": 200,
+    "final_loss": 0.011993587017059326,
+    "extra": {
+      "ewc": {
+        "tag": "task6",
+        "consolidation": 7,
+        "fisher_max": 1.8980669975280762,
+        "fisher_mean": 0.0020459224469959736,
+        "stability_ratio": 0.18980669975280762
+      }
+    }
+  }
+]

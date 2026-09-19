@@ -79,12 +79,21 @@ class EGraphSAGE(nn.Module):
             h = self.dropout(torch.relu(layer(h, edge_index, edge_attr)))
         return h
 
-    def forward(self, x, edge_index, edge_attr, target_edges: torch.Tensor | None = None):
-        """Return logits for `target_edges` (indices into edge_index), or all edges."""
+    def edge_features(self, x, edge_index, edge_attr, target_edges: torch.Tensor | None = None):
         h = self.node_embeddings(x, edge_index, edge_attr)
         ei = edge_index if target_edges is None else edge_index[:, target_edges]
         ea = edge_attr if target_edges is None else edge_attr[target_edges]
         parts = [h[ei[0]], h[ei[1]]]
         if self.edge_skip:
             parts.append(torch.relu(self.edge_proj(ea)))
-        return self.classifier(torch.cat(parts, dim=-1))
+        return torch.cat(parts, dim=-1)
+
+    def forward(self, x, edge_index, edge_attr, target_edges: torch.Tensor | None = None):
+        """Return logits for `target_edges` (indices into edge_index), or all edges."""
+        return self.classifier(self.edge_features(x, edge_index, edge_attr, target_edges))
+
+    def forward_with_embedding(self, x, edge_index, edge_attr):
+        """(logits, embedding): embedding = the classifier's hidden layer, one vector per
+        flow. Used for prototype-distance novelty scores and embedding-drift detection."""
+        z = self.classifier[1](self.classifier[0](self.edge_features(x, edge_index, edge_attr)))
+        return self.classifier[3](z), z
