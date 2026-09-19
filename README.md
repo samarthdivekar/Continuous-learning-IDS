@@ -588,7 +588,7 @@ Flagged flows of the same predicted category are joined into connected attacker/
 
 On CSE-CIC-IDS2018 the budget helps both models. The GNN goes from 105 incidents at 81 % precision to 89 at 96 %, and the FFNN from 834 incidents at 12 % to 102 at 92 %. Without a budget, the FFNN's scattered false alarms would give an analyst 738 false incidents to dismiss.
 
-**Can the GNN be made less dependent on host identity?** (topology augmentation, CIC-IDS2017, seed 42; 3-seed confirmation pending)
+**Can the GNN be made less dependent on host identity?** (topology augmentation, CIC-IDS2017)
 During training, with probability 0.5 per window, every flow's source is reassigned to a random host from a pool of 65,536. This is the same perturbation as the `random_src` test. Macro-F1 after the last task:
 
 | Model | Normal | Hosts permuted | Sources randomised |
@@ -596,6 +596,15 @@ During training, with probability 0.5 per window, every flow's source is reassig
 | GNN + EWC + replay (ours) | 0.950 | 0.950 | 0.427 |
 | … + topology augmentation | 0.969 | 0.969 | 0.914 |
 | FFNN + EWC + replay | 0.947 | 0.947 | 0.947 |
+
+The table above is a single run (seed 42). On the standard task sequence with 3 seeds, the augmentation has a cost:
+
+| Model | Macro-F1 (3 seeds) | BWT | WebAttack recall per seed |
+|---|---|---|---|
+| GNN + EWC + replay (ours) | 0.964 ± 0.020 | -0.021 | 96 %, 96 %, 96 % |
+| … + topology augmentation | 0.906 ± 0.043 | -0.135 | 12 %, 92 %, 12 % |
+
+**Verdict: a trade-off, not a free win.** Randomising sources during training makes the GNN far more robust when the attacker is not a single hub (0.427 → 0.914). It also erases the one-attacker-one-victim pattern of WebAttack, a class with only 24 test flows, which is lost in two of three seeds, and it adds forgetting. Identical runs also vary: seed 42 scored 0.969 in the IP-remap run and 0.874 here. The augmentation therefore stays an **option** (`gnn_ewc_replay_topo`) for deployments that expect spoofed or NAT-hidden sources. It is not the default model.
 
 **Can it adapt safely on a small label budget?** (CIC-IDS2017, drift stream as in §3)
 
@@ -620,6 +629,9 @@ What this shows (single seed):
   macro-F1 while the per-flow FFNN is unaffected. On these lab datasets each attack comes from very few
   hosts; a real network with many or spoofed attackers could look much more like the randomised case.
   The graph's advantage (and its unseen-attack detection) should be read with this in mind.
+  Training with randomised sources (§7) recovers 0.914 under randomisation, but costs in-distribution
+  macro-F1 (0.906 ± 0.043 vs 0.964 ± 0.020, 3 seeds) and loses the small WebAttack class in two of three
+  seeds. The dependence can be traded away, but not for free.
 * **The graph advantage is small in-distribution and does not replicate on 2018.** 0.964 vs 0.928
   macro-F1 on CIC-IDS2017 multiclass; a tie in 2017 binary; a tie (0.855 vs 0.850) in 2018 multiclass and
   the FFNN ahead in 2018 binary (0.995 vs 0.977). The FFNN has the lower false-positive rate throughout.

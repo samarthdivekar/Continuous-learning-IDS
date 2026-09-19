@@ -1,0 +1,233 @@
+[
+  {
+    "tag": "task0",
+    "seconds": 47.85013794898987,
+    "steps": 970,
+    "final_loss": 1.3438560927170329e-05,
+    "extra": {
+      "ewc": {
+        "tag": "task0",
+        "consolidation": 1,
+        "fisher_max": 1.0,
+        "fisher_mean": 0.0003522349870763719,
+        "stability_ratio": 0.009999999776482582
+      },
+      "buffer": {
+        "1": {
+          "stored": 10,
+          "seen": 19
+        }
+      }
+    }
+  },
+  {
+    "tag": "task1",
+    "seconds": 99.04771828651428,
+    "steps": 700,
+    "final_loss": 0.006606006994843483,
+    "extra": {
+      "ewc": {
+        "tag": "task1",
+        "consolidation": 2,
+        "fisher_max": 1.208245038986206,
+        "fisher_mean": 0.0008326286915689707,
+        "stability_ratio": 0.012082450091838837
+      },
+      "buffer": {
+        "1": {
+          "stored": 10,
+          "seen": 19
+        },
+        "2": {
+          "stored": 10,
+          "seen": 37
+        }
+      }
+    }
+  },
+  {
+    "tag": "task2",
+    "seconds": 25.643146991729736,
+    "steps": 180,
+    "final_loss": 0.004040905740112066,
+    "extra": {
+      "ewc": {
+        "tag": "task2",
+        "consolidation": 3,
+        "fisher_max": 1.1613696813583374,
+        "fisher_mean": 0.001024255296215415,
+        "stability_ratio": 0.011613696813583374
+      },
+      "buffer": {
+        "1": {
+          "stored": 10,
+          "seen": 19
+        },
+        "2": {
+          "stored": 10,
+          "seen": 37
+        },
+        "3": {
+          "stored": 9,
+          "seen": 9
+        }
+      }
+    }
+  },
+  {
+    "tag": "task3",
+    "seconds": 48.04483222961426,
+    "steps": 340,
+    "final_loss": 0.009585194289684296,
+    "extra": {
+      "ewc": {
+        "tag": "task3",
+        "consolidation": 4,
+        "fisher_max": 1.100703477859497,
+        "fisher_mean": 0.0012433184310793877,
+        "stability_ratio": 0.011007034219801426
+      },
+      "buffer": {
+        "1": {
+          "stored": 10,
+          "seen": 19
+        },
+        "2": {
+          "stored": 10,
+          "seen": 37
+        },
+        "3": {
+          "stored": 9,
+          "seen": 9
+        },
+        "4": {
+          "stored": 10,
+          "seen": 20
+        }
+      }
+    }
+  },
+  {
+    "tag": "task4",
+    "seconds": 28.091166973114014,
+    "steps": 200,
+    "final_loss": 0.029879223555326462,
+    "extra": {
+      "ewc": {
+        "tag": "task4",
+        "consolidation": 5,
+        "fisher_max": 1.8249458074569702,
+        "fisher_mean": 0.0013287682086229324,
+        "stability_ratio": 0.018249457702040672
+      },
+      "buffer": {
+        "1": {
+          "stored": 10,
+          "seen": 19
+        },
+        "2": {
+          "stored": 10,
+          "seen": 37
+        },
+        "3": {
+          "stored": 9,
+          "seen": 9
+        },
+        "4": {
+          "stored": 10,
+          "seen": 20
+        },
+        "5": {
+          "stored": 7,
+          "seen": 7
+        }
+      }
+    }
+  },
+  {
+    "tag": "task5",
+    "seconds": 54.421955585479736,
+    "steps": 380,
+    "final_loss": 0.04375515878200531,
+    "extra": {
+      "ewc": {
+        "tag": "task5",
+        "consolidation": 6,
+        "fisher_max": 1.730979561805725,
+        "fisher_mean": 0.0018318260554224253,
+        "stability_ratio": 0.017309796065092087
+      },
+      "buffer": {
+        "1": {
+          "stored": 10,
+          "seen": 19
+        },
+        "2": {
+          "stored": 10,
+          "seen": 37
+        },
+        "3": {
+          "stored": 9,
+          "seen": 9
+        },
+        "4": {
+          "stored": 10,
+          "seen": 20
+        },
+        "5": {
+          "stored": 7,
+          "seen": 7
+        },
+        "6": {
+          "stored": 10,
+          "seen": 30
+        }
+      }
+    }
+  },
+  {
+    "tag": "task6",
+    "seconds": 27.803903341293335,
+    "steps": 200,
+    "final_loss": 0.03772513568401337,
+    "extra": {
+      "ewc": {
+        "tag": "task6",
+        "consolidation": 7,
+        "fisher_max": 1.8010045289993286,
+        "fisher_mean": 0.0023791000712662935,
+        "stability_ratio": 0.01801004447042942
+      },
+      "buffer": {
+        "1": {
+          "stored": 10,
+          "seen": 19
+        },
+        "2": {
+          "stored": 10,
+          "seen": 37
+        },
+        "3": {
+          "stored": 9,
+          "seen": 9
+        },
+        "4": {
+          "stored": 10,
+          "seen": 20
+        },
+        "5": {
+          "stored": 7,
+          "seen": 7
+        },
+        "6": {
+          "stored": 10,
+          "seen": 30
+        },
+        "7": {
+          "stored": 10,
+          "seen": 16
+        }
+      }
+    }
+  }
+]
