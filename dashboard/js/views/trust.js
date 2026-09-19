@@ -12,6 +12,7 @@ const ADAPT = {
   drift_gate: "ADWIN + safety gate (rollback if worse)",
   drift_al100: "ADWIN + 100 labels per update",
   drift_al20: "ADWIN + 20 labels per update",
+  drift_al100_hybrid: "ADWIN + 100 labels (half uncertain, half random)",
   drift_labelfree_al100: "Label-free trigger + 100 labels",
 };
 
@@ -126,7 +127,7 @@ async function adaptation(ds) {
     { title: "Variant", value: (x) => ADAPT[x.variant] || x.variant },
     { title: "Updates", num: true, value: (x) => int(x.retrains) },
     { title: "Rolled back", num: true, value: (x) => (x.rollbacks == null ? "–" : int(x.rollbacks)) },
-    { title: "Labels used", num: true, value: (x) => (x.labels_used == null ? "all" : int(x.labels_used)) },
+    { title: "Labels used", num: true, value: (x) => (!x.label_budget ? "all" : int(x.labels_used)) },
     { title: "Final macro-F1", num: true, value: (x) => f3(x.final_macro_f1_seen) },
     { title: "False-positive rate", num: true, value: (x) => pct(x.final_fpr_seen, 2) },
   ], rows) + `<p class="note">Rows appear as each run finishes. “Labels used” counts flows an analyst would have had to label.</p>`;

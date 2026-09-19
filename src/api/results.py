@@ -184,7 +184,7 @@ def adaptation(dataset: str = "cicids2017"):
     """Improvements 4 + 8: gated adaptation and label-budgeted (active-learning) streams, next to the baseline."""
     base = _check(dataset, "multiclass")
     out = {}
-    for name in ("drift", "drift_gate", "drift_al100", "drift_al20", "drift_labelfree_al100"):
+    for name in ("drift", "drift_gate", "drift_al100", "drift_al100_hybrid", "drift_al20", "drift_labelfree_al100"):
         f = base / name / "summary.csv"
         if f.exists():
             out[name] = _records(pd.read_csv(f))

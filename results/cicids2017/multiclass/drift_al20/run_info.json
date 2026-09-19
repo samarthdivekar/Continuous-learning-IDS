@@ -1,0 +1,207 @@
+{
+  "timestamp_utc": "2026-09-19T14:20:05.510380+00:00",
+  "seed": 42,
+  "python": "3.12.10",
+  "platform": "Windows-11-10.0.26200-SP0",
+  "cuda_available": true,
+  "gpu": "NVIDIA GeForce GTX 1650",
+  "packages": {
+    "torch": "2.14.0+cu126",
+    "torch-geometric": "2.8.0.post1",
+    "xgboost": "3.4.1",
+    "scikit-learn": "1.9.1",
+    "river": "0.26.1",
+    "pandas": "3.0.5",
+    "numpy": "2.5.3"
+  },
+  "command": "C:\\Users\\samar\\Desktop\\PBL\\continual-learning-gnn-ids\\experiments\\run_drift_stream.py --dataset cicids2017 --label-mode multiclass --runs gnn_ewc_replay:adwin --out-name drift_al20 --set drift.label_budget=20",
+  "config": {
+    "seed": 42,
+    "paths": {
+      "raw": "data/raw",
+      "processed": "data/processed",
+      "cache": "cache",
+      "results": "results",
+      "checkpoints": "cache/checkpoints"
+    },
+    "dataset": "cicids2017",
+    "categories": [
+      "Benign",
+      "BruteForce",
+      "DoS",
+      "WebAttack",
+      "Infiltration",
+      "Botnet",
+      "PortScan",
+      "DDoS"
+    ],
+    "preprocessing": {
+      "attempted_policy": "benign",
+      "window_fraction": null,
+      "flow_sample_fraction": 1.0,
+      "clip_value": 10.0,
+      "segment_gap_seconds": 3600,
+      "min_segment_flows": 10
+    },
+    "window": {
+      "mode": "count",
+      "flows_per_window": 5000,
+      "seconds": 30,
+      "min_fraction": 0.2
+    },
+    "split": {
+      "period": 10,
+      "val_positions": [
+        5
+      ],
+      "test_positions": [
+        2,
+        8
+      ]
+    },
+    "label_mode": "multiclass",
+    "graph": {
+      "node_features": "degree",
+      "hidden": 64,
+      "layers": 2,
+      "dropout": 0.2,
+      "edge_skip": true,
+      "topology_augment": {
+        "prob": 0.5,
+        "pool_size": 65536
+      },
+      "neighbor_sampling": {
+        "enabled": "auto",
+        "max_edges_full": 20000,
+        "fanouts": [
+          25,
+          10
+        ],
+        "batch_edges": 4096
+      }
+    },
+    "ffnn": {
+      "hidden": [
+        256,
+        128
+      ],
+      "dropout": 0.2
+    },
+    "train": {
+      "device": "auto",
+      "optimizer": "adam",
+      "lr": 0.001,
+      "weight_decay": 0.0,
+      "grad_clip": 5.0,
+      "gnn_epochs": 10,
+      "ffnn_epochs": 10,
+      "ffnn_batch_size": 1024,
+      "class_weight_power": 0.5,
+      "class_weight_clip": [
+        0.05,
+        50.0
+      ]
+    },
+    "ewc": {
+      "lambda": 100.0,
+      "gamma": 1.0,
+      "fisher_batches": 50,
+      "normalize": "max",
+      "stability_warn": 1.0
+    },
+    "replay": {
+      "graphs_per_class": 10,
+      "graphs_per_step": 2,
+      "min_class_edges": 1,
+      "flows_per_class": 5000,
+      "flows_per_step": 512,
+      "replay_weight": 1.0,
+      "category_balanced_loss": false
+    },
+    "xgboost": {
+      "n_estimators": 300,
+      "max_depth": 8,
+      "learning_rate": 0.1,
+      "subsample": 0.8,
+      "colsample_bytree": 0.8,
+      "tree_method": "hist"
+    },
+    "drift": {
+      "delta": 0.002,
+      "signal": "error",
+      "granularity": "flow",
+      "adapt_windows": 20,
+      "min_windows_between": 5,
+      "adapt_epochs": null,
+      "periodic_every": 25,
+      "label_budget": 20
+    },
+    "ip_remap": {
+      "pool_size": 65536
+    },
+    "dataset_info": {
+      "name": "CIC-IDS2017 (improved / error-corrected, Engelen et al. 2021; Liu et al. 2022)",
+      "archive": "CICIDS2017_improved.zip",
+      "url": "https://intrusion-detection.distrinet-research.be/CNS2022/Datasets/CICIDS2017_improved.zip",
+      "extract_dir": "cicids2017"
+    },
+    "model_overrides": {
+      "ffnn_ewc_replay": [
+        "ewc.lambda=10.0",
+        "ewc.gamma=0.9"
+      ],
+      "gnn_ewc": [
+        "ewc.lambda=100.0",
+        "ewc.gamma=0.9"
+      ],
+      "gnn_ewc_replay": [
+        "ewc.lambda=10.0",
+        "ewc.gamma=0.9"
+      ],
+      "gnn_ewc_replay_topo": [
+        "ewc.lambda=10.0",
+        "ewc.gamma=0.9"
+      ]
+    },
+    "selection": {
+      "tuning_source": "C:\\Users\\samar\\Desktop\\PBL\\continual-learning-gnn-ids\\results\\cicids2017\\multiclass\\tuning\\selected.yaml",
+      "tuning_overrides": [
+        "replay.category_balanced_loss=false",
+        "train.ffnn_epochs=10",
+        "train.gnn_epochs=10"
+      ],
+      "ewc_source": "C:\\Users\\samar\\Desktop\\PBL\\continual-learning-gnn-ids\\results\\cicids2017\\multiclass\\ewc_lambda_sweep\\selected.json",
+      "ewc_per_model": {
+        "ffnn_ewc_replay": [
+          "ewc.lambda=10.0",
+          "ewc.gamma=0.9"
+        ],
+        "gnn_ewc": [
+          "ewc.lambda=100.0",
+          "ewc.gamma=0.9"
+        ],
+        "gnn_ewc_replay": [
+          "ewc.lambda=10.0",
+          "ewc.gamma=0.9"
+        ],
+        "gnn_ewc_replay_topo": [
+          "ewc.lambda=10.0",
+          "ewc.gamma=0.9"
+        ]
+      },
+      "cli_keys_respected": []
+    }
+  },
+  "runs": [
+    "gnn_ewc_replay:adwin"
+  ],
+  "task_categories": [
+    "BruteForce",
+    "DoS",
+    "WebAttack",
+    "Infiltration",
+    "Botnet",
+    "PortScan",
+    "DDoS"
+  ]
+}

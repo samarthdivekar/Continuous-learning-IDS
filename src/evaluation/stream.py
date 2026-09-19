@@ -42,6 +42,26 @@ from src.training.learners import BaseLearner
 NOVEL_CONFIDENCE = 0.6  # predictions below this max-probability are shown as "Novel / Drifted"
 
 
+def select_label_rows(margins: np.ndarray, budget: int, strategy: str = "margin", rng=None) -> np.ndarray:
+    """Rows (flows) an analyst is asked to label, given top-1 minus top-2 margins.
+
+    margin  the `budget` least certain flows
+    hybrid  half the budget on the least certain flows, half uniformly at random from
+            the rest. Pure uncertainty sampling never asks about a new attack that the
+            model confidently mistakes for an old one.
+    """
+    order = np.argsort(margins, kind="stable")
+    if strategy == "margin":
+        return order[:budget]
+    if strategy != "hybrid":
+        raise ValueError(f"unknown label_strategy {strategy!r}")
+    n_unc = budget // 2
+    rest = order[n_unc:]
+    rng = rng if rng is not None else np.random.default_rng(0)
+    rand = rng.choice(rest, size=min(budget - n_unc, len(rest)), replace=False)
+    return np.concatenate([order[:n_unc], rand])
+
+
 @dataclass
 class StreamRunner:
     cfg: dict
@@ -100,9 +120,9 @@ class StreamRunner:
 
     def _select_labels(self, graphs: list) -> list:
         """Improvement 1 — active learning. With `drift.label_budget` = N > 0, an
-        adaptation cycle obtains labels for only the N most uncertain flows
-        (smallest top-1 minus top-2 probability margin) across its windows, as an
-        analyst would label a short queue. Unlabelled flows stay in the graphs as
+        adaptation cycle obtains labels for only N flows across its windows, as an
+        analyst would label a short queue, chosen by `drift.label_strategy` (see
+        select_label_rows). Unlabelled flows stay in the graphs as
         message-passing context but carry no loss."""
         from torch_geometric.data import Data
         budget = int(self.cfg["drift"].get("label_budget", 0) or 0)
@@ -113,7 +133,8 @@ class StreamRunner:
             p = np.sort(self.learner.predict_proba(g), axis=1)
             margins.append(np.c_[np.full(len(p), gi), np.arange(len(p)), p[:, -1] - p[:, -2]])
         m = np.concatenate(margins)
-        pick = m[np.argsort(m[:, 2], kind="stable")[:budget]]
+        rng = np.random.default_rng(int(self.cfg.get("seed", 42)) + self.retrains)
+        pick = m[select_label_rows(m[:, 2], budget, self.cfg["drift"].get("label_strategy", "margin"), rng)]
         out = []
         for gi, g in enumerate(graphs):
             mask = torch.zeros(g.edge_index.shape[1], dtype=torch.bool)

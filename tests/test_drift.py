@@ -94,3 +94,16 @@ def test_river_resets_after_detection():
     assert a.drift_detected and a.estimation > before + 0.1
     a.update(1.0)
     assert a.width == 1   # full reset on the next update
+
+
+def test_label_selection_margin_and_hybrid():
+    import numpy as np
+    from src.evaluation.stream import select_label_rows
+    margins = np.linspace(0, 1, 100)                     # row i has margin i/99
+    assert list(select_label_rows(margins, 10, "margin")) == list(range(10))
+    h = select_label_rows(margins, 10, "hybrid", np.random.default_rng(1))
+    assert len(h) == 10 and len(set(h)) == 10
+    assert set(range(5)) <= set(h) and len(set(h) - set(range(5))) == 5 and min(set(h) - set(range(5))) >= 5
+    import pytest
+    with pytest.raises(ValueError):
+        select_label_rows(margins, 10, "bogus")

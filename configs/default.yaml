@@ -128,6 +128,8 @@ drift:
   adapt_windows: 20         # most recent windows used for an adaptation cycle
   min_windows_between: 5    # refractory period after an adaptation
   adapt_epochs: null        # null = the family's tuned epochs (train.gnn_epochs / train.ffnn_epochs)
+  label_budget: 0           # >0: an adaptation cycle gets labels for only this many flows (active learning)
+  label_strategy: margin    # margin = least certain flows | hybrid = half least certain, half random
   periodic_every: 25        # for the periodic-retraining comparison
 
 ip_remap:
