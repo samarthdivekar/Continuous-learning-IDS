@@ -34,31 +34,70 @@
       <span class="pill" id="pill-db"><i class="dot"></i>DB</span>
       <span class="pill" id="pill-stream"><i class="dot"></i><span>Stream idle</span></span>
     </div>
+    <button class="icon-btn" id="help-btn" title="How to use this console (?)">? Help</button>
     <button class="icon-btn" id="theme-btn" title="Toggle light/dark">◐</button>
   </div>
 </header>
 
 <nav class="tabs" role="tablist">
-  <button class="tab on" data-view="overview">Overview</button>
-  <button class="tab" data-view="live">Live Stream <span class="badge hidden" id="live-badge">LIVE</span></button>
-  <button class="tab" data-view="explorer">Graph Explorer</button>
-  <button class="tab" data-view="compare">Model Comparison</button>
-  <button class="tab" data-view="drift">Drift Analysis</button>
-  <button class="tab" data-view="general">Generalisation</button>
-  <button class="tab" data-view="classify">Classify</button>
-  <button class="tab" data-view="repro">Reproducibility</button>
+  <span class="tab-group">Operate</span>
+  <button class="tab on" data-view="overview" title="The headline results in one screen">Overview</button>
+  <button class="tab" data-view="soc" title="Alerts grouped into incidents, with explanations and approve/reject">Incident queue</button>
+  <button class="tab" data-view="live" title="Replay traffic and watch the model detect drift and adapt">Live stream <span class="badge hidden" id="live-badge">LIVE</span></button>
+  <button class="tab" data-view="explorer" title="See one traffic window as a graph of hosts and flows">Graph explorer</button>
+  <button class="tab" data-view="classify" title="Classify a window or your own CSV flows">Classify</button>
+  <span class="tab-group">Evaluate</span>
+  <button class="tab" data-view="compare" title="Accuracy, forgetting and false alarms of every model">Model comparison</button>
+  <button class="tab" data-view="drift" title="When the model noticed change and retrained">Drift analysis</button>
+  <button class="tab" data-view="general" title="Unseen attacks and the IP-leakage test">Generalisation</button>
+  <button class="tab" data-view="trust" title="Novel attacks, abstention, alert fatigue, safe adaptation">Trust &amp; novelty</button>
+  <button class="tab" data-view="repro" title="Data, settings and how to reproduce every number">Reproducibility</button>
 </nav>
 
 <main>
   <section class="view on" id="view-overview"></section>
+  <section class="view" id="view-soc"></section>
   <section class="view" id="view-live"></section>
   <section class="view" id="view-explorer"></section>
   <section class="view" id="view-compare"></section>
   <section class="view" id="view-drift"></section>
   <section class="view" id="view-general"></section>
   <section class="view" id="view-classify"></section>
+  <section class="view" id="view-trust"></section>
   <section class="view" id="view-repro"></section>
 </main>
+
+<aside class="drawer hidden" id="help" role="dialog" aria-label="Help">
+  <div class="drawer-head"><h2>How to use this console</h2><button class="icon-btn" id="help-close" aria-label="Close">&#x2715;</button></div>
+  <p class="muted">This console watches network traffic as a <b>graph</b> &mdash; computers are dots, conversations between them are lines &mdash;
+  and flags attacks. It keeps learning new attack types without forgetting old ones.</p>
+  <h3>Where to start</h3>
+  <ol class="steps">
+    <li><b>Overview</b> &mdash; the results in one screen.</li>
+    <li><b>Incident queue</b> &mdash; what an analyst works through: incidents, why they were flagged, what to do.</li>
+    <li><b>Live stream</b> &mdash; press Start to replay traffic and watch detection and self-updating happen.</li>
+    <li><b>Graph explorer</b> &mdash; see an attack as a shape: scans fan out, floods fan in.</li>
+  </ol>
+  <p class="muted">Use the switches at the top to change dataset (2017 / 2018) and whether attacks are named (multiclass) or only
+  attack/benign (binary). Keys <span class="kbd">1</span>&ndash;<span class="kbd">0</span> switch tabs, <span class="kbd">?</span> opens this panel.</p>
+  <h3>Glossary</h3>
+  <dl class="gloss">
+    <dt>Flow</dt><dd>One network conversation between two computers, summarised by ~50 numbers (duration, packets, bytes&hellip;).</dd>
+    <dt>Window</dt><dd>5,000 consecutive flows turned into one graph.</dd>
+    <dt>Task</dt><dd>A period in which a new kind of attack appears. The model learns tasks one after another.</dd>
+    <dt>Macro-F1</dt><dd>Detection quality averaged over every category, so rare attacks count as much as common ones. 1.0 is perfect.</dd>
+    <dt>Retention</dt><dd>Share of previously learned attack types still detected after learning new ones. 1.0 = nothing forgotten.</dd>
+    <dt>False-positive rate</dt><dd>Share of normal traffic wrongly flagged. Every 0.1% is an alarm someone must dismiss.</dd>
+    <dt>Forgetting (BWT)</dt><dd>How much older tasks got worse after later training. Closer to 0 is better.</dd>
+    <dt>EWC</dt><dd>Protects the weights that mattered for old attacks while learning new ones.</dd>
+    <dt>Replay</dt><dd>Keeps a small sample of old traffic graphs and rehearses them during training.</dd>
+    <dt>Drift / ADWIN</dt><dd>Traffic changes over time. ADWIN watches the error rate and triggers an update when it shifts.</dd>
+    <dt>Incident</dt><dd>A group of alerts that belong together (same attacker or same victim), reviewed as one item.</dd>
+    <dt>Abstain</dt><dd>When the model is not sure enough it passes the flow to a human instead of guessing.</dd>
+    <dt>Dry run</dt><dd>Proposed firewall rules are shown and recorded, never applied.</dd>
+  </dl>
+</aside>
+<div class="scrim hidden" id="help-scrim"></div>
 
 <script type="module" src="js/main.js"></script>
 </body>

@@ -51,6 +51,8 @@ def explain_edge(learner, g, edge: int, feature_names: list[str], scaler=None, t
     own = attr[edge]
     order = np.argsort(-np.abs(own))[:top_k]
     raw = scaler.inverse_transform(g.edge_attr[edge:edge + 1].numpy())[0] if scaler is not None else None
+    if raw is not None:
+        raw = np.where(np.abs(raw) < 1e-6, 0.0, raw)            # float noise around a true zero
     features = [{"feature": feature_names[j], "label": pretty(feature_names[j]),
                  "attribution": float(own[j]), "value": float(raw[j]) if raw is not None else None,
                  "direction": "towards" if own[j] > 0 else "against"} for j in order]
@@ -59,6 +61,13 @@ def explain_edge(learner, g, edge: int, feature_names: list[str], scaler=None, t
     s, d = int(src[edge]), int(dst[edge])
     fan_out = int((src == s).sum()); fan_in = int((dst == d).sum())
     peers_out = int(len(np.unique(dst[src == s]))); peers_in = int(len(np.unique(src[dst == d])))
+    ports = None
+    if scaler is not None and "dst_port" in feature_names:  # distinct target ports: the port-scan signature
+        j = feature_names.index("dst_port")
+        col = g.edge_attr[src == s][:, j:j + 1].numpy()
+        z = np.zeros((len(col), len(feature_names)))
+        z[:, j] = col[:, 0]
+        ports = int(len(np.unique(np.round(scaler.inverse_transform(z)[:, j]))))
     context = []
     if learner.family == "gnn":
         per_flow = np.abs(attr).sum(axis=1)
@@ -76,7 +85,8 @@ def explain_edge(learner, g, edge: int, feature_names: list[str], scaler=None, t
             "features": features, "context": context, "context_share": context_share,
             "structure": {"source_host": s, "destination_host": d, "source_flows": fan_out,
                           "source_distinct_peers": peers_out, "destination_flows": fan_in,
-                          "destination_distinct_peers": peers_in, "window_hosts": int(g.num_nodes)}}
+                          "destination_distinct_peers": peers_in, "source_distinct_ports": ports,
+                          "window_hosts": int(g.num_nodes)}}
 
 
 def summarize(exp: dict, class_names: list[str]) -> str:
@@ -89,7 +99,11 @@ def summarize(exp: dict, class_names: list[str]) -> str:
     if st["destination_distinct_peers"] >= 20:
         parts.append(f"The destination received flows from {st['destination_distinct_peers']} different hosts "
                      f"— a fan-in pattern typical of (distributed) flooding.")
-    if st["source_flows"] >= 50 and st["source_distinct_peers"] < 5:
+    ports = st.get("source_distinct_ports")
+    if ports is not None and ports >= 20:
+        parts.append(f"The source probed {ports} different destination ports "
+                     f"({st['source_flows']} flows) — a port-scan pattern.")
+    elif st["source_flows"] >= 50 and st["source_distinct_peers"] < 5:
         parts.append(f"The source sent {st['source_flows']} flows to only {st['source_distinct_peers']} host(s) "
                      f"— repeated attempts against one target (e.g. brute force or DoS).")
     top = [f for f in exp["features"] if f["direction"] == "towards"][:3]

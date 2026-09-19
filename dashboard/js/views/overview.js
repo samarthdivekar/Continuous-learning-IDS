@@ -16,6 +16,7 @@ async function render() {
     <div class="view-head"><div><h2>Mission overview</h2>
       <p>Does the continual GNN learn new attacks <b>and</b> remember old ones? Every number on this page is read from
       <span class="mono">results/${dataset}/${mode}/</span> — nothing is typed in by hand.</p></div></div>
+    <div id="ov-plain"></div>
     <div class="grid g4" id="ov-kpis"></div>
     <div class="grid g-7-5" style="margin-top:16px">
       <div class="card"><div class="card-head"><div><h3>The core claim, measured</h3>
@@ -54,6 +55,15 @@ async function render() {
     adw ? tile("Drift-triggered retrains", int(adw.retrains), `oracle needed ${int(orc?.retrains)}`, `${int(adw.drift_flags)} ADWIN flags · stream of ${int(adw.stream_windows)} windows`)
         : tile("Static baseline blind spot", pct(xgb.macro_f1_seen), "macro-F1 of frozen XGBoost", "never learns new attacks"),
   ].join("");
+
+  const tasks = c.tasks || [];
+  const per100k = ours.fpr_seen == null ? null : Math.round(ours.fpr_seen * 100000);
+  root.querySelector("#ov-plain").innerHTML = ours.retention_rate == null ? "" : `<div class="callout" style="margin-bottom:16px;font-size:15.5px">
+    <b>In plain words:</b> the model learned ${tasks.length} attack types one after another (${tasks.map(esc).join(" → ")}).
+    After the last one it still catches <b>${pct(ours.retention_rate, 0)}</b> of the first attack type${naive.retention_rate != null
+      ? `, while a normally retrained model catches <b>${pct(naive.retention_rate, 0)}</b>` : ""}.
+    ${per100k != null ? `It wrongly flags about <b>${int(per100k)}</b> of every 100,000 normal flows.` : ""}
+    New here? Press <span class="kbd">?</span> for a guided tour and glossary.</div>`;
 
   const order = ["gnn_ewc_replay", "ffnn_ewc_replay", "gnn_replay", "gnn_ewc", "gnn_naive", "ffnn_naive", "xgboost_static", "gnn_joint", "ffnn_joint"]
     .filter((m) => fin[m]);

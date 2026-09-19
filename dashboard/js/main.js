@@ -4,12 +4,14 @@ import { applyDefaults } from "./lib/charts.js";
 
 const VIEWS = {
   overview: () => import("./views/overview.js"),
+  soc: () => import("./views/soc.js"),
   live: () => import("./views/live.js"),
   explorer: () => import("./views/explorer.js"),
   compare: () => import("./views/compare.js"),
   drift: () => import("./views/drift.js"),
   general: () => import("./views/general.js"),
   classify: () => import("./views/classify.js"),
+  trust: () => import("./views/trust.js"),
   repro: () => import("./views/repro.js"),
 };
 const loaded = {};
@@ -46,6 +48,21 @@ function initControls() {
     Object.values(loaded).forEach((m) => m.refresh && m.refresh());
   });
   onContextChange(() => Object.values(loaded).forEach((m) => m.refresh && m.refresh()));
+  const help = (open) => {
+    $("#help").classList.toggle("hidden", !open); $("#help-scrim").classList.toggle("hidden", !open);
+    if (open) prefs.set("helpSeen", "1");
+  };
+  $("#help-btn").addEventListener("click", () => help(true));
+  $("#help-close").addEventListener("click", () => help(false));
+  $("#help-scrim").addEventListener("click", () => help(false));
+  const order = $$(".tab").map((t) => t.dataset.view);
+  window.addEventListener("keydown", (e) => {
+    if (e.ctrlKey || e.metaKey || e.altKey || /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement?.tagName)) return;
+    if (e.key === "Escape") help(false);
+    else if (e.key === "?") help($("#help").classList.contains("hidden"));
+    else if (/^[0-9]$/.test(e.key)) { const i = e.key === "0" ? 9 : Number(e.key) - 1; if (order[i]) location.hash = order[i]; }
+  });
+  if (!prefs.get("helpSeen", "")) help(true);
 }
 
 function pill(id, ok, text) {

@@ -109,6 +109,9 @@ a { color: var(--accent-2); }
 }
 .tab:hover { color: var(--ink-2); }
 .tab.on { color: var(--ink); border-bottom-color: var(--accent); }
+.tab-group { align-self: center; font-size: 11px; text-transform: uppercase; letter-spacing: 0.09em; color: var(--muted);
+  opacity: 0.75; padding: 0 2px 0 14px; white-space: nowrap; }
+.tab-group:first-child { padding-left: 0; }
 .tab .badge { font-size: 11px; padding: 1px 7px; border-radius: 999px; background: var(--critical); color: #fff; }
 
 /* ---------------- layout ---------------- */
@@ -125,6 +128,7 @@ main { padding: 22px 24px 48px; max-width: 1680px; margin: 0 auto; }
 .g4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 .g-7-5 { grid-template-columns: minmax(0, 7fr) minmax(0, 5fr); }
 .g-8-4 { grid-template-columns: minmax(0, 8fr) minmax(0, 4fr); }
+.g-5-7 { grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); }
 .span-2 { grid-column: span 2; }
 .card {
   background: linear-gradient(180deg, var(--panel), var(--panel-2)); border: 1px solid var(--border);
@@ -234,9 +238,26 @@ input[type="range"] { accent-color: var(--accent); width: 180px; }
 .toast { position: fixed; right: 20px; bottom: 20px; z-index: 50; background: var(--panel); border: 1px solid var(--border-hi);
   border-radius: 12px; padding: 12px 16px; box-shadow: var(--shadow); font-size: 14px; max-width: 380px; }
 
+/* ---------------- help drawer ---------------- */
+.drawer { position: fixed; top: 0; right: 0; bottom: 0; width: min(460px, 100vw); z-index: 60; overflow-y: auto;
+  background: var(--panel); border-left: 1px solid var(--border-hi); box-shadow: var(--shadow); padding: 20px 22px 40px;
+  animation: slide 0.2s ease; }
+@keyframes slide { from { transform: translateX(30px); opacity: 0; } to { transform: none; opacity: 1; } }
+.drawer-head { display: flex; justify-content: space-between; align-items: center; }
+.drawer h2 { margin: 0; font-size: 21px; }
+.drawer h3 { font-size: 15px; margin: 18px 0 6px; }
+.drawer .steps { padding-left: 20px; margin: 0; color: var(--ink-2); line-height: 1.55; }
+.gloss { margin: 0; display: grid; grid-template-columns: 130px 1fr; gap: 8px 12px; font-size: 14px; }
+.gloss dt { font-weight: 650; color: var(--ink); }
+.gloss dd { margin: 0; color: var(--ink-2); }
+.kbd { font-family: var(--mono); font-size: 12px; border: 1px solid var(--border-hi); border-bottom-width: 2px;
+  border-radius: 5px; padding: 0 5px; }
+.scrim { position: fixed; inset: 0; z-index: 55; background: rgba(0, 0, 0, 0.45); }
+.scrim.hidden, .drawer.hidden { display: none; }
+
 @media (max-width: 1200px) { .g4 { grid-template-columns: repeat(2, minmax(0, 1fr)); } .g3 { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 900px) {
-  .g2, .g3, .g4, .g-7-5, .g-8-4 { grid-template-columns: minmax(0, 1fr); }
+  .g2, .g3, .g4, .g-7-5, .g-8-4, .g-5-7 { grid-template-columns: minmax(0, 1fr); }
   .span-2 { grid-column: auto; }
   main, .appbar, .tabs { padding-left: 16px; padding-right: 16px; }
   .kpi .value { font-size: 32px; }

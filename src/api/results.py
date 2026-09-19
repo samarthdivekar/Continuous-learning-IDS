@@ -66,7 +66,8 @@ def index():
                 exp: (base / exp / marker).exists()
                 for exp, marker in [("continual", "summary.csv"), ("drift", "summary.csv"), ("loao", "loao.csv"),
                                     ("ip_remap", "summary.csv"), ("ewc_lambda_sweep", "sweep.csv"),
-                                    ("tuning", "tuning.csv")]
+                                    ("tuning", "tuning.csv"), ("open_set", "open_set.csv"),
+                                    ("conformal", "conformal.csv"), ("incidents", "incidents.csv")]
             }
     return out
 
@@ -155,9 +156,47 @@ def tuning(dataset: str = "cicids2017"):
     return out
 
 
+@router.get("/open_set")
+def open_set(dataset: str = "cicids2017"):
+    """Improvement 6: novelty-detection scores on the next (unseen) task, plus proposed-category clusters."""
+    base = _check(dataset, "multiclass") / "open_set"
+    clusters = pd.read_csv(base / "clusters.csv") if (base / "clusters.csv").exists() else pd.DataFrame()
+    return {"rows": _records(_read_csv(base / "open_set.csv")), "clusters": _records(clusters) if len(clusters) else []}
+
+
+@router.get("/conformal")
+def conformal(dataset: str = "cicids2017"):
+    """Improvement 7: class-conditional conformal abstention."""
+    base = _check(dataset, "multiclass") / "conformal"
+    per = pd.read_csv(base / "per_class.csv") if (base / "per_class.csv").exists() else pd.DataFrame()
+    return {"rows": _records(_read_csv(base / "conformal.csv")), "per_class": _records(per) if len(per) else []}
+
+
+@router.get("/incidents")
+def incidents(dataset: str = "cicids2017"):
+    """Improvement 3: alert -> incident compression under a false-alarm budget."""
+    base = _check(dataset, "multiclass") / "incidents"
+    return {"rows": _records(_read_csv(base / "incidents.csv"))}
+
+
+@router.get("/adaptation")
+def adaptation(dataset: str = "cicids2017"):
+    """Improvements 4 + 8: gated adaptation and label-budgeted (active-learning) streams, next to the baseline."""
+    base = _check(dataset, "multiclass")
+    out = {}
+    for name in ("drift", "drift_gate", "drift_al100", "drift_al20", "drift_labelfree_al100"):
+        f = base / name / "summary.csv"
+        if f.exists():
+            out[name] = _records(pd.read_csv(f))
+    if len(out) <= 1:
+        raise HTTPException(404, "adaptation variants not run yet")
+    return out
+
+
 @router.get("/run_info")
 def run_info(dataset: str = "cicids2017", mode: str = "multiclass", experiment: str = "continual"):
-    if experiment not in ("continual", "drift", "loao", "ip_remap", "ewc_lambda_sweep", "tuning"):
+    if experiment not in ("continual", "drift", "loao", "ip_remap", "ewc_lambda_sweep", "tuning", "open_set",
+                          "conformal", "incidents"):
         raise HTTPException(422, "unknown experiment")
     info = _read_json(_check(dataset, mode) / experiment / "run_info.json")
     if info is None:
