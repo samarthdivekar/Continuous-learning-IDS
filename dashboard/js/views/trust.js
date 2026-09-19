@@ -53,7 +53,7 @@ const missing = (el, e) => { el.innerHTML = `<div class="empty">${e.status === 4
 let osData = null;
 async function openSet(ds) {
   try { osData = await get(`/results/open_set?dataset=${ds}`); }
-  catch (e) { missing($("#tr-os-note", root), e); return; }
+  catch (e) { missing($("#tr-os-note", root), e); missing($("#tr-cl", root), e); return; }
   const method = $("#tr-method", root).value;
   const rows = osData.rows.filter((r) => r.method === method);
   const models = [...new Set(rows.map((r) => r.model))];

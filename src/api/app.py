@@ -56,6 +56,11 @@ class ProposeIn(BaseModel):
     window_id: int
     incident_id: int
     model: str = "gnn_ewc_replay"
+    # incident ids are ranks at a given confidence threshold, so the client sends the threshold it used
+    # and what it was shown; the server re-derives the incident and refuses if it does not match
+    threshold: float = Field(default=0.0, ge=0.0, le=1.0)
+    category: str | None = None
+    target: str | None = None
 
 
 class DecisionIn(BaseModel):
@@ -86,7 +91,11 @@ def _remote(method: str, path: str, **kw):
     except httpx.HTTPError as exc:
         raise HTTPException(503, f"ML service unreachable: {exc}")
     if r.status_code >= 400:
-        raise HTTPException(r.status_code, r.json().get("detail", r.text))
+        try:
+            detail = r.json().get("detail", r.text)
+        except ValueError:                     # e.g. a plain-text 500 page
+            detail = r.text[:300] or f"ML service error {r.status_code}"
+        raise HTTPException(r.status_code, detail)
     return r.json()
 
 
@@ -316,11 +325,20 @@ def create_app(database_url: str | None = None, service=None, load_models: bool 
     @router.post("/actions")
     def propose(body: ProposeIn):
         """Improvement 15: record the proposed containment action for an incident (dry run)."""
-        inc = incidents(body.window_id, body.model, 0.0)
+        inc = incidents(body.window_id, body.model, body.threshold)
         match = next((i for i in inc["incidents"] if i["incident_id"] == body.incident_id), None)
         if match is None:
             raise HTTPException(404, "incident not found")
         pr = match["proposed"]
+        if (body.category and body.category != match["category"]) or (body.target and body.target != pr["target"]):
+            raise HTTPException(409, "incident changed since it was displayed; reload the queue")
+        with state.Session() as s:        # one action per window / model / category / target: never a duplicate
+            existing = s.scalars(select(ResponseAction).where(
+                ResponseAction.window_id == body.window_id, ResponseAction.model_name == body.model,
+                ResponseAction.category == match["category"], ResponseAction.target == pr["target"],
+                ResponseAction.action == pr["action"]).order_by(desc(ResponseAction.id)).limit(1)).first()
+            if existing is not None:
+                return _action_dict(existing)
         row = ResponseAction(window_id=body.window_id, incident_id=body.incident_id, model_name=body.model,
                              category=match["category"], action=pr["action"], target=pr["target"],
                              rationale=pr["rationale"], rule_linux=pr["rules"].get("linux"),

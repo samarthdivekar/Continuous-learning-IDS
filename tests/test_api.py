@@ -151,6 +151,9 @@ def test_results_endpoints_read_files_and_404_when_missing(client, tmp_path, mon
     assert r["models"] == ["gnn_ewc_replay"] and r["summary"][0]["macro_f1_seen"] == 0.9
     assert r["forgetting"]["gnn_ewc_replay"]["bwt"] == -0.1
     assert client.get("/results/drift?dataset=cicids2017").status_code == 404        # not run -> 404, never a number
+    for exp in ("open_set", "conformal", "incidents", "adaptation"):
+        assert client.get(f"/results/{exp}?dataset=cicids2017").status_code == 404
+        assert client.get(f"/results/{exp}?dataset=evil").status_code == 422
     assert client.get("/results/continual?dataset=evil&mode=multiclass").status_code == 422
     assert client.get("/results/run_info?experiment=../../etc").status_code == 422
     idx = client.get("/api/results/index").json()
@@ -167,6 +170,7 @@ def test_incidents_explain_and_action_workflow(client):
     assert {"summary", "features", "structure", "src_ip", "dst_ip", "predicted_label"} <= set(ex)
     assert client.get(f"/explain/{wid}/999999?model=gnn_ewc_replay").status_code == 404
     assert client.get(f"/explain/{wid}/0?model=xgboost_static").status_code == 404   # trees: no gradients
+    assert inc["incidents"], "fixture should produce at least one incident"
     if inc["incidents"]:
         iid = inc["incidents"][0]["incident_id"]
         a = client.post("/actions", json={"window_id": wid, "incident_id": iid, "model": "gnn_ewc_replay"}).json()
@@ -176,3 +180,16 @@ def test_incidents_explain_and_action_workflow(client):
         assert client.post(f"/actions/{a['id']}/decision", json={"decision": "reject"}).status_code == 409
         assert client.post(f"/actions/{a['id']}/decision", json={"decision": "execute"}).status_code == 422
         assert any(x["id"] == a["id"] for x in client.get("/actions?status=approved").json())
+        # proposing the same incident again returns the existing (already decided) action, never a duplicate
+        again = client.post("/actions", json={"window_id": wid, "incident_id": iid, "model": "gnn_ewc_replay"}).json()
+        assert again["id"] == a["id"] and again["status"] == "approved"
+        # the client states what it saw; a mismatch (e.g. ids computed at another threshold) is refused
+        first = inc["incidents"][0]
+        bad = client.post("/actions", json={"window_id": wid, "incident_id": iid, "model": "gnn_ewc_replay",
+                                            "category": first["category"], "target": "203.0.113.99"})
+        assert bad.status_code == 409
+        ok = client.post("/actions", json={"window_id": wid, "incident_id": iid, "model": "gnn_ewc_replay",
+                                           "threshold": 0.0, "category": first["category"],
+                                           "target": first["proposed"]["target"]})
+        assert ok.status_code == 200 and ok.json()["id"] == a["id"]
+        assert client.post("/actions", json={"window_id": wid, "incident_id": iid, "threshold": 1.5}).status_code == 422

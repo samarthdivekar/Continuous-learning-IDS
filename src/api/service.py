@@ -299,6 +299,8 @@ class MLService:
         names = class_names(self.cfg)
         inc = build_incidents(src[fi], dst[fi], probs, names, threshold=threshold, ts=ts[fi], y_cat=g.y.numpy())
         metrics = incident_metrics(inc, g.y.numpy())         # uses ground truth: evaluation info for the demo
+        # 0/0 ratios (no incidents, or no attack flows) are undefined -> null, never NaN in JSON
+        metrics = {k: (None if isinstance(v, float) and not np.isfinite(v) else v) for k, v in metrics.items()}
         for i in inc:
             i["proposed"] = propose_action(i)
             i["sample_edges"] = i["flow_indices"][:5]           # window-local edge ids, for /explain

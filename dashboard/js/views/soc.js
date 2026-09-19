@@ -188,9 +188,13 @@ async function decide(i, decision) {
   const analyst = $("#soc-analyst", root).value.trim() || "analyst";
   prefs.set("analyst", analyst);
   try {
-    const a = await post("/actions", { window_id: current.window_id, incident_id: i.incident_id, model: current.model });
-    const d = await post(`/actions/${a.id}/decision`, { decision, analyst, note: $("#soc-note", root).value.trim() || null });
-    toast(`Incident #${i.incident_id}: ${ACTION_TEXT[d.action] || d.action} ${d.status} (dry run)`);
+    const a = await post("/actions", { window_id: current.window_id, incident_id: i.incident_id, model: current.model,
+                                       threshold: current.threshold, category: i.category, target: i.proposed?.target });
+    const d = a.status === "proposed"
+      ? await post(`/actions/${a.id}/decision`, { decision, analyst, note: $("#soc-note", root).value.trim() || null })
+      : a;                                 // already decided earlier: show that decision instead of a second one
+    if (d !== a || a.status === "proposed") toast(`Incident #${i.incident_id}: ${ACTION_TEXT[d.action] || d.action} ${d.status} (dry run)`);
+    else toast(`Incident #${i.incident_id} was already ${d.status} by ${d.decided_by || "an analyst"}`);
     btns[0].parentElement.innerHTML = `<span class="tag ${d.status === "approved" ? "good" : "bad"}">${esc(d.status)}</span>
       <span class="muted">by ${esc(d.decided_by)} · ${esc(localTime(d.decided_at))} · recorded in the decision log</span>`;
     log(currentFilter());

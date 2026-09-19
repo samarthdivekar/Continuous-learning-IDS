@@ -61,3 +61,16 @@ def test_explanation_structure_and_summary(cfg):
     assert len(exp["features"]) == 2 and 0 <= exp["confidence"] <= 1
     assert 0 <= exp["context_share"] <= 1
     assert "confidence" in summarize(exp, NAMES)
+
+
+def test_incident_metrics_are_json_safe_when_nothing_is_flagged():
+    import json
+    import numpy as np
+    from src.product.incidents import build_incidents, incident_metrics
+    src = np.array(["a", "a"]); dst = np.array(["b", "c"])
+    probs = np.array([[0.9, 0.1], [0.8, 0.2]])            # everything predicted benign
+    inc = build_incidents(src, dst, probs, ["Benign", "DoS"], threshold=0.0, y_cat=np.array([1, 1]))
+    m = incident_metrics(inc, np.array([1, 1]))
+    assert inc == [] and np.isnan(m["incident_precision"])  # the raw ratio is undefined ...
+    safe = {k: (None if isinstance(v, float) and not np.isfinite(v) else v) for k, v in m.items()}
+    json.dumps(safe, allow_nan=False)                        # ... and the service's cleaned form is valid JSON
