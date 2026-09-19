@@ -1,5 +1,5 @@
 {
-  "timestamp_utc": "2026-09-18T15:43:10.735383+00:00",
+  "timestamp_utc": "2026-09-19T14:00:19.074383+00:00",
   "seed": 42,
   "python": "3.12.10",
   "platform": "Windows-11-10.0.26200-SP0",
@@ -14,7 +14,7 @@
     "pandas": "3.0.5",
     "numpy": "2.5.3"
   },
-  "command": "C:\\Users\\samar\\Desktop\\PBL\\continual-learning-gnn-ids\\experiments\\run_ip_remap.py --dataset cicids2017 --label-mode multiclass",
+  "command": "C:\\Users\\samar\\Desktop\\PBL\\continual-learning-gnn-ids\\experiments\\run_ip_remap.py --dataset cicids2017 --label-mode multiclass --models gnn_ewc_replay_topo",
   "config": {
     "seed": 42,
     "paths": {
@@ -66,6 +66,10 @@
       "layers": 2,
       "dropout": 0.2,
       "edge_skip": true,
+      "topology_augment": {
+        "prob": 0.5,
+        "pool_size": 65536
+      },
       "neighbor_sampling": {
         "enabled": "auto",
         "max_edges_full": 20000,
@@ -152,6 +156,10 @@
       "gnn_ewc_replay": [
         "ewc.lambda=10.0",
         "ewc.gamma=0.9"
+      ],
+      "gnn_ewc_replay_topo": [
+        "ewc.lambda=10.0",
+        "ewc.gamma=0.9"
       ]
     },
     "selection": {
@@ -174,15 +182,17 @@
         "gnn_ewc_replay": [
           "ewc.lambda=10.0",
           "ewc.gamma=0.9"
+        ],
+        "gnn_ewc_replay_topo": [
+          "ewc.lambda=10.0",
+          "ewc.gamma=0.9"
         ]
       },
       "cli_keys_respected": []
     }
   },
   "models": [
-    "gnn_ewc_replay",
-    "gnn_naive",
-    "ffnn_ewc_replay"
+    "gnn_ewc_replay_topo"
   ],
   "modes": [
     "none",

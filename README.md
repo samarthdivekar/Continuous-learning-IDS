@@ -183,18 +183,21 @@ Open **http://localhost:8080**; stop with `scripts/run_stack.ps1 -Stop`. First l
 database once with `python -m src.db.seed --dataset cicids2017 --label-mode multiclass` (the stack script
 does this unless `-SkipSeed`). A single-process variant is `python -m uvicorn src.api.app:app --port 8000`.
 
-The console has eight tabs; every panel is fed by result files or live API data (a missing experiment
-shows "not run yet", never a number):
+The console has ten tabs in two groups, *Operate* and *Evaluate*. Every panel is fed by result files or live API data, and a missing
+experiment shows "not run yet", never a number. A **Help** drawer (key `?`) gives a plain-language tour and
+glossary and opens automatically on the first visit. Keys `1`–`0` switch tabs.
 
 | Tab | What it shows |
 |---|---|
 | Overview | headline KPIs, the "adapts / remembers" verdict table computed from results, attack timeline, architecture |
+| Incident queue | a window's alerts grouped into incidents; per-incident explanation (feature attribution, network context, plain-English summary); proposed containment rule; analyst approve / reject with a decision log (dry run) |
 | Live Stream | replays the stream through four models; ADWIN flags, adaptations, per-window counts, drift feed, speed control, forced retrain |
 | Graph Explorer | any window graph as an interactive force layout (zoom, hover, category filters) with a per-flow **model-error overlay** |
 | Model Comparison | any metric over tasks for all models with ±1 std bands, recall heatmaps, BWT, confusion matrix after any task |
 | Drift Analysis | ADWIN vs periodic vs oracle vs never: retrain cost vs final quality, error timelines |
 | Generalisation | leave-one-attack-out detection and the IP-remap leakage test |
 | Classify | run every model on a held-out window or on pasted/uploaded flows |
+| Trust & novelty | open-set detection of unseen attacks and proposed new-category clusters, conformal abstention, alert → incident compression, gated / label-budgeted adaptation |
 | Reproducibility | λ sweep, tuning table, EWC stability ratios, run metadata |
 
 The live stream warm-starts from the task-1 checkpoints written by `run_continual` (first seed) in
@@ -454,6 +457,17 @@ flow sample, **one seed (42)**, hyper-parameters reused from CIC-IDS2017, no joi
 | FFNN + EWC + replay (ablation) / adwin | 63 | 33 | 0.801 | 1.000 |
 | XGBoost static / never | 0 | 0 | 0.282 | 1.000 |
 
+**Unseen attacks** (leave-one-attack-out, binary; share of held-out attack flows detected)
+
+| Held out | XGBoost | FFNN (per-flow) | GNN (graph) |
+|---|---|---|---|
+| Botnet | 0.0 % | 0.0 % | 8.5 % |
+| BruteForce | 0.0 % | 0.0 % | 99.7 % |
+| DDoS | 0.0 % | 0.0 % | 99.4 % |
+| DoS | 90.1 % | 0.1 % | 98.6 % |
+| Infiltration | 0.0 % | 0.0 % | 0.0 % |
+| WebAttack | 0.0 % | 0.0 % | 0.0 % |
+
 **IP-remap** (macro-F1 of the same trained model)
 
 | Model | Normal | Hosts permuted | Sources randomised |
@@ -474,7 +488,15 @@ flow sample, **one seed (42)**, hyper-parameters reused from CIC-IDS2017, no joi
   CIC-IDS2017 the same detector over-triggered (16 vs 8 periodic). The efficiency claim therefore holds
   on one dataset and not the other.
 * **GNN vs FFNN is inconclusive on 2018.** Single-seed results tie in multiclass (0.855 vs 0.850) and favour
-  the FFNN in binary (0.995 vs 0.977) with a lower false-positive rate.
+  the FFNN in binary (0.995 vs 0.977) with a lower false-positive rate. That is on attacks the models
+  were trained on.
+* **On attacks never seen in training, the graph model wins clearly, more so than on 2017.** Holding one
+  category out, the GNN flags 99.7 % of unseen BruteForce, 98.6 % of DoS and 99.4 % of DDoS flows. The
+  per-flow FFNN flags ≤ 0.1 % of each, and XGBoost flags 90.1 % of DoS and 0 % of the others. None of
+  the three detects unseen Infiltration (0 %). On Botnet the GNN manages only 8.5 %. WebAttack has
+  just 7 held-out flows in the 15 % sample, too few to support any conclusion. These are the host
+  fan-out/fan-in patterns a per-flow model cannot see. 2017 showed the same direction (DoS: GNN 67.7 % vs
+  FFNN 3.0 %).
 * **The GNN is unstable on Infiltration.** The IP-remap experiment re-trains the identical configuration
   (same seed, same data). Its "normal" column scores **0.948** where the task-sequence run scored **0.855**.
   The whole gap is one class: the task-sequence run flagged **9,196** benign flows as Infiltration
@@ -484,6 +506,62 @@ flow sample, **one seed (42)**, hyper-parameters reused from CIC-IDS2017, no joi
   numbers for the GNN should be read as one draw from a wide distribution.
 * **Topology dependence replicates, less severely.** Randomising source hosts drops the GNN from 0.948 to
   0.754 (2017: 0.950 → 0.427) while the FFNN is unaffected; host permutation changes nothing.
+
+### 7. Product layer: novelty, abstention, incidents, explanations, safe adaptation
+
+These features sit on top of the trained continual models. They are evaluated with the same per-task checkpoints and test splits as §1–6. They answer questions a security team asks before trusting a detector. Scripts: `experiments/run_open_set.py`, `run_conformal.py`, `run_incidents.py`, and `run_drift_stream.py --out-name ...`.
+
+**Would it notice an attack it was never taught?** (open-set detection)
+After each task, the next task's attack category is still unknown. The detector must score it as more novel than known traffic. The table gives AUROC averaged over the unseen categories; 0.5 is chance.
+
+| Dataset | Model | Score | Mean AUROC | Range |
+|---|---|---|---|---|
+| CIC-IDS2017 | FFNN + EWC + replay | energy | 0.471 | 0.019–0.973 (n=6) |
+| CIC-IDS2017 | FFNN + EWC + replay | msp | 0.689 | 0.409–0.970 (n=6) |
+| CIC-IDS2017 | FFNN + EWC + replay | prototype | 0.643 | 0.141–0.987 (n=6) |
+| CIC-IDS2017 | GNN + EWC + replay (ours) | energy | 0.875 | 0.644–0.998 (n=6) |
+| CIC-IDS2017 | GNN + EWC + replay (ours) | msp | 0.766 | 0.423–0.999 (n=6) |
+| CIC-IDS2017 | GNN + EWC + replay (ours) | prototype | 0.749 | 0.177–0.997 (n=6) |
+
+Flows flagged as novel are clustered (k chosen by silhouette) to propose a new category. On CIC-IDS2017 the largest GNN cluster is the true new attack for DoS (87 % pure), Infiltration (97 % pure), DDoS (100 % pure). For WebAttack, Botnet, PortScan the largest cluster is benign traffic, so the novelty signal there was mostly false alarms.
+
+**Does it know when not to decide?** (class-conditional conformal prediction)
+The model abstains, handing the flow to an analyst, when its conformal prediction set is not a single class. Thresholds are calibrated per class on validation windows.
+
+| Dataset | Model | α | False alarms: always decide → abstain when unsure | Flows handed to analyst | Accuracy on flows it decides |
+|---|---|---|---|---|---|
+| CIC-IDS2017 | GNN + EWC + replay (ours) | 0.01 | 184 → 0 | 10.1 % | 99.49 % |
+| CIC-IDS2017 | GNN + EWC + replay (ours) | 0.05 | 184 → 0 | 9.8 % | 99.77 % |
+| CIC-IDS2017 | GNN + EWC + replay (ours) | 0.1 | 184 → 107 | 9.3 % | 99.97 % |
+| CIC-IDS2017 | FFNN + EWC + replay | 0.01 | 118 → 89 | 2.6 % | 99.70 % |
+| CIC-IDS2017 | FFNN + EWC + replay | 0.05 | 118 → 83 | 4.9 % | 99.32 % |
+| CIC-IDS2017 | FFNN + EWC + replay | 0.1 | 118 → 82 | 9.0 % | 99.20 % |
+| CSE-CIC-IDS2018 | GNN + EWC + replay (ours) | 0.01 | 9,219 → 9,202 | 0.5 % | 99.51 % |
+| CSE-CIC-IDS2018 | GNN + EWC + replay (ours) | 0.05 | 9,219 → 9,202 | 2.8 % | 99.50 % |
+| CSE-CIC-IDS2018 | GNN + EWC + replay (ours) | 0.1 | 9,219 → 0 | 3.5 % | 100.00 % |
+| CSE-CIC-IDS2018 | FFNN + EWC + replay | 0.01 | 1,240 → 332 | 0.9 % | 99.98 % |
+| CSE-CIC-IDS2018 | FFNN + EWC + replay | 0.05 | 1,240 → 137 | 4.6 % | 99.99 % |
+| CSE-CIC-IDS2018 | FFNN + EWC + replay | 0.1 | 1,240 → 124 | 9.5 % | 99.99 % |
+
+Which α works depends on the dataset. On CIC-IDS2017 the stricter settings remove all 184 GNN false alarms (α = 0.01 and 0.05), and at α = 0.10 107 remain, as expected, because a smaller α gives larger sets. On CSE-CIC-IDS2018 the direction reverses. The 9,219 false alarms are benign flows called Infiltration with high but not extreme confidence. True Infiltration flows in validation are so confident that, at α = 0.10, the Infiltration threshold requires p ≥ 0.997, so the false alarms fall into an empty set and are handed to an analyst. At α ≤ 0.05 the threshold (p ≥ 0.48–0.07) admits them. There is no single safe α. It has to be chosen on validation data for each deployment. The FFNN's false alarms are spread thinly and shrink gradually.
+
+**Will analysts drown in alerts?** (alert → incident grouping, CIC-IDS2017 test windows)
+Flagged flows of the same predicted category are joined into connected attacker/victim components. The false-alarm budget raises the confidence threshold until the validation false-positive rate fits the budget.
+
+| Model | Budget | Flow alerts | Incidents | Real incidents | Attack traffic inside real incidents |
+|---|---|---|---|---|---|
+| GNN + EWC + replay (ours) | 0 | 101,913 | 50 | 84 % | 98.9 % |
+| GNN + EWC + replay (ours) | 0.001 | 101,913 | 50 | 84 % | 98.9 % |
+| GNN + EWC + replay (ours) | 0.0001 | 101,913 | 50 | 84 % | 98.9 % |
+| GNN + EWC + replay (ours) | 1e-05 | 101,913 | 50 | 84 % | 98.9 % |
+| FFNN + EWC + replay | 0 | 102,893 | 106 | 54 % | 99.9 % |
+| FFNN + EWC + replay | 0.001 | 102,893 | 106 | 54 % | 99.9 % |
+| FFNN + EWC + replay | 0.0001 | 102,666 | 65 | 85 % | 99.8 % |
+| FFNN + EWC + replay | 1e-05 | 100,515 | 51 | 98 % | 97.7 % |
+
+About 100,000 flow alerts reduce to 50 incidents for the GNN. The budget does not change the GNN's numbers: its false alarms are confident enough to survive every threshold, which is consistent with the conformal result above. For the FFNN the budget matters, taking it from 106 incidents at 54 % precision to 51 at 98 %.
+
+**Explanations and response.** For any flagged flow, `GET /explain/{window}/{edge}` returns a gradient × input attribution over the flow's own features and the share of evidence that came from neighbouring flows. It also reports structural facts (fan-out, fan-in, distinct target ports) and a one-paragraph summary generated by rules, with no language model. `GET /incidents/{window}` groups alerts and proposes a containment action (block source, rate-limit to victim, or isolate host) with the exact iptables / Windows Firewall rule. `POST /actions/{id}/decision` records an analyst's approve / reject. **Nothing is ever executed:** approval is stored as a dry run. The *Incident queue* tab of the console is built on these endpoints.
 
 ## Known limitations and honest caveats
 
@@ -536,7 +614,7 @@ src/drift/          ADWIN monitor
 src/evaluation/     metrics, task-sequence harness, streaming simulation
 src/db/             SQLAlchemy schema, session (SQLite/Timescale), seeding
 src/api/            FastAPI public app, ML service app, service layer + live demo
-dashboard/          8-tab console (Chart.js + d3-force; served by FastAPI, nginx or scripts/dashboard_server.py)
+dashboard/          10-tab console (Chart.js + d3-force; served by FastAPI, nginx or scripts/dashboard_server.py)
 scripts/            run_stack.ps1 (Docker-free five-layer stack), dashboard_server.py
 experiments/        every script that produces a reported number
 results/            committed CSV/JSON/PNG outputs + RESULTS.md

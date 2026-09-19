@@ -10,7 +10,15 @@
   CIC-IDS2017 the same detector over-triggered (16 vs 8 periodic). The efficiency claim therefore holds
   on one dataset and not the other.
 * **GNN vs FFNN is inconclusive on 2018.** Single-seed results tie in multiclass (0.855 vs 0.850) and favour
-  the FFNN in binary (0.995 vs 0.977) with a lower false-positive rate.
+  the FFNN in binary (0.995 vs 0.977) with a lower false-positive rate. That is on attacks the models
+  were trained on.
+* **On attacks never seen in training, the graph model wins clearly, more so than on 2017.** Holding one
+  category out, the GNN flags 99.7 % of unseen BruteForce, 98.6 % of DoS and 99.4 % of DDoS flows. The
+  per-flow FFNN flags ≤ 0.1 % of each, and XGBoost flags 90.1 % of DoS and 0 % of the others. None of
+  the three detects unseen Infiltration (0 %). On Botnet the GNN manages only 8.5 %. WebAttack has
+  just 7 held-out flows in the 15 % sample, too few to support any conclusion. These are the host
+  fan-out/fan-in patterns a per-flow model cannot see. 2017 showed the same direction (DoS: GNN 67.7 % vs
+  FFNN 3.0 %).
 * **The GNN is unstable on Infiltration.** The IP-remap experiment re-trains the identical configuration
   (same seed, same data). Its "normal" column scores **0.948** where the task-sequence run scored **0.855**.
   The whole gap is one class: the task-sequence run flagged **9,196** benign flows as Infiltration

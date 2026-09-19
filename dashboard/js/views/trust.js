@@ -96,7 +96,7 @@ async function conformal(ds) {
     { title: "Sent to a human", num: true, value: (x) => pct(x.abstain_rate) },
     { title: "Accuracy when it decides", num: true, value: (x) => pct(x.accuracy_acted, 2) },
   ], rows, { highlight: (x) => x.false_alarms_argmax > 0 && x.false_alarms_after_abstention === 0 })
-    + `<p class="note">α is the error rate you are willing to tolerate. Smaller α = bigger “not sure” sets = more hand-offs.</p>`;
+    + `<p class="note">α is the per-class error rate you are willing to tolerate. A flow is handed off when the model is torn between classes, or when it is less confident than genuine examples of that class usually are. Which α removes the false alarms differs by dataset, so choose it on validation data.</p>`;
 }
 
 async function incidents(ds) {
