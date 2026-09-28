@@ -1,5 +1,7 @@
 # Continual-Learning GNN Intrusion Detection
 
+[![tests](https://github.com/samarthdivekar/Continuous-learning-IDS/actions/workflows/tests.yml/badge.svg)](https://github.com/samarthdivekar/Continuous-learning-IDS/actions/workflows/tests.yml)
+
 A network intrusion detection system (NIDS) that models traffic as graphs (hosts = nodes, flows = edges),
 classifies flows with an edge-featured GraphSAGE network, **keeps learning new attack types without
 forgetting old ones** (EWC + subgraph replay) and **only retrains when an ADWIN drift detector confirms
