@@ -549,8 +549,14 @@ class DemoRunner(threading.Thread):
         except Exception as exc:  # surfaced through /demo/status
             log.exception("demo failed")
             self.error = repr(exc)
-            self.ready = False
             self.status = "failed"
+        finally:
+            # Whatever ended the run — finished, stopped or failed — the demo's learners (warm-started
+            # on task 1 and adapted along the stream) must stop answering /predict, /incidents and
+            # /explain. Previously only the failure path did this, so after any successful or stopped
+            # run the console kept serving task-1 models until the service restarted.
+            self.ready = False
+            self.svc.invalidate_predictions()
 
     def describe(self) -> dict:
         return {"run_id": self.run_id, "status": self.status, "position": self.position, "total": self.total,

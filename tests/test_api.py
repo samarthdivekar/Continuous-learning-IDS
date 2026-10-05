@@ -245,3 +245,33 @@ def test_incident_scan_covers_many_windows(client):
         assert any(x["incident_id"] == inc["incident_id"] and x["category"] == inc["category"] for x in same)
     assert client.get("/incidents/scan?limit=0").status_code == 422
     assert client.get("/incidents/scan?limit=999").status_code == 422
+
+
+def test_stopping_or_finishing_a_demo_hands_predictions_back_to_the_served_models(client):
+    """Regression: the demo's task-1 learners used to keep answering every prediction after a run
+    finished or was stopped, until the service restarted."""
+    svc = client.svc
+    served = dict(svc.models)
+
+    # a run that finishes on its own
+    assert client.post("/demo/start", json={"delay_seconds": 0.0, "eval_every": 50, "max_windows": 3}).status_code == 200
+    for _ in range(600):
+        if client.get("/demo/status").json()["status"] in ("finished", "failed"):
+            break
+        time.sleep(0.1)
+    svc.demo.join(timeout=30)
+    assert client.get("/demo/status").json()["status"] == "finished"
+    assert not svc.demo.ready
+    assert all(svc.active_learners()[m] is served[m] for m in served)
+
+    # a run that is stopped part-way
+    assert client.post("/demo/start", json={"delay_seconds": 0.5, "eval_every": 50}).status_code == 200
+    for _ in range(600):
+        if svc.demo.ready or client.get("/demo/status").json()["status"] in ("finished", "failed"):
+            break
+        time.sleep(0.1)
+    assert client.post("/demo/stop").status_code == 200
+    svc.demo.join(timeout=60)
+    assert client.get("/demo/status").json()["status"] in ("stopped", "finished")
+    assert not svc.demo.ready
+    assert all(svc.active_learners()[m] is served[m] for m in served)

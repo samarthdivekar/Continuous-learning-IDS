@@ -22,12 +22,7 @@ export async function mount_(el) {
     <div class="card" style="margin-bottom:16px"><div class="card-head"><div><h3 id="lv-status">Idle</h3>
       <p class="sub" id="lv-run">run: –</p></div><div class="legend" id="lv-legend"></div></div>
       <div class="progress"><i id="lv-prog"></i></div>
-      <p class="note" id="lv-progress-text">not started</p>
-      <div id="lv-after" class="callout warn hidden" style="margin-top:10px">
-        <b>After a stream run the model service keeps serving the stream's models.</b> They are warm-started on task 1
-        only, so other tabs (Incident queue, Classify, Graph explorer) will under-report until the service is restarted
-        with <span class="mono">scripts/run_stack.ps1 -Stop</span> then started again.
-      </div></div>
+      <p class="note" id="lv-progress-text">not started</p></div>
     <div class="grid g3">
       <div class="card"><h3>Accuracy</h3><p class="sub">tasks seen so far · dashed = our adaptations</p><div class="chart"><canvas id="lv-acc"></canvas></div></div>
       <div class="card"><h3>Retention</h3><p class="sub">recall on the first attack category</p><div class="chart"><canvas id="lv-ret"></canvas></div></div>
@@ -95,7 +90,6 @@ async function tick() {
   root.querySelector("#lv-progress-text").textContent = st.total
     ? `window ${int(st.position)} of ${int(st.total)} · ${esc(st.status || "")}`
     : (st.status ? esc(st.status) : "not started");
-  root.querySelector("#lv-after").classList.toggle("hidden", !(st.run_id && !alive && st.position > 0));
   root.querySelector("#lv-start").disabled = alive;
   root.querySelector("#lv-stop").disabled = !alive;
   root.querySelector("#lv-retrain").disabled = !alive;

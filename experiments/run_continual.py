@@ -27,6 +27,8 @@ from src.evaluation.continual import run_task_sequence
 from src.preprocessing.pipeline import load_processed, prepare_dataset
 from src.utils.config import apply_overrides, resolve_path
 from src.utils.logging import get_logger
+from src.graph.window_builder import cache_key
+from src.utils.config import load_config
 from src.utils.repro import set_seed, write_run_info
 
 log = get_logger("continual")
@@ -74,14 +76,18 @@ def main():
                         "use when adding seeds or running a non-default split")
     args = p.parse_args()
     base_cfg = config_from_args(args) if args.no_selected else apply_selection(config_from_args(args), args)
-    prepare_dataset(base_cfg)
-    data = load_processed(base_cfg)
     temporal = base_cfg["split"].get("strategy", "interleaved") != "interleaved"
+    # Any run whose data differs from the reference protocol (another split, another window size,
+    # another sample) is a different experiment: it must not be averaged into continual/ and must
+    # not replace the checkpoints the API serves.
+    nonstandard = cache_key(base_cfg) != cache_key(load_config(base_cfg["dataset"]))
     default_name = ("continual_temporal" if temporal else "continual") + ("" if args.split == "test" else "_val")
     name = args.out_name or default_name
-    if temporal and name in ("continual", "continual_val"):
-        # mixing temporal seeds into the interleaved folder would silently average two protocols
-        raise SystemExit("temporal-split results must not go into the interleaved results folder; use --out-name")
+    if nonstandard and name in ("continual", "continual_val"):
+        raise SystemExit(f"this run's data ({cache_key(base_cfg)}) differs from the reference protocol "
+                         f"({cache_key(load_config(base_cfg['dataset']))}); write it elsewhere with --out-name")
+    prepare_dataset(base_cfg)
+    data = load_processed(base_cfg)
     root = results_dir(base_cfg, args, name)
     root.mkdir(parents=True, exist_ok=True)
 
@@ -96,7 +102,7 @@ def main():
             "data_meta": {k: data.meta[k] for k in ("n_flows", "n_windows", "n_features", "cache_key")}})
         ckpt = None
         # Only the default protocol's first seed may refresh the served checkpoints.
-        if i == 0 and args.split == "test" and not args.dev and not args.no_checkpoints and not temporal:
+        if i == 0 and args.split == "test" and not args.dev and not args.no_checkpoints and not nonstandard:
             ckpt = resolve_path(cfg, "checkpoints") / cfg["dataset"] / cfg["label_mode"]
         run_task_sequence(cfg, data, args.models, out, eval_split=args.split, checkpoint_dir=ckpt)
 
