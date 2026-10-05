@@ -40,7 +40,16 @@ async function request(path, init) {
 export const get = (path) => request(path, {});
 export const post = (path, body) => request(path, { method: "POST", headers: { "Content-Type": "application/json" },
                                                     body: JSON.stringify(body || {}) });
-export const apiUrl = (path) => `${API}${path}${apiKey() ? `${path.includes("?") ? "&" : "?"}api_key=${encodeURIComponent(apiKey())}` : ""}`;
+/** Open or download an API response in a new tab without putting the key in the URL. */
+export async function openApi(path, { filename } = {}) {
+  const r = await fetch(`${API}${path}`, { headers: authHeaders() });
+  if (!r.ok) { toast(`${r.status}: could not open ${path}`); return; }
+  const blob = await r.blob();
+  if (filename) { download(filename, blob); return; }
+  const url = URL.createObjectURL(blob);
+  window.open(url, "_blank");
+  setTimeout(() => URL.revokeObjectURL(url), 60_000);
+}
 
 // ---------------------------------------------------------------- models
 export const MODELS = {

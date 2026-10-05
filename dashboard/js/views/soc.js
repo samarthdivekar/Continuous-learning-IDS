@@ -1,7 +1,7 @@
 // SOC queue: a window's alerts grouped into incidents, with a plain-English explanation of
 // why each was flagged and a proposed containment action that an analyst approves or rejects.
 // Nothing is ever executed — approval is recorded as a dry run.
-import { $, $$, apiUrl, catColor, downloadCsv, esc, get, int, label, pct, post, prefs, table, toast } from "../lib/core.js";
+import { $, $$, catColor, downloadCsv, esc, get, int, label, openApi, pct, post, prefs, table, toast } from "../lib/core.js";
 import { mount } from "../lib/charts.js";
 
 let root, catalog = [], current = null, selected = null;
@@ -71,7 +71,8 @@ export async function mount_(el) {
   });
   $("#soc-cef", root).addEventListener("click", () => {
     if (!current) { toast("load a window first"); return; }
-    window.open(apiUrl(`/incidents/${current.window_id}/cef?model=${current.model}&threshold=${current.threshold || 0}`), "_blank");
+    openApi(`/incidents/${current.window_id}/cef?model=${current.model}&threshold=${current.threshold || 0}`,
+            { filename: `incidents_w${current.window_id}.cef` });
   });
   $("#soc-model", root).value = prefs.get("soc.model", "gnn_ewc_replay");
   log("");
@@ -183,9 +184,9 @@ async function pick(id) {
     try { await navigator.clipboard.writeText(rule); toast("rule copied to the clipboard"); }
     catch { toast("could not copy — select the text manually"); }
   });
-  $("#soc-report", det).addEventListener("click", () => window.open(
-    apiUrl(`/incidents/${current.window_id}/report?incident_id=${i.incident_id}&model=${current.model}`
-           + `&threshold=${current.threshold || 0}`), "_blank"));
+  $("#soc-report", det).addEventListener("click", () => openApi(
+    `/incidents/${current.window_id}/report?incident_id=${i.incident_id}&model=${current.model}`
+    + `&threshold=${current.threshold || 0}`));
   $("#soc-approve", det).addEventListener("click", () => decide(i, "approve"));
   $("#soc-reject", det).addEventListener("click", () => decide(i, "reject"));
   explain(i);

@@ -145,7 +145,8 @@ class MLService:
             learners = self.active_learners()
             if model not in learners:
                 raise KeyError(f"model {model} not loaded")
-            key = (int(g.window_id), model, self._model_epoch)
+            live = self.demo.run_id if (self.demo is not None and self.demo.ready) else None
+            key = (int(g.window_id), model, self._model_epoch, live)
             cached = self._prob_cache.get(key)
             if cached is not None:
                 self._prob_cache.move_to_end(key)

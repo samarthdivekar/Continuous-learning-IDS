@@ -80,9 +80,10 @@ function pill(id, ok, text) {
 /** One line at the top of the page when something is wrong, naming what still works. */
 function banner(html, kind = "warn") {
   const el = $("#banner");
-  if (!html) { el.classList.add("hidden"); el.innerHTML = ""; return; }
+  // clearing also forgets the last message, so the same problem shows again if it returns
+  if (!html) { el.classList.add("hidden"); el.innerHTML = ""; el.dataset.html = ""; return; }
   if (el.dataset.html === html) return;                 // do not re-render on every poll
-  el.dataset.html = html; el.className = `banner ${kind}`;
+  el.dataset.html = html; el.dataset.dismissed = ""; el.className = `banner ${kind}`;
   el.innerHTML = `${html}<button class="icon-btn small" id="banner-x" title="Dismiss">✕</button>`;
   $("#banner-x").addEventListener("click", () => { el.classList.add("hidden"); el.dataset.dismissed = "1"; });
 }
