@@ -11,6 +11,8 @@ Final-year B.Tech project. Every number in this repository is produced by the sc
 `experiments/` from the public datasets and is written to `results/`. Where the evidence does not
 support the expected story, the README says so.
 
+> **Demo walkthrough: [`DEMO.md`](DEMO.md)** (what to show, in order, with the numbers to quote).
+>
 > **Headline results and all tables: [`results/RESULTS.md`](results/RESULTS.md)** (generated from CSVs,
 > never edited by hand). A summary with interpretation is in [Results](#results) below.
 

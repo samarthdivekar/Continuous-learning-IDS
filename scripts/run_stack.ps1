@@ -18,7 +18,8 @@ param(
     [int]$ApiPort = 8000,
     [int]$MlPort = 8001,
     [int]$DashboardPort = 8080,
-    [switch]$SkipSeed
+    [switch]$SkipSeed,
+    [switch]$Open          # open the dashboard in the default browser once the stack is up
 )
 
 $ErrorActionPreference = "Stop"
@@ -75,3 +76,8 @@ Write-Host "dashboard : http://localhost:$DashboardPort/"
 Write-Host "api docs  : http://localhost:$ApiPort/docs"
 Write-Host "ml service: http://localhost:$MlPort/health"
 Write-Host "logs      : logs\stack_*.log     stop: scripts\run_stack.ps1 -Stop"
+
+if ($Open) {
+    # the dashboard is ready immediately; the ML service finishes loading its models shortly after
+    Start-Process "http://localhost:$DashboardPort/"
+}
