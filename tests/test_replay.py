@@ -87,3 +87,23 @@ def test_same_window_is_offered_to_reservoir_once():
     assert buf.add(g) == [2]
     assert buf.add(_g({0: 10, 2: 5}, 7)) == []      # overlapping adaptation re-offers window 7
     assert buf.summary()[2] == {"stored": 1, "seen": 1}
+
+
+def test_zero_replay_budget_stores_and_replays_nothing():
+    # The replay-budget sweep's 0 point: replay-only must degenerate to naive fine-tuning.
+    buf = GraphReplayBuffer(graphs_per_class=0, graphs_per_step=2, seed=0)
+    for w in range(10):
+        buf.add(_g({0: 10, 2: 5}, w))
+    assert len(buf) == 0 and buf.categories == [] and buf.sample() == []
+
+
+def test_runs_that_depart_from_the_reference_protocol_are_flagged():
+    # Such runs must not be averaged into continual/ or replace the served checkpoints.
+    from experiments.run_continual import is_nonstandard
+    from src.utils.config import apply_overrides, load_config
+    cfg = load_config("cicids2017")
+    assert not is_nonstandard(cfg, [])
+    assert is_nonstandard(apply_overrides(cfg, ["seed=43"]), ["seed=43"])      # another data sample
+    assert is_nonstandard(cfg, ["replay.graphs_per_class=0"])            # outside the data cache key
+    temporal = apply_overrides(cfg, ["split.strategy=temporal"])
+    assert is_nonstandard(temporal, [])                                   # data differ

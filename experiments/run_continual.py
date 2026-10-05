@@ -63,6 +63,14 @@ def aggregate(root, seeds: list[int]) -> pd.DataFrame:
     return mean
 
 
+def is_nonstandard(cfg: dict, overrides: list[str]) -> bool:
+    """True when a run departs from the reference protocol: any --set override (per-seed training
+    seeds come from --seeds, not --set), or data that hash differently from the dataset's default."""
+    if overrides:
+        return True
+    return cache_key(cfg) != cache_key(load_config(cfg["dataset"]))
+
+
 def main():
     p = base_parser(__doc__)
     p.add_argument("--models", nargs="*", default=DEFAULT_MODELS)
@@ -77,15 +85,18 @@ def main():
     args = p.parse_args()
     base_cfg = config_from_args(args) if args.no_selected else apply_selection(config_from_args(args), args)
     temporal = base_cfg["split"].get("strategy", "interleaved") != "interleaved"
-    # Any run whose data differs from the reference protocol (another split, another window size,
-    # another sample) is a different experiment: it must not be averaged into continual/ and must
-    # not replace the checkpoints the API serves.
-    nonstandard = cache_key(base_cfg) != cache_key(load_config(base_cfg["dataset"]))
+    # Any run whose data or settings differ from the reference protocol (another split, another window
+    # size, another replay budget, ...) is a different experiment: it must not be averaged into
+    # continual/ and must not replace the checkpoints the API serves. Settings outside the data cache
+    # key (replay, EWC, training) are caught by the --set check.
+    overridden = list(args.set)
+    nonstandard = is_nonstandard(base_cfg, args.set)
     default_name = ("continual_temporal" if temporal else "continual") + ("" if args.split == "test" else "_val")
     name = args.out_name or default_name
     if nonstandard and name in ("continual", "continual_val"):
-        raise SystemExit(f"this run's data ({cache_key(base_cfg)}) differs from the reference protocol "
-                         f"({cache_key(load_config(base_cfg['dataset']))}); write it elsewhere with --out-name")
+        raise SystemExit(f"this run differs from the reference protocol (overrides {overridden}, data "
+                         f"{cache_key(base_cfg)} vs {cache_key(load_config(base_cfg['dataset']))}); "
+                         f"write it elsewhere with --out-name")
     prepare_dataset(base_cfg)
     data = load_processed(base_cfg)
     root = results_dir(base_cfg, args, name)
