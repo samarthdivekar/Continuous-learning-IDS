@@ -78,6 +78,14 @@ def incidents(window_id: int, model: str = "gnn_ewc_replay", threshold: float = 
         raise HTTPException(404, str(exc)) from exc
 
 
+@app.get("/incidents/{window_id}/report")
+def incident_report(window_id: int, incident_id: int, model: str = "gnn_ewc_replay", threshold: float = 0.0):
+    try:
+        return svc.incident_report(window_id, incident_id, model, threshold)
+    except KeyError as exc:
+        raise HTTPException(404, str(exc)) from exc
+
+
 @app.get("/explain/{window_id}/{edge}")
 def explain(window_id: int, edge: int, model: str = "gnn_ewc_replay"):
     try:

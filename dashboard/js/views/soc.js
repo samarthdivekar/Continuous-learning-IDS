@@ -5,6 +5,11 @@ import { $, $$, catColor, esc, get, int, label, pct, post, prefs, table, toast }
 import { mount } from "../lib/charts.js";
 
 let root, catalog = [], current = null, selected = null;
+
+// readable feature values: 56737 -> "56,737", never "5.674e+4"
+const fmtValue = (v) => (v == null ? "–"
+  : Math.abs(v - Math.round(v)) < 1e-9 ? Math.round(v).toLocaleString()
+  : Math.abs(v) >= 1e-4 ? Number(v.toPrecision(4)).toLocaleString() : v.toExponential(2));
 const NEURAL = ["gnn_ewc_replay", "ffnn_ewc_replay", "gnn_naive"];
 const ACTION_TEXT = {
   block_source: "Block the attacking host",
@@ -171,7 +176,7 @@ async function explain(i) {
     data: { labels: f.map((x) => x.label), datasets: [{ label: "attribution", data: f.map((x) => x.attribution),
       backgroundColor: f.map((x) => (x.attribution > 0 ? getComputedStyle(document.documentElement).getPropertyValue("--critical") : getComputedStyle(document.documentElement).getPropertyValue("--m-ours"))), borderRadius: 4 }] },
     options: { indexAxis: "y", responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false },
-      tooltip: { callbacks: { label: (c) => { const x = f[c.dataIndex]; return ` value ${x.value == null ? "–" : Number(x.value).toPrecision(4)} · ${x.direction} the verdict`; } } } },
+      tooltip: { callbacks: { label: (c) => { const x = f[c.dataIndex]; return ` value ${x.value == null ? "–" : fmtValue(x.value)} · ${x.direction} the verdict`; } } } },
       scales: { x: { grid: { color: getComputedStyle(document.documentElement).getPropertyValue("--grid") }, ticks: { display: false } }, y: { grid: { display: false } } } } });
 }
 

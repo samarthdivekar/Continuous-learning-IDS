@@ -17,8 +17,9 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 import httpx
-from fastapi import APIRouter, FastAPI, HTTPException, Query
-from fastapi.responses import RedirectResponse
+from fastapi import APIRouter, FastAPI, HTTPException, Query, Request
+from fastapi.middleware.gzip import GZipMiddleware
+from fastapi.responses import HTMLResponse, JSONResponse, PlainTextResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 from sqlalchemy import case, desc, func, select, text
@@ -147,6 +148,26 @@ def create_app(database_url: str | None = None, service=None, load_models: bool 
             state.service.stop_demo()
 
     app = FastAPI(title="Continual-learning GNN-IDS", version="1.0", lifespan=lifespan)
+    # 2.2 MB of drift rows compress to a fraction of that; only bodies above 1 KB are touched.
+    app.add_middleware(GZipMiddleware, minimum_size=1024)
+
+    # Optional shared-secret auth. With GNNIDS_API_KEY set, every endpoint except /health and
+    # the dashboard's own files needs the key (X-API-Key header or ?api_key=). Unset = open,
+    # which is the local-development default; deployments should set it and sit behind TLS.
+    api_key = os.environ.get("GNNIDS_API_KEY") or None
+    OPEN_PATHS = ("/health", "/api/health", "/docs", "/openapi.json", "/redoc", "/favicon.ico")
+
+    @app.middleware("http")
+    async def require_api_key(request: Request, call_next):
+        if api_key and request.method != "OPTIONS":
+            path = request.url.path
+            protected = not (path in OPEN_PATHS or path == "/" or path.startswith("/dashboard"))
+            if protected:
+                given = request.headers.get("x-api-key") or request.query_params.get("api_key")
+                if given != api_key:
+                    return JSONResponse({"detail": "missing or invalid API key"}, status_code=401)
+        return await call_next(request)
+
     router = APIRouter()
 
     @router.get("/health")
@@ -321,6 +342,33 @@ def create_app(database_url: str | None = None, service=None, load_models: bool 
             return state.service.incidents(window_id, model, threshold)
         except KeyError as exc:
             raise HTTPException(404, str(exc)) from exc
+
+    @router.get("/incidents/{window_id}/report", response_class=HTMLResponse)
+    def incident_report(window_id: int, incident_id: int, model: str = "gnn_ewc_replay",
+                        threshold: float = Query(0.0, ge=0.0, le=1.0), fmt: str = Query("html", pattern="^(html|json)$")):
+        """A printable hand-off report for one incident (browser Print -> Save as PDF)."""
+        rep = (_remote("GET", f"/incidents/{window_id}/report",
+                       params={"incident_id": incident_id, "model": model, "threshold": threshold})
+               if state.ml_url else _service_report(window_id, incident_id, model, threshold))
+        if fmt == "json":
+            return JSONResponse(rep)
+        from src.api.report_html import incident_report_html
+        return HTMLResponse(incident_report_html(rep))
+
+    def _service_report(window_id: int, incident_id: int, model: str, threshold: float):
+        try:
+            return state.service.incident_report(window_id, incident_id, model, threshold)
+        except KeyError as exc:
+            raise HTTPException(404, str(exc)) from exc
+
+    @router.get("/incidents/{window_id}/cef", response_class=PlainTextResponse)
+    def incidents_cef(window_id: int, model: str = "gnn_ewc_replay",
+                      threshold: float = Query(0.0, ge=0.0, le=1.0)):
+        """The window's incidents as ArcSight CEF lines, for a SIEM to ingest. Nothing is sent anywhere."""
+        from src.product.siem import incidents_to_cef
+        data = incidents(window_id, model, threshold)
+        return PlainTextResponse(incidents_to_cef(data["incidents"], window_id, model),
+                                 headers={"Content-Disposition": f'attachment; filename="incidents_w{window_id}.cef"'})
 
     @router.get("/explain/{window_id}/{edge}")
     def explain(window_id: int, edge: int, model: str = "gnn_ewc_replay"):

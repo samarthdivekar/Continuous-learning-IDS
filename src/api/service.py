@@ -309,6 +309,26 @@ class MLService:
                 "n_flows": int(len(fi)), "flagged_flows": int(sum(i["n_flows"] for i in inc)),
                 "metrics": metrics, "incidents": inc}
 
+    def incident_report(self, window_id: int, incident_id: int, model: str = "gnn_ewc_replay",
+                        threshold: float = 0.0) -> dict:
+        """Everything needed for a hand-off report: the incident, the proposed action and
+        the explanation of a representative flow. Used by /incidents/{w}/report."""
+        from datetime import datetime, timezone
+        data = self.incidents(window_id, model, threshold)
+        match = next((i for i in data["incidents"] if i["incident_id"] == incident_id), None)
+        if match is None:
+            raise KeyError(f"incident {incident_id} not found in window {window_id}")
+        evidence = None
+        for edge in (match.get("sample_edges") or [])[:1]:
+            try:
+                evidence = self.explain(window_id, int(edge), model)
+            except KeyError:                      # e.g. a tree model has no gradients
+                evidence = None
+        return {"generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+                "window_id": int(window_id), "model": model, "threshold": threshold,
+                "incident": match, "evidence": evidence, "window_metrics": data["metrics"],
+                "dataset": self.cfg["dataset"], "label_mode": self.cfg["label_mode"]}
+
     def explain(self, window_id: int, edge: int, model: str = "gnn_ewc_replay") -> dict:
         """Improvement 2: why was this flow classified the way it was?"""
         from src.explain.explain import explain_edge, summarize
