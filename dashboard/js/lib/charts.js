@@ -29,7 +29,7 @@ export function modelDataset(model, points, extra = {}) {
   const ours = model === "gnn_ewc_replay";
   return {
     label: label(model), data: points, borderColor: color(model), backgroundColor: color(model),
-    borderWidth: ours ? 3.5 : 2.2, borderDash: spec.dashed ? [6, 5] : [], pointRadius: points.length <= 12 ? 4 : 0,
+    borderWidth: (parseFloat(css("--chart-line")) || 2.2) * (ours ? 1.5 : 1), borderDash: spec.dashed ? [6, 5] : [], pointRadius: points.length <= 12 ? 4 : 0,
     pointHoverRadius: 6, tension: 0.15, ...extra,
   };
 }

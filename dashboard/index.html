@@ -4,7 +4,10 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>GNN-IDS Console</title>
-  <link rel="stylesheet" href="css/app.css">
+  <link rel="stylesheet" href="fonts/fonts.css">
+  <link rel="stylesheet" href="css/tokens.css">
+  <link rel="stylesheet" href="css/base.css">
+  <link rel="stylesheet" href="css/components.css">
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/d3@7.9.0/dist/d3.min.js"></script>
 </head>
@@ -29,16 +32,18 @@
       <button data-v="binary">Binary</button>
     </div>
     <div class="pills">
-      <span class="pill" id="pill-api"><i class="dot"></i>API</span>
-      <span class="pill" id="pill-ml"><i class="dot"></i>ML</span>
-      <span class="pill" id="pill-db"><i class="dot"></i>DB</span>
+      <span class="pill" id="pill-api" data-tip="Public API on port 8000"><i class="dot"></i><span class="pill-text">API</span></span>
+      <span class="pill" id="pill-ml" data-tip="Model service on port 8001"><i class="dot"></i><span class="pill-text">ML</span></span>
+      <span class="pill" id="pill-db" data-tip="Database (SQLite locally)"><i class="dot"></i><span class="pill-text">DB</span></span>
       <span class="pill" id="pill-stream"><i class="dot"></i><span>Stream idle</span></span>
     </div>
     <label class="inline switch" title="Off: the deployed model only. On: every baseline and ablation.">
       <input type="checkbox" id="compare-toggle"><span>Compare models</span></label>
     <button class="icon-btn" id="tour-btn" title="A five-step guided walk through the console">▶ Tour</button>
     <button class="icon-btn" id="help-btn" title="How to use this console (?)">? Help</button>
-    <button class="icon-btn" id="theme-btn" title="Toggle light/dark">◐</button>
+    <button class="icon-btn" id="present-btn" title="Presentation mode: larger type and thicker lines for a projector"
+            aria-pressed="false">⛶</button>
+    <button class="icon-btn" id="theme-btn" title="Toggle light/dark" aria-label="Toggle light or dark theme">◐</button>
   </div>
 </header>
 

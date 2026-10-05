@@ -106,7 +106,7 @@ def tabs():
 
 
 def css_tokens():
-    css = (ROOT / "dashboard/css/app.css").read_text(encoding="utf-8")
+    css = (ROOT / "dashboard/css/tokens.css").read_text(encoding="utf-8")
     block = css[css.index(":root"):css.index("}", css.index(":root"))]
     return re.findall(r"(--[a-z0-9-]+):\s*([^;]+);", block)
 

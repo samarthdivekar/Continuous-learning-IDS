@@ -109,9 +109,12 @@ def routes_table(files, prefix_filter=None):
 
 
 def controls_table(view_file, annotations):
+    """`view_file` may be a list: a tab's controls can live in the modules it composes
+    (Models = compare.js + general.js, Adaptation & trust = drift.js + trust.js)."""
+    files = [view_file] if isinstance(view_file, str) else list(view_file)
     rows = []
     for c in CONTROLS:
-        if c["file"] != view_file:
+        if c["file"] not in files:
             continue
         label = c["label"] or c["data"] or c["title"] or "—"
         if "${" in label or not label.strip():

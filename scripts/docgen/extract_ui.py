@@ -14,8 +14,11 @@ ATTR = lambda a, s: (re.search(rf'{a}="([^"]*)"', s) or [None, ""])[1]
 
 
 def clean(text):
+    """Visible label of a control. A template literal that builds one control per data row has
+    no fixed label, so say that instead of quoting the leftovers of the interpolation."""
+    if "${" in text:
+        return "(one per row)"
     text = re.sub(r"<[^>]+>", "", text)
-    text = re.sub(r"\$\{[^}]*\}", "", text)
     return " ".join(text.split())[:60]
 
 

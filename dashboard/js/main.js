@@ -57,6 +57,17 @@ function initControls() {
     $("#help").classList.toggle("hidden", !open); $("#help-scrim").classList.toggle("hidden", !open);
     if (open) prefs.set("helpSeen", "1");
   };
+  const present = $("#present-btn");
+  const setPresentation = (on) => {
+    document.documentElement.dataset.presentation = on ? "on" : "off";
+    present.classList.toggle("on", on);
+    present.setAttribute("aria-pressed", String(on));
+    prefs.set("presentation", on ? "1" : "0");
+    applyDefaults();
+    Object.values(loaded).forEach((m) => m.refresh && m.refresh());
+  };
+  setPresentation(prefs.get("presentation", "0") === "1");
+  present.addEventListener("click", () => setPresentation(document.documentElement.dataset.presentation !== "on"));
   $("#tour-btn").addEventListener("click", () => { help(false); tour.start(); });
   $("#help-btn").addEventListener("click", () => { tour.stop(); help(true); });
   $("#help-close").addEventListener("click", () => help(false));
@@ -74,7 +85,7 @@ function initControls() {
 function pill(id, ok, text) {
   const el = $(id); const dot = el.querySelector(".dot");
   dot.className = `dot ${ok === true ? "ok" : ok === false ? "bad" : "warn"}`;
-  if (text) (el.querySelector("span") || el).lastChild.textContent = text;
+  if (text) (el.querySelector(".pill-text") || el.querySelector("span") || el).textContent = text;
 }
 
 /** One line at the top of the page when something is wrong, naming what still works. */
