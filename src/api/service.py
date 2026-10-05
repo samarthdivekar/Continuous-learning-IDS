@@ -21,6 +21,7 @@ from src.db.models import DriftEventRow, Metric, WindowStat
 from src.evaluation.stream import StreamRunner
 from src.graph.window_builder import build_window_graph
 from src.ingestion.columns import canonical_name
+from src.utils.safe_load import load_checkpoint
 from src.preprocessing.pipeline import load_processed, processed_dir
 from src.preprocessing.scaling import FeatureScaler
 from src.training.learners import make_learner
@@ -117,8 +118,8 @@ class MLService:
                     with open(self.checkpoint_dir() / f"{name}_after_task0.pkl", "rb") as fh:
                         learner.model = pickle.load(fh)
                 else:
-                    state = torch.load(self.checkpoint_dir() / f"{name}_after_task{n_tasks - 1}.pt",
-                                       map_location=self.device, weights_only=False)
+                    state = load_checkpoint(self.checkpoint_dir() / f"{name}_after_task{n_tasks - 1}.pt",
+                                            map_location=self.device)
                     learner.model.load_state_dict(state["model"])
                 self.models[name] = learner
             except FileNotFoundError as exc:
@@ -136,8 +137,7 @@ class MLService:
                 with open(d / f"{learner.name}_after_task{task}.pkl", "rb") as fh:
                     learner.model = pickle.load(fh)
                 return True
-            state = torch.load(d / f"{learner.name}_after_task{task}.pt", map_location=self.device,
-                               weights_only=False)
+            state = load_checkpoint(d / f"{learner.name}_after_task{task}.pt", map_location=self.device)
         except FileNotFoundError:
             return False
         learner.model.load_state_dict(state["model"])

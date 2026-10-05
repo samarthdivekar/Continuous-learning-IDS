@@ -34,6 +34,7 @@ from torch_geometric.data import Batch, Data
 from src.graph.sampling import iter_training_subgraphs
 from src.graph.window_builder import edge_labels
 from src.models.baseline_xgb import StaticXGBoost
+from src.utils.safe_load import load_checkpoint
 from src.models.egraphsage import EGraphSAGE
 from src.models.ewc import EWC
 from src.models.ffnn import FFNN
@@ -450,7 +451,7 @@ def load_learner_checkpoint(learner: BaseLearner, path) -> BaseLearner:
         with open(path.with_suffix(".pkl"), "rb") as fh:
             learner.model = pickle.load(fh)
         return learner
-    state = torch.load(path, map_location=learner.device, weights_only=False)
+    state = load_checkpoint(path, map_location=learner.device)
     learner.model.load_state_dict(state["model"])
     if getattr(learner, "ewc", None) is not None and "ewc" in state:
         learner.ewc.load_state_dict(state["ewc"], learner.device)

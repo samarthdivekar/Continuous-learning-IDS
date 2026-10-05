@@ -26,9 +26,11 @@ support the expected story, the README says so.
 7. [Evaluation protocol](#evaluation-protocol)
 8. [Results](#results)
 9. [Known limitations and honest caveats](#known-limitations-and-honest-caveats)
-10. [Future work](#future-work-scoped-out-deliberately)
-11. [Repository layout](#repository-layout)
-12. [References](#references)
+10. [How this compares to existing work](#how-this-compares-to-existing-work)
+11. [Security notes](#security-notes)
+12. [Future work](#future-work-scoped-out-deliberately)
+13. [Repository layout](#repository-layout)
+14. [References](#references)
 
 ---
 
@@ -675,6 +677,51 @@ What this shows (single seed):
   replay entries in drift adaptation, the EWC-only ablation inheriting another model's λ, and several
   serving bugs. All affected experiments were re-run.
 
+
+## How this compares to existing work
+
+This is a student project, not a benchmarked competitor: nothing here was run against the systems below,
+so the differences are of *scope*, not measured superiority.
+
+| Line of work | What it does | Where this project differs |
+|---|---|---|
+| [E-GraphSAGE](https://arxiv.org/abs/2103.16329) (Lo et al., 2021) | the edge-featured GNN this project's model is built on; single training run | adds continual learning across a task sequence, drift-triggered adaptation, and a product layer |
+| Continual GNN IDS with experience replay (e.g. ER-GNN based theses, 2026) | replay to resist forgetting as new attack classes arrive | combines replay **and** EWC, and reports the ablation honestly: replay is what works, EWC alone fails (§1) |
+| Conformal / risk-controlled alert triage (2025–26 literature) | calibrated abstention and false-alarm control for SOC queues | class-conditional (Mondrian) sets over a *continual* model, plus the finding that the safe α differs per dataset (§7) |
+| Commercial NDR products | packet capture, enrichment, response automation at scale | not comparable in scope; this project is an evaluated research prototype with dry-run response only |
+
+**What is distinctive here, as far as the evidence in this repo goes:** the combination of continual learning,
+drift-triggered retraining and an operator-facing layer (incidents, explanations, abstention, proposed
+containment) in one evaluated system, on error-corrected data, with negative results reported rather than
+hidden — EWC-only fails, the label-free drift trigger fails, uncertainty-only labelling fails, topology
+augmentation is a trade-off, and the 2018 GNN is unstable on Infiltration.
+
+## Security notes
+
+The system is a research prototype. Its threat model is "runs on a trusted host, operated by its owner".
+
+**Hardened in this repository**
+
+* **Model files are not blindly unpickled.** `torch.load` executes arbitrary code when reading an untrusted
+  checkpoint. Checkpoints are read with `weights_only=True`, and the permissive reader is used only as a
+  fallback for files inside this project's own `cache/` or `results/` (`src/utils/safe_load.py`).
+* **Optional API authentication.** Set `GNNIDS_API_KEY` and every endpoint except `/health` requires the key
+  (`X-API-Key` header). Unset, the API is open, which is the local-development default.
+* **Localhost-only by default.** The API, ML service and dashboard all bind `127.0.0.1` (`scripts/run_stack.ps1`).
+* **Response headers.** `X-Content-Type-Options`, `Referrer-Policy`, `X-Frame-Options` on API responses, plus a
+  Content-Security-Policy on the dashboard that allows scripts only from the page itself and the two CDN
+  libraries it loads.
+* **Bounded requests and escaped output.** Ingest and predict bodies are size-limited; the dashboard escapes
+  every value it renders; the CEF exporter escapes the separators a log-injection attempt would use.
+* **Response actions are inert.** Firewall rules are generated, displayed and recorded. Nothing is executed,
+  with or without approval.
+
+**Deliberately not solved (deployment concerns, not research claims)**
+
+* No TLS, no user accounts, no roles: put the API behind a reverse proxy that provides them.
+* No rate limiting; a local caller can start an expensive prediction repeatedly.
+* The database holds flow records and predictions in clear text, which is personal data in a real network.
+* Model and data files are trusted as produced locally; there is no signing of checkpoints.
 
 ## Future work (scoped out deliberately)
 
