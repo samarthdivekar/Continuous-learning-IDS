@@ -196,22 +196,28 @@ Open **http://localhost:8080**; stop with `scripts/run_stack.ps1 -Stop`. First l
 database once with `python -m src.db.seed --dataset cicids2017 --label-mode multiclass` (the stack script
 does this unless `-SkipSeed`). A single-process variant is `python -m uvicorn src.api.app:app --port 8000`.
 
-The console has ten tabs in two groups, *Operate* and *Evaluate*. Every panel is fed by result files or live API data, and a missing
-experiment shows "not run yet", never a number. A **Help** drawer (key `?`) gives a plain-language tour and
-glossary and opens automatically on the first visit. Keys `1`–`0` switch tabs.
+The console has eight tabs in two groups, *Operate* (what a security team uses) and *Evaluate* (the evidence
+behind it). Every panel is fed by result files or live API data, and a missing experiment shows "not run yet",
+never a number.
 
 | Tab | What it shows |
 |---|---|
-| Overview | headline KPIs, the "adapts / remembers" verdict table computed from results, attack timeline, architecture |
-| Incident queue | a window's alerts grouped into incidents; per-incident explanation (feature attribution, network context, plain-English summary); proposed containment rule; analyst approve / reject with a decision log (dry run) |
-| Live Stream | replays the stream through four models; ADWIN flags, adaptations, per-window counts, drift feed, speed control, forced retrain |
-| Graph Explorer | any window graph as an interactive force layout (zoom, hover, category filters) with a per-flow **model-error overlay** |
-| Model Comparison | any metric over tasks for all models with ±1 std bands, recall heatmaps, BWT, confusion matrix after any task |
-| Drift Analysis | ADWIN vs periodic vs oracle vs never: retrain cost vs final quality, error timelines |
-| Generalisation | leave-one-attack-out detection and the IP-remap leakage test |
-| Classify | run every model on a held-out window or on pasted/uploaded flows |
-| Trust & novelty | open-set detection of unseen attacks and proposed new-category clusters, conformal abstention, alert → incident compression, gated / label-budgeted adaptation |
+| Overview | the result in plain words, headline KPIs, the "adapts / remembers" verdict table, attack timeline, architecture |
+| Incident queue | a window's alerts grouped into incidents; per-incident explanation (feature attribution, network context, plain-English summary); proposed containment rule; approve / reject with a decision log (dry run); filters, a printable report and a CEF download |
+| Live stream | replays the stream through four models; ADWIN flags, adaptations, per-window counts, drift feed, speed control, forced retrain |
+| Graph explorer | any window graph as an interactive force layout (zoom, hover, category filters) with a per-flow **model-error overlay** |
+| Classify | run the models on a held-out window or on pasted/uploaded flows |
+| Models | *Accuracy & forgetting* (metric over tasks with ±1 std bands, recall heatmaps, BWT, confusion matrix) and *Unseen attacks & IP leakage* (leave-one-attack-out, IP-remap) |
+| Adaptation & trust | *Drift & retraining* (ADWIN vs periodic vs oracle vs never) and *Trust* (open-set novelty, conformal abstention, alert → incident compression, gated / label-budgeted adaptation) |
 | Reproducibility | λ sweep, tuning table, EWC stability ratios, run metadata |
+
+Interface details that matter in a demo:
+
+* **One model by default.** Charts show the deployed model and its two reference points; the **Compare models**
+  switch in the header brings in every baseline and ablation.
+* **▶ Tour** walks through the console in five steps; **? Help** opens a glossary, and `1`–`8` switch tabs.
+* **A banner** appears when the ML service is down, naming the tabs that still work.
+* **⤓ buttons** export any panel as CSV (and the chart as PNG), for slides and reports.
 
 The live stream warm-starts from the task-1 checkpoints written by `run_continual` (first seed) in
 `cache/checkpoints/`; without them it trains task 1 itself first.
@@ -258,6 +264,22 @@ Docker-free stack above is the day-to-day option.
 All routes are also served under `/api/…`. Interactive docs: `/docs`.
 
 ---
+
+**Operator endpoints** (all served at `/` and `/api`):
+
+| Endpoint | Purpose |
+|---|---|
+| `GET /incidents/{window}` | the window's alerts grouped into incidents, each with a proposed action |
+| `GET /incidents/{window}/report?incident_id=N` | a printable one-page report (`fmt=json` for the raw payload) |
+| `GET /incidents/{window}/cef` | the same incidents as ArcSight **CEF** lines for a SIEM to ingest |
+| `GET /explain/{window}/{edge}` | feature, neighbourhood and structural evidence for one flow |
+| `POST /actions`, `POST /actions/{id}/decision`, `GET /actions` | propose a containment action and record approve / reject (dry run) |
+
+Set `GNNIDS_API_KEY` to require an `X-API-Key` header on every endpoint except `/health`.
+
+**Feeding it your own traffic.** `python scripts/pcap_to_flows.py capture.pcap` converts a capture with
+CICFlowMeter (install it separately; point to it with `--jar` or `CICFLOWMETER_JAR`), posts the flows to
+`/ingest` and prints the verdicts. With an existing flow CSV, skip conversion: `--csv flows.csv`.
 
 ## Design
 

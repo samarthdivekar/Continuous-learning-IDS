@@ -193,3 +193,38 @@ def test_incidents_explain_and_action_workflow(client):
                                            "target": first["proposed"]["target"]})
         assert ok.status_code == 200 and ok.json()["id"] == a["id"]
         assert client.post("/actions", json={"window_id": wid, "incident_id": iid, "threshold": 1.5}).status_code == 422
+
+
+def test_incident_report_and_cef_export(client):
+    cat = client.get("/windows/catalog").json()
+    wid = next(w["window_id"] for w in cat if w["n_attack"] > 0)
+    inc = client.get(f"/incidents/{wid}?model=gnn_ewc_replay").json()
+    assert inc["incidents"], "fixture should produce an incident"
+    iid = inc["incidents"][0]["incident_id"]
+
+    html = client.get(f"/incidents/{wid}/report?incident_id={iid}&model=gnn_ewc_replay")
+    assert html.status_code == 200 and html.headers["content-type"].startswith("text/html")
+    assert "Proposed containment" in html.text and "dry run" in html.text
+
+    data = client.get(f"/incidents/{wid}/report?incident_id={iid}&model=gnn_ewc_replay&fmt=json").json()
+    assert data["incident"]["incident_id"] == iid and data["window_id"] == wid and "generated_at" in data
+
+    cef = client.get(f"/incidents/{wid}/cef?model=gnn_ewc_replay")
+    assert cef.status_code == 200 and cef.text.startswith("CEF:0|ContinualGNN|")
+    assert len(cef.text.splitlines()) == len(inc["incidents"])
+    assert "attachment" in cef.headers.get("content-disposition", "")
+
+    assert client.get(f"/incidents/{wid}/report?incident_id=9999&model=gnn_ewc_replay").status_code == 404
+
+
+def test_api_key_blocks_everything_except_health(cfg, tmp_path, monkeypatch):
+    """With GNNIDS_API_KEY set, only /health and the dashboard are reachable without the key."""
+    monkeypatch.setenv("GNNIDS_API_KEY", "s3cret")
+    url = f"sqlite:///{(tmp_path / 'auth.db').as_posix()}"
+    reset_for_tests(url)
+    with TestClient(create_app(database_url=url, load_models=False)) as c:
+        assert c.get("/health").status_code == 200                       # always open
+        assert c.get("/metrics").status_code == 401                      # no key
+        assert c.get("/metrics", headers={"X-API-Key": "wrong"}).status_code == 401
+        assert c.get("/metrics", headers={"X-API-Key": "s3cret"}).status_code == 200
+        assert c.get("/metrics?api_key=s3cret").status_code == 200       # query form, for downloads
