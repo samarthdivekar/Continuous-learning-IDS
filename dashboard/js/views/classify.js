@@ -33,7 +33,8 @@ export async function mount_(el) {
         <div class="toolbar" style="margin-top:8px"><button class="btn primary" id="cl-run-f">Classify flows</button></div></div>
     </div>
     <div class="card" style="margin-top:16px"><h3>Verdicts</h3><div id="cl-out"><div class="empty">Run a classification above.</div></div></div>`;
-  try { catalog = (await get("/windows/catalog")).filter((w) => w.split === "test"); } catch { catalog = []; }
+  try { catalog = (await get("/windows/catalog")).filter((w) => w.split === "test"); }
+  catch (e) { catalog = []; showError($("#cl-out", root), e, { what: "the window catalogue" }); }
   const firstAttack = catalog.find((w) => w.n_attack > 200);
   $("#cl-win", root).innerHTML = catalog.map((w) => `<option value="${w.window_id}" ${firstAttack && w.window_id === firstAttack.window_id ? "selected" : ""}>#${w.window_id} · task ${w.task_id + 1} ${esc(w.task_category)} · ${int(w.n_attack)} attack flows</option>`).join("");
   $("#cl-run-w", root).addEventListener("click", () => run({ window_id: Number($("#cl-win", root).value) }));

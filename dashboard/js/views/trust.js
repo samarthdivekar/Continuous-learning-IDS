@@ -3,6 +3,7 @@
 // Every number is read from results/ files written by the experiment scripts.
 import { $, attachExport, catColor, color, esc, f3, get, int, label, MODELS, pct, state, table } from "../lib/core.js";
 import { barOptions, mount } from "../lib/charts.js";
+import { makeSortable, showError } from "../lib/ui.js";
 const short = (m) => (MODELS[m] || { short: m }).short;
 
 let root;
@@ -48,7 +49,7 @@ async function render() {
   openSet(ds); conformal(ds); incidents(ds); adaptation(ds);
 }
 
-const missing = (el, e) => { el.innerHTML = `<div class="empty">${e.status === 404 ? "Not run yet for this dataset." : esc(e.message)}</div>`; };
+const missing = (el, e) => showError(el, e, { what: "this experiment" });
 
 let osData = null;
 async function openSet(ds) {

@@ -1,6 +1,7 @@
 // Model Comparison: metric-over-tasks for all models, recall heatmap, forgetting, confusion matrix.
 import { $, attachExport, color, esc, f3, get, heatColor, label, MODELS, modelCell, pct, shownModels, state, table } from "../lib/core.js";
 import { barOptions, legend, lineOptions, modelDataset, mount } from "../lib/charts.js";
+import { makeSortable, showError, skeleton } from "../lib/ui.js";
 
 let root, data, charts = {};
 let models = [];                                 // the model set the charts draw
@@ -36,7 +37,7 @@ async function render() {
       <div class="card"><h3>Final scoreboard</h3><p class="sub">after the last task</p><div id="cmp-table"></div></div>
     </div>`;
   try { data = await get(`/results/continual?dataset=${dataset}&mode=${mode}`); }
-  catch (e) { root.querySelector(".card").innerHTML = `<div class="empty">${esc(e.message)}</div>`; return; }
+  catch (e) { showError(root.querySelector(".card"), e, { what: "the task-sequence results" }); return; }
   models = shownModels(data.models);              // one model by default (header toggle shows all)
   $("#cmp-rm", root).innerHTML = models.map((m) => `<option value="${m}">${esc(label(m))}</option>`).join("");
   $("#cmp-cm-model", root).innerHTML = $("#cmp-rm", root).innerHTML;
@@ -107,7 +108,7 @@ async function drawCm() {
         return `<td class="cell" style="background:${i === j ? heatColor(share) : share > 0.01 ? `color-mix(in srgb, var(--critical) ${Math.round(Math.min(1, share * 3) * 70)}%, transparent)` : "transparent"}"
           title="${(share * 100).toFixed(2)}% of true ${esc(cm.labels[i])}">${v.toLocaleString()}</td>`; }).join("")}</tr>` : "").join("")}</tbody></table></div>
       <p class="note">Blue diagonal = correct share of each true class; red off-diagonal = confusions (≥ 1% of the row).</p>`;
-  } catch (e) { box.innerHTML = `<div class="empty">${esc(e.message)}</div>`; }
+  } catch (e) { showError(box, e, { what: "the confusion matrix" }); }
 }
 
 function drawTable() {

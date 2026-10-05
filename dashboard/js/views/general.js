@@ -1,6 +1,7 @@
 // Generalisation: leave-one-attack-out (unseen attacks) and the IP-remap leakage test.
 import { $, attachExport, catColor, color, esc, f3, get, int, label, pct, state, table } from "../lib/core.js";
 import { mount } from "../lib/charts.js";
+import { makeSortable, showError } from "../lib/ui.js";
 
 let root;
 // In leave-one-attack-out every model is trained ONCE, jointly on all other tasks
@@ -41,7 +42,7 @@ async function render() {
 async function loao(dataset, mode) {
   let rows;
   try { rows = (await get(`/results/loao?dataset=${dataset}&mode=${mode}`)).rows; }
-  catch (e) { $("#gn-loao-t", root).innerHTML = `<div class="empty">${esc(e.message)}</div>`; return; }
+  catch (e) { showError($("#gn-loao-t", root), e, { what: "the unseen-attack results" }); return; }
   const cats = [...new Set(rows.map((r) => r.held_out_category))];
   const models = [...new Set(rows.map((r) => r.model))];
   const val = (c, m) => rows.find((r) => r.held_out_category === c && r.model === m)?.heldout_detection_rate ?? null;
@@ -58,6 +59,7 @@ async function loao(dataset, mode) {
     { title: "Detected", num: true, value: (r) => pct(r.heldout_detection_rate) },
     { title: "FPR", num: true, value: (r) => pct(r.fpr, 2) },
   ], rows);
+  makeSortable($("#gn-loao-t", root));
   const mean = (m) => { const v = cats.map((c) => val(c, m)).filter((x) => x != null); return v.length ? v.reduce((a, b) => a + b, 0) / v.length : null; };
   $("#gn-callout", root).innerHTML = `<div class="callout">Mean detection of unseen attacks: ${models.map((m) => `<b style="color:${color(m)}">${esc(loaoLabel(m))}</b> ${pct(mean(m))}`).join(" · ")}
     ${cats.length < 7 ? ` <span class="muted">(${cats.length} of 7 categories finished)</span>` : ""}</div>`;
@@ -66,7 +68,7 @@ async function loao(dataset, mode) {
 async function ipremap(dataset) {
   let r;
   try { r = await get(`/results/ip_remap?dataset=${dataset}&mode=multiclass`); }
-  catch (e) { $("#gn-ip-t", root).innerHTML = `<div class="empty" style="margin-top:10px">${esc(e.message)}</div>`; return; }
+  catch (e) { showError($("#gn-ip-t", root), e, { what: "the IP-remap results" }); return; }
   const models = [...new Set(r.final.map((x) => x.model))], modes = ["none", "permute", "random_src"];
   const v = (m, k) => r.final.find((x) => x.model === m && x.ip_mode === k)?.macro_f1_seen ?? null;
   mount($("#gn-ip", root), { type: "bar", data: { labels: models.map(label), datasets: modes.map((k, i) => ({ label: k,

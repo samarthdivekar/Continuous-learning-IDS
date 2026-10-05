@@ -91,7 +91,8 @@ export async function mount_(el) {
 
   get("/health").then((h) => { $("#soc-svc", root).textContent = `live models: ${h.ml?.dataset || "?"} · ${h.ml?.label_mode || ""}`; })
     .catch(() => {});
-  try { catalog = (await get("/windows/catalog")).filter((w) => w.split === "test" && w.n_attack > 0); } catch { catalog = []; }
+  try { catalog = (await get("/windows/catalog")).filter((w) => w.split === "test" && w.n_attack > 0); }
+  catch (e) { catalog = []; showError($("#soc-list", root), e, { what: "the window catalogue" }); }
   catalog.sort((a, b) => b.n_attack - a.n_attack);
   $("#soc-win", root).innerHTML = catalog.length ? catalog.map((w) =>
     `<option value="${w.window_id}">#${w.window_id} · ${esc(w.top_attack || w.task_category)} · ${int(w.n_attack)} attack flows</option>`).join("")

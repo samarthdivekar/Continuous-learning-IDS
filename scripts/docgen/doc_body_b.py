@@ -128,7 +128,7 @@ TABS = [
       "<b>Dataset panel</b> &mdash; flow and window counts, features, task segmentation, read from the processed "
       "metadata (<span class='mono'>/results/data_summary</span>)."],
      {"": ""}),
-    ("6.4", "Incident queue", "dashboard/js/views/soc.js", "soc",
+    ("6.4", "Incident queue", "dashboard/js/views/soc.js", ["dashboard/js/views/soc.js"],
      "What an analyst actually works through: alerts grouped into incidents, each explained, each with a "
      "proposed containment action awaiting a human decision.",
      ["<b>Scope</b> &mdash; one window, or a scan of the last 10/20/50 windows ranked by severity (a shift's queue).",
@@ -161,7 +161,7 @@ TABS = [
       "Windows Firewall": "shows the PowerShell form of the same rule",
       "All": "decision log filter: everything", "Pending": "decision log filter: awaiting a decision",
       "Approved": "decision log filter: approved", "Rejected": "decision log filter: rejected"}),
-    ("6.5", "Live stream", "dashboard/js/views/live.js", "live",
+    ("6.5", "Live stream", "dashboard/js/views/live.js", ["dashboard/js/views/live.js"],
      "Replays the traffic stream through four models at once and shows drift detection and self-retraining "
      "as they happen.",
      ["<b>Progress and KPIs</b> &mdash; position in the stream, and per-window counts of benign, known-attack and "
@@ -175,7 +175,7 @@ TABS = [
       "lv-retrain": "forces an adaptation now (<span class='mono'>POST /retrain</span>), the operator override",
       "lv-stop": "stops the replay (<span class='mono'>POST /demo/stop</span>)",
       "lv-speed": "delay between windows, from fast to slow enough to narrate"}),
-    ("6.6", "Graph explorer", "dashboard/js/views/explorer.js", "explorer",
+    ("6.6", "Graph explorer", "dashboard/js/views/explorer.js", ["dashboard/js/views/explorer.js"],
      "One window as a picture: hosts as dots, flows as lines, laid out by d3-force on a canvas.",
      ["<b>Why it exists</b> &mdash; attacks have shapes. A port scan fans out from one host; a flood fans in to one "
       "victim. That shape is exactly what the graph model can use and a per-flow model cannot.",
@@ -189,7 +189,7 @@ TABS = [
       "ex-attack": "show only edges that are attacks",
       "Ground truth": "colour edges by their true category",
       "Model errors": "colour edges by whether the model got them right"}),
-    ("6.7", "Classify", "dashboard/js/views/classify.js", "classify",
+    ("6.7", "Classify", "dashboard/js/views/classify.js", ["dashboard/js/views/classify.js"],
      "Run the models on demand: either a held-out window with ground truth, or your own flows.",
      ["<b>Window mode</b> &mdash; pick a test window; every loaded model classifies it and the counts are compared "
       "with the truth.",
@@ -201,7 +201,8 @@ TABS = [
       "cl-run-w": "classifies that window with every loaded model (<span class='mono'>POST /predict</span>)",
       "cl-run-f": "classifies the pasted CSV rows (parsed in the browser, then <span class='mono'>POST /predict</span>)",
       "cl-file": "loads a CSV file into the text box (5 MB limit, stated in the interface)"}),
-    ("6.8", "Models", "dashboard/js/views/models.js", "compare",
+    ("6.8", "Models", "dashboard/js/views/models.js (compare.js + general.js)",
+     ["dashboard/js/views/compare.js", "dashboard/js/views/general.js"],
      "The evidence about model quality, in two sub-sections: <i>Accuracy &amp; forgetting</i> and "
      "<i>Unseen attacks &amp; IP leakage</i>.",
      ["<b>Metric over tasks</b> &mdash; any metric plotted as the task sequence progresses, with a shaded band of "
@@ -219,7 +220,8 @@ TABS = [
       "cmp-cm-task": "after which task the confusion matrix is taken",
       "Binary": "scores the unseen-attack test in attack-vs-benign mode",
       "Multiclass": "scores it with named categories"}),
-    ("6.9", "Adaptation &amp; trust", "dashboard/js/views/adapt.js", "trust",
+    ("6.9", "Adaptation &amp; trust", "dashboard/js/views/adapt.js (drift.js + trust.js)",
+     ["dashboard/js/views/drift.js", "dashboard/js/views/trust.js"],
      "When the system noticed traffic had changed and what it did, plus how far its decisions can be trusted. "
      "Two sub-sections: <i>Drift &amp; retraining</i> and <i>Trust</i>.",
      ["<b>Policy comparison</b> &mdash; ADWIN against a fixed schedule, an oracle that knows the true boundaries, "
@@ -233,7 +235,7 @@ TABS = [
       "negative results."],
      {"dr-run": "which stream run to display",
       "tr-method": "which novelty score to chart (energy, max softmax, prototype distance)"}),
-    ("6.10", "Reproducibility", "dashboard/js/views/repro.js", "repro",
+    ("6.10", "Reproducibility", "dashboard/js/views/repro.js", ["dashboard/js/views/repro.js"],
      "How every number was produced, so a reader can check rather than trust.",
      ["<b>EWC &lambda; sweep</b> &mdash; validation score against the penalty strength, on a logarithmic axis, with "
       "the selected value marked.",
@@ -249,7 +251,7 @@ for num, title, path, view_file, intro, bullets, annots in TABS:
     add(f"<p>{intro}</p><ul>" + "".join(f"<li>{b}</li>" for b in bullets) + "</ul>")
     if view_file:
         add("<h4>Every control on this tab</h4>")
-        add(controls_table(path, annots))
+        add(controls_table(view_file, annots))
     add("</section>")
 
 # ------------------------------------------------------------------ 7. traces

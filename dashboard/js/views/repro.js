@@ -1,7 +1,8 @@
 // Reproducibility: tuning + λ sweep (validation split), selections, run metadata and seeds.
-import { $, esc, f3, get, label, MODELS, pct, state, table } from "../lib/core.js";
+import { $, esc, f3, get, label, MODELS, pct, state, table, toast } from "../lib/core.js";
 const short = (m) => (MODELS[m] || {}).short || m;
 import { mount } from "../lib/charts.js";
+import { makeSortable, showError, skeleton } from "../lib/ui.js";
 
 let root;
 export async function mount_(el) { root = el; await render(); }
@@ -13,7 +14,11 @@ async function render() {
   root.innerHTML = `
     <div class="view-head"><div><h2>Reproducibility</h2>
       <p>Every hyper-parameter was chosen on the <b>validation</b> split; test windows were only used by the final runs.
-      Re-create every number with <span class="mono">python -m experiments.reproduce_all --dataset ${esc(dataset)}</span>.</p></div></div>
+      Re-create every number with the command below.</p></div></div>
+    <div class="card" style="margin-bottom:16px"><div class="card-head"><div><h3>Reproduce everything</h3>
+      <p class="sub">data preparation → tuning → λ sweep → task sequence (3 seeds) → drift stream → unseen attacks → IP remap → figures → report</p></div>
+      <button class="btn" id="rp-copy">Copy command</button></div>
+      <pre class="rule mono" id="rp-cmd">python -m experiments.reproduce_all --dataset ${esc(dataset)}</pre></div>
     <div class="grid g2">
       <div class="card"><h3>EWC λ sweep (validation)</h3><p class="sub">final validation macro-F1 per λ · solid γ = 0.9, dashed γ = 1.0 · log x-axis</p>
         <div class="chart"><canvas id="rp-sweep"></canvas></div><div id="rp-selected"></div></div>
@@ -23,8 +28,15 @@ async function render() {
       <div class="card"><h3>Run metadata</h3><p class="sub">results/${esc(dataset)}/${esc(mode)}/continual/run_info.json</p><div id="rp-info"></div></div>
       <div class="card"><h3>EWC stability (brief trap 3)</h3><p class="sub">max lr·λ·max(F) reached per sweep run — above 1 the penalty step can overshoot</p><div id="rp-stab"></div></div>
     </div>`;
+  $("#rp-copy", root).addEventListener("click", async () => {
+    try { await navigator.clipboard.writeText($("#rp-cmd", root).textContent.trim()); toast("command copied"); }
+    catch { toast("could not copy — select the text manually"); }
+  });
+  $("#rp-tuning", root).innerHTML = skeleton("table");
+  $("#rp-info", root).innerHTML = skeleton("lines");
   let t;
-  try { t = await get(`/results/tuning?dataset=${dataset}`); } catch (e) { $("#rp-tuning", root).innerHTML = `<div class="empty">${esc(e.message)}</div>`; }
+  try { t = await get(`/results/tuning?dataset=${dataset}`); }
+  catch (e) { showError($("#rp-tuning", root), e, { what: "the tuning results" }); }
   if (t?.sweep) {
     const models = [...new Set(t.sweep.map((r) => r.model))];
     const sets = [];
@@ -35,7 +47,24 @@ async function render() {
     }
     mount($("#rp-sweep", root), { type: "line", data: { datasets: sets }, options: { responsive: true, maintainAspectRatio: false, parsing: false,
       plugins: { legend: { display: true, position: "bottom", labels: { boxWidth: 18 } } },
-      scales: { x: { type: "logarithmic", title: { display: true, text: "λ" } }, y: { min: 0, max: 1 } } } });
+      scales: { x: { type: "logarithmic", title: { display: true, text: "λ (log scale)" } }, y: { min: 0, max: 1 } } },
+      plugins: [{                                   // mark the λ that was selected for our model
+        id: "selected-lambda",
+        afterDatasetsDraw(chart) {
+          const pick = (t.selected_ewc || {}).gnn_ewc_replay;
+          if (!pick) return;
+          const x = chart.scales.x.getPixelForValue(Number(pick.lambda));
+          if (!Number.isFinite(x)) return;
+          const { ctx, chartArea: a } = chart;
+          ctx.save();
+          ctx.strokeStyle = getComputedStyle(document.documentElement).getPropertyValue("--accent-2");
+          ctx.setLineDash([5, 4]); ctx.lineWidth = 1.5;
+          ctx.beginPath(); ctx.moveTo(x, a.top); ctx.lineTo(x, a.bottom); ctx.stroke();
+          ctx.setLineDash([]); ctx.fillStyle = ctx.strokeStyle; ctx.font = "12px system-ui";
+          ctx.fillText(`selected λ=${pick.lambda}`, Math.min(x + 6, a.right - 90), a.top + 14);
+          ctx.restore();
+        },
+      }] });
     $("#rp-selected", root).innerHTML = `<p class="note">Selected per model: ${Object.entries(t.selected_ewc || {}).map(([m, v]) =>
       `<b>${esc(label(m))}</b> λ=${v.lambda}, γ=${v.gamma}`).join(" · ")}. Neighbouring λ values are often within run-to-run noise.</p>`;
     $("#rp-stab", root).innerHTML = table([

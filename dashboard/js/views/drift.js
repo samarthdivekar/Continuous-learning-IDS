@@ -1,6 +1,7 @@
 // Drift Analysis: ADWIN vs periodic vs oracle vs never — retrain cost vs final quality, plus timelines.
 import { $, color, css, esc, f3, get, int, label, pct, state, table } from "../lib/core.js";
 import { barOptions, lineOptions, markerPlugin, modelDataset, mount } from "../lib/charts.js";
+import { makeSortable, showError } from "../lib/ui.js";
 
 let root, d;
 const POLICY = { adwin: "ADWIN (drift-triggered)", periodic: "Periodic schedule", oracle: "Oracle (true task boundaries)", never: "Never adapt" };
@@ -26,7 +27,11 @@ async function render() {
     <div class="card" style="margin-top:16px"><h3>Quality over the stream</h3><p class="sub">macro-F1 on held-out test windows of all tasks seen so far</p>
       <div class="chart"><canvas id="dr-eval"></canvas></div></div>`;
   try { d = await get(`/results/drift?dataset=${dataset}&mode=multiclass`); }
-  catch (e) { root.querySelector(".grid").innerHTML = `<div class="card span-2"><div class="empty">${esc(e.message)}</div></div>`; return; }
+  catch (e) {
+    root.querySelector(".grid").innerHTML = '<div class="card span-2"></div>';
+    showError(root.querySelector(".grid .card"), e, { what: "the drift-stream results" });
+    return;
+  }
   const s = d.summary;
   const runs = s.map((r) => `${r.model}|${r.policy}`);
   $("#dr-run", root).innerHTML = runs.map((k) => { const [m, p] = k.split("|"); return `<option value="${k}">${esc(label(m))} · ${esc(POLICY[p] || p)}</option>`; }).join("");
