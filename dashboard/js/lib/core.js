@@ -4,12 +4,13 @@ export const API = window.API_BASE || "/api";
 export const state = {
   dataset: localGet("ds", "cicids2017"),
   mode: localGet("mode", "multiclass"),
+  compare: localGet("compare", "0") === "1",   // off = one model; on = every ablation
   listeners: new Set(),
 };
 export function onContextChange(fn) { state.listeners.add(fn); }
 export function setContext(patch) {
   Object.assign(state, patch);
-  localSet("ds", state.dataset); localSet("mode", state.mode);
+  localSet("ds", state.dataset); localSet("mode", state.mode); localSet("compare", state.compare ? "1" : "0");
   state.listeners.forEach((fn) => { try { fn(); } catch (e) { console.error(e); } });
 }
 
@@ -17,22 +18,29 @@ function localGet(k, d) { try { return localStorage.getItem("gnnids." + k) || d;
 function localSet(k, v) { try { localStorage.setItem("gnnids." + k, v); } catch { /* private mode */ } }
 export const prefs = { get: localGet, set: localSet };
 
-export async function get(path) {
-  const r = await fetch(`${API}${path}`);
+// The API needs a key only when the server was started with GNNIDS_API_KEY. It can come from
+// the URL (?api_key=...) once and is then remembered in this browser.
+const urlKey = new URLSearchParams(location.search).get("api_key");
+if (urlKey) { localSet("apiKey", urlKey); history.replaceState(null, "", location.pathname + location.hash); }
+export const apiKey = () => localGet("apiKey", "");
+export function setApiKey(k) { localSet("apiKey", k || ""); }
+const authHeaders = () => (apiKey() ? { "X-API-Key": apiKey() } : {});
+
+async function request(path, init) {
+  const r = await fetch(`${API}${path}`, { ...init, headers: { ...(init?.headers || {}), ...authHeaders() } });
   if (!r.ok) {
     const j = await r.json().catch(() => ({}));
     const err = new Error(j.detail || `${r.status} ${path}`);
-    err.status = r.status; throw err;
+    err.status = r.status;
+    if (r.status === 401) err.needsKey = true;
+    throw err;
   }
   return r.json();
 }
-export async function post(path, body) {
-  const r = await fetch(`${API}${path}`, { method: "POST", headers: { "Content-Type": "application/json" },
-                                           body: JSON.stringify(body || {}) });
-  const j = await r.json().catch(() => ({}));
-  if (!r.ok) { const e = new Error(j.detail || r.status); e.status = r.status; throw e; }
-  return j;
-}
+export const get = (path) => request(path, {});
+export const post = (path, body) => request(path, { method: "POST", headers: { "Content-Type": "application/json" },
+                                                    body: JSON.stringify(body || {}) });
+export const apiUrl = (path) => `${API}${path}${apiKey() ? `${path.includes("?") ? "&" : "?"}api_key=${encodeURIComponent(apiKey())}` : ""}`;
 
 // ---------------------------------------------------------------- models
 export const MODELS = {
@@ -47,7 +55,15 @@ export const MODELS = {
   gnn_joint:       { label: "GNN joint (upper bound)",   short: "GNN joint", var: "--m-joint", dashed: true },
   ffnn_joint:      { label: "FFNN joint (upper bound)",  short: "FFNN joint", var: "--muted", dashed: true },
 };
+export const PRIMARY = "gnn_ewc_replay";                       // the product's model
 export const HEADLINE = ["gnn_ewc_replay", "gnn_naive", "xgboost_static", "ffnn_ewc_replay"];
+// What a chart should draw: the story (ours vs forgetting vs static) or every ablation.
+export const STORY = ["gnn_ewc_replay", "gnn_naive", "xgboost_static"];
+export const shownModels = (available) => {
+  const keep = state.compare ? Object.keys(MODELS) : STORY;
+  const picked = keep.filter((m) => available.includes(m));
+  return picked.length ? picked : available.slice(0, state.compare ? available.length : 3);
+};
 export const css = (v) => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
 export const color = (m) => css((MODELS[m] || { var: "--muted" }).var);
 export const label = (m) => (MODELS[m] || { label: m }).label;
@@ -82,6 +98,46 @@ export function table(columns, rows, { highlight } = {}) {
     `<td class="${c.num ? "num" : ""}">${c.html ? c.html(r) : esc(c.value ? c.value(r) : r[c.key])}</td>`).join("")}</tr>`).join("");
   return `<div class="table-wrap"><table class="data"><thead><tr>${th}</tr></thead><tbody>${tr}</tbody></table></div>`;
 }
+/** Download helpers: every table and chart can leave the browser as CSV or PNG. */
+export function download(name, blob) {
+  const url = URL.createObjectURL(blob);
+  const a = Object.assign(document.createElement("a"), { href: url, download: name });
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+export function downloadCsv(name, rows) {
+  if (!rows?.length) { toast("nothing to export"); return; }
+  const cols = [...new Set(rows.flatMap((r) => Object.keys(r)))];
+  const needsQuote = /[",\r\n]/;
+  const cell = (v) => (v == null ? "" : needsQuote.test(String(v)) ? `"${String(v).replace(/"/g, '""')}"` : String(v));
+  const csv = [cols.join(","), ...rows.map((r) => cols.map((c) => cell(r[c])).join(","))].join("\r\n");
+  download(name, new Blob([csv], { type: "text/csv;charset=utf-8" }));
+}
+export function downloadChart(canvas, name) {
+  if (!canvas) { toast("no chart to export"); return; }
+  const out = document.createElement("canvas");
+  out.width = canvas.width; out.height = canvas.height;
+  const ctx = out.getContext("2d");
+  ctx.fillStyle = css("--page") || "#fff";           // charts are transparent; PNGs should not be
+  ctx.fillRect(0, 0, out.width, out.height);
+  ctx.drawImage(canvas, 0, 0);
+  out.toBlob((b) => download(name, b));
+}
+/** A small ⤓ menu for a card: CSV of the rows, PNG of the chart. */
+export function exportButton(id, { rows, canvas, name }) {
+  setTimeout(() => {
+    const el = document.getElementById(id);
+    if (!el || el.dataset.wired) return;
+    el.dataset.wired = "1";
+    el.addEventListener("click", () => {
+      if (typeof rows === "function" ? rows()?.length : rows?.length) downloadCsv(`${name}.csv`, typeof rows === "function" ? rows() : rows);
+      const c = typeof canvas === "function" ? canvas() : canvas;
+      if (c) downloadChart(c, `${name}.png`);
+    });
+  }, 0);
+  return `<button class="icon-btn small" id="${id}" title="Download this panel (CSV / PNG)">⤓</button>`;
+}
+
 export const modelCell = (m) => `<span class="swatch" style="background:${color(m)}"></span>${esc(label(m))}`;
 
 // sequential blue scale for heatmaps (value in [0,1])

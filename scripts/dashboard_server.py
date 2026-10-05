@@ -16,6 +16,11 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 HOP_BY_HOP = {"connection", "keep-alive", "transfer-encoding", "upgrade", "content-encoding", "content-length"}
+# Chart.js and d3 come from jsdelivr (see dashboard/index.html); everything else is local.
+CSP = ("default-src 'self'; script-src 'self' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline'; "
+       "img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'")
+SECURITY_HEADERS = {"Content-Security-Policy": CSP, "X-Content-Type-Options": "nosniff",
+                    "Referrer-Policy": "no-referrer", "X-Frame-Options": "DENY"}
 
 
 class Handler(SimpleHTTPRequestHandler):
@@ -28,6 +33,8 @@ class Handler(SimpleHTTPRequestHandler):
         # always revalidate: the console is edited live and ES modules are cached aggressively
         if not self.path.startswith("/api/"):
             self.send_header("Cache-Control", "no-cache")
+        for header, value in SECURITY_HEADERS.items():
+            self.send_header(header, value)
         super().end_headers()
 
     def log_message(self, fmt, *args):  # quieter console
@@ -38,8 +45,9 @@ class Handler(SimpleHTTPRequestHandler):
         length = int(self.headers.get("Content-Length") or 0)
         body = self.rfile.read(length) if length else None
         req = urllib.request.Request(self.api_base + self.path[len("/api"):], data=body, method=method)
-        if self.headers.get("Content-Type"):
-            req.add_header("Content-Type", self.headers["Content-Type"])
+        for header in ("Content-Type", "X-API-Key"):      # the key must survive the proxy hop
+            if self.headers.get(header):
+                req.add_header(header, self.headers[header])
         try:
             with urllib.request.urlopen(req, timeout=300) as r:
                 payload, status, headers = r.read(), r.status, r.headers

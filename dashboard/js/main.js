@@ -1,5 +1,5 @@
 // App shell: tab routing (hash-based), global dataset/mode context, health pills, theme.
-import { $, $$, get, onContextChange, prefs, setContext, state } from "./lib/core.js";
+import { $, $$, esc, get, onContextChange, prefs, setApiKey, setContext, state, toast } from "./lib/core.js";
 import { applyDefaults } from "./lib/charts.js";
 
 const VIEWS = {
@@ -7,16 +7,15 @@ const VIEWS = {
   soc: () => import("./views/soc.js"),
   live: () => import("./views/live.js"),
   explorer: () => import("./views/explorer.js"),
-  compare: () => import("./views/compare.js"),
-  drift: () => import("./views/drift.js"),
-  general: () => import("./views/general.js"),
   classify: () => import("./views/classify.js"),
-  trust: () => import("./views/trust.js"),
+  models: () => import("./views/models.js"),
+  adapt: () => import("./views/adapt.js"),
   repro: () => import("./views/repro.js"),
 };
 const loaded = {};
 
 async function show(name) {
+  if (LEGACY[name]) name = LEGACY[name];          // old bookmarks keep working
   if (!VIEWS[name]) name = "overview";
   $$(".tab").forEach((t) => t.classList.toggle("on", t.dataset.view === name));
   $$(".view").forEach((v) => v.classList.toggle("on", v.id === `view-${name}`));
@@ -31,6 +30,8 @@ async function show(name) {
   }
 }
 
+const LEGACY = { compare: "models", general: "models", drift: "adapt", trust: "adapt" };
+
 function syncSeg(id, value) { $$(`#${id} button`).forEach((b) => b.classList.toggle("on", b.dataset.v === value)); }
 
 function initControls() {
@@ -39,6 +40,9 @@ function initControls() {
   $$("#mode-seg button").forEach((b) => b.addEventListener("click", () => { syncSeg("mode-seg", b.dataset.v); setContext({ mode: b.dataset.v }); }));
   $$(".tab").forEach((t) => t.addEventListener("click", () => { location.hash = t.dataset.view; }));
   window.addEventListener("hashchange", () => show(location.hash.slice(1)));
+  const cmp = $("#compare-toggle");
+  cmp.checked = state.compare;
+  cmp.addEventListener("change", () => setContext({ compare: cmp.checked }));
   const theme = prefs.get("theme", "dark");
   document.documentElement.dataset.theme = theme;
   $("#theme-btn").addEventListener("click", () => {
@@ -71,16 +75,39 @@ function pill(id, ok, text) {
   if (text) (el.querySelector("span") || el).lastChild.textContent = text;
 }
 
+/** One line at the top of the page when something is wrong, naming what still works. */
+function banner(html, kind = "warn") {
+  const el = $("#banner");
+  if (!html) { el.classList.add("hidden"); el.innerHTML = ""; return; }
+  if (el.dataset.html === html) return;                 // do not re-render on every poll
+  el.dataset.html = html; el.className = `banner ${kind}`;
+  el.innerHTML = `${html}<button class="icon-btn small" id="banner-x" title="Dismiss">✕</button>`;
+  $("#banner-x").addEventListener("click", () => { el.classList.add("hidden"); el.dataset.dismissed = "1"; });
+}
+
+async function askForKey() {
+  const key = window.prompt("This API needs a key (GNNIDS_API_KEY on the server). Paste it to continue:");
+  if (key) { setApiKey(key.trim()); location.reload(); }
+}
+
 async function health() {
   try {
     const h = await get("/health");
     pill("#pill-api", true);
     pill("#pill-db", h.database);
     const ml = h.ml || {};
-    pill("#pill-ml", ml.status === "ok" || ml.status === "in-process");
+    const mlOk = ml.status === "ok" || ml.status === "in-process";
+    pill("#pill-ml", mlOk);
+    if ($("#banner").dataset.dismissed !== "1") {
+      banner(mlOk ? "" : `<b>Live model unavailable.</b> Overview, Models, Adaptation &amp; trust and Reproducibility still
+        work (they read saved results). Incident queue, Live stream, Graph explorer and Classify need the model service.
+        <span class="muted">${esc(String(ml.detail || "").slice(0, 140))}</span>`);
+    }
     $("#pill-ml").title = `${ml.device || "?"}${ml.gpu ? " · " + ml.gpu : ""} · models: ${(ml.models_loaded || []).join(", ")}`;
-  } catch {
+  } catch (e) {
     pill("#pill-api", false); pill("#pill-ml", null); pill("#pill-db", null);
+    if (e.needsKey) { banner("<b>API key required.</b> The server was started with authentication enabled.", "bad"); askForKey(); }
+    else if ($("#banner").dataset.dismissed !== "1") banner("<b>API unreachable.</b> Start it with <span class=\"mono\">scripts/run_stack.ps1</span>.", "bad");
   }
   try {
     const d = await get("/demo/status");

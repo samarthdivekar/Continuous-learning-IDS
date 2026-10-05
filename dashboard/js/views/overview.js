@@ -1,6 +1,6 @@
 // Overview: headline KPIs, the brief's verdict table (computed, with thresholds shown),
 // dataset/task timeline and the system architecture.
-import { color, esc, f3, get, int, label, modelCell, pct, state, table } from "../lib/core.js";
+import { color, esc, f3, get, int, label, modelCell, pct, shownModels, state, table } from "../lib/core.js";
 import { barOptions, mount } from "../lib/charts.js";
 
 let root;
@@ -65,8 +65,8 @@ async function render() {
     ${per100k != null ? `It wrongly flags about <b>${int(per100k)}</b> of every 100,000 normal flows.` : ""}
     New here? Press <span class="kbd">?</span> for a guided tour and glossary.</div>`;
 
-  const order = ["gnn_ewc_replay", "ffnn_ewc_replay", "gnn_replay", "gnn_ewc", "gnn_naive", "ffnn_naive", "xgboost_static", "gnn_joint", "ffnn_joint"]
-    .filter((m) => fin[m]);
+  const order = shownModels(["gnn_ewc_replay", "ffnn_ewc_replay", "gnn_replay", "gnn_ewc", "gnn_naive", "ffnn_naive",
+                             "xgboost_static", "gnn_joint", "ffnn_joint"].filter((m) => fin[m]));
   const adapts = (m) => {
     const rows = c.summary.filter((r) => r.model === m && r.after_task > 0);
     return rows.length ? rows.reduce((s, r) => s + (r.current_task_recall ?? 0), 0) / rows.length : null;

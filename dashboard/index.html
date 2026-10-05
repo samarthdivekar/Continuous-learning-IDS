@@ -34,6 +34,8 @@
       <span class="pill" id="pill-db"><i class="dot"></i>DB</span>
       <span class="pill" id="pill-stream"><i class="dot"></i><span>Stream idle</span></span>
     </div>
+    <label class="inline switch" title="Off: the deployed model only. On: every baseline and ablation.">
+      <input type="checkbox" id="compare-toggle"><span>Compare models</span></label>
     <button class="icon-btn" id="help-btn" title="How to use this console (?)">? Help</button>
     <button class="icon-btn" id="theme-btn" title="Toggle light/dark">◐</button>
   </div>
@@ -47,23 +49,20 @@
   <button class="tab" data-view="explorer" title="See one traffic window as a graph of hosts and flows">Graph explorer</button>
   <button class="tab" data-view="classify" title="Classify a window or your own CSV flows">Classify</button>
   <span class="tab-group">Evaluate</span>
-  <button class="tab" data-view="compare" title="Accuracy, forgetting and false alarms of every model">Model comparison</button>
-  <button class="tab" data-view="drift" title="When the model noticed change and retrained">Drift analysis</button>
-  <button class="tab" data-view="general" title="Unseen attacks and the IP-leakage test">Generalisation</button>
-  <button class="tab" data-view="trust" title="Novel attacks, abstention, alert fatigue, safe adaptation">Trust &amp; novelty</button>
+  <button class="tab" data-view="models" title="Accuracy, forgetting, unseen attacks and the IP-leakage test">Models</button>
+  <button class="tab" data-view="adapt" title="Drift detection, retraining, novelty, abstention and alert load">Adaptation &amp; trust</button>
   <button class="tab" data-view="repro" title="Data, settings and how to reproduce every number">Reproducibility</button>
 </nav>
 
+<div id="banner" class="banner hidden"></div>
 <main>
   <section class="view on" id="view-overview"></section>
   <section class="view" id="view-soc"></section>
   <section class="view" id="view-live"></section>
   <section class="view" id="view-explorer"></section>
-  <section class="view" id="view-compare"></section>
-  <section class="view" id="view-drift"></section>
-  <section class="view" id="view-general"></section>
   <section class="view" id="view-classify"></section>
-  <section class="view" id="view-trust"></section>
+  <section class="view" id="view-models"></section>
+  <section class="view" id="view-adapt"></section>
   <section class="view" id="view-repro"></section>
 </main>
 

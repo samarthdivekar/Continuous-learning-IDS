@@ -239,6 +239,23 @@ input[type="range"] { accent-color: var(--accent); width: 180px; }
 .toast { position: fixed; right: 20px; bottom: 20px; z-index: 50; background: var(--panel); border: 1px solid var(--border-hi);
   border-radius: 12px; padding: 12px 16px; box-shadow: var(--shadow); font-size: 14px; max-width: 380px; }
 
+/* ---------------- banner, sub-tabs, switches ---------------- */
+.banner { display: flex; align-items: center; gap: 10px; margin: 0 24px 0; padding: 10px 14px; font-size: 14px;
+  border-radius: 0 0 12px 12px; border: 1px solid var(--border-hi); border-top: 0; color: var(--ink-2);
+  background: color-mix(in srgb, var(--warn) 12%, var(--panel)); }
+.banner.bad { background: color-mix(in srgb, var(--critical) 14%, var(--panel)); }
+.banner b { color: var(--ink); }
+.banner .icon-btn { margin-left: auto; }
+.icon-btn.small { padding: 2px 7px; font-size: 13px; line-height: 1.4; }
+.view-intro { color: var(--muted); max-width: 900px; margin: 0 0 14px; font-size: 15px; }
+.sub-nav { margin-bottom: 16px; }
+.sub-panel { display: none; }
+.sub-panel.on { display: block; animation: fade 0.2s ease; }
+.sub-panel .view-head h2 { font-size: 19px; }
+.switch { gap: 6px; user-select: none; cursor: pointer; }
+.switch input { accent-color: var(--accent); width: 15px; height: 15px; }
+.card-tools { display: flex; gap: 6px; align-items: center; }
+
 /* ---------------- help drawer ---------------- */
 .drawer { position: fixed; top: 0; right: 0; bottom: 0; width: min(460px, 100vw); z-index: 60; overflow-y: auto;
   background: var(--panel); border-left: 1px solid var(--border-hi); box-shadow: var(--shadow); padding: 20px 22px 40px;

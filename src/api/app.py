@@ -46,10 +46,11 @@ class IngestIn(BaseModel):
 
 
 class PredictIn(BaseModel):
-    flows: list[FlowIn] | None = None
-    flow_ids: list[int] | None = Field(default=None, description="classify previously ingested flows")
+    flows: list[FlowIn] | None = Field(default=None, max_length=100_000)
+    flow_ids: list[int] | None = Field(default=None, max_length=100_000,
+                                       description="classify previously ingested flows")
     window_id: int | None = Field(default=None, description="classify a cached window graph")
-    models: list[str] | None = None
+    models: list[str] | None = Field(default=None, max_length=20)
     store: bool = True
 
 
@@ -156,6 +157,14 @@ def create_app(database_url: str | None = None, service=None, load_models: bool 
     # which is the local-development default; deployments should set it and sit behind TLS.
     api_key = os.environ.get("GNNIDS_API_KEY") or None
     OPEN_PATHS = ("/health", "/api/health", "/docs", "/openapi.json", "/redoc", "/favicon.ico")
+
+    @app.middleware("http")
+    async def security_headers(request: Request, call_next):
+        response = await call_next(request)
+        response.headers.setdefault("X-Content-Type-Options", "nosniff")
+        response.headers.setdefault("Referrer-Policy", "no-referrer")
+        response.headers.setdefault("X-Frame-Options", "DENY")
+        return response
 
     @app.middleware("http")
     async def require_api_key(request: Request, call_next):

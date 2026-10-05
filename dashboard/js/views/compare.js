@@ -1,8 +1,9 @@
 // Model Comparison: metric-over-tasks for all models, recall heatmap, forgetting, confusion matrix.
-import { $, color, esc, f3, get, heatColor, label, MODELS, modelCell, pct, state, table } from "../lib/core.js";
+import { $, color, esc, f3, get, heatColor, label, MODELS, modelCell, pct, shownModels, state, table } from "../lib/core.js";
 import { barOptions, legend, lineOptions, modelDataset, mount } from "../lib/charts.js";
 
 let root, data, charts = {};
+let models = [];                                 // the model set the charts draw
 const METRICS = [
   ["macro_f1_seen", "Macro-F1 (tasks seen)"], ["accuracy_seen", "Accuracy (tasks seen)"],
   ["retention_rate", "Retention (task-1 recall)"], ["fpr_seen", "False-positive rate"],
@@ -17,7 +18,8 @@ async function render() {
   const { dataset, mode } = state;
   root.innerHTML = `
     <div class="view-head"><div><h2>Model comparison</h2>
-      <p>All ${Object.keys(MODELS).length} models through the identical chronological task sequence (${esc(dataset)}, ${esc(mode)}).
+      <p>${state.compare ? "Every baseline and ablation" : "The deployed model and its two reference points"} through the identical
+      chronological task sequence (${esc(dataset)}, ${esc(mode)}). Use <b>Compare models</b> in the header to ${state.compare ? "narrow this down" : "show all of them"}.
       Mean over seeds; the band shows ± 1 std.</p></div>
       <div class="toolbar"><select id="cmp-metric">${METRICS.map(([k, t]) => `<option value="${k}">${t}</option>`).join("")}</select></div></div>
     <div class="card"><div class="card-head"><div><h3 id="cmp-title"></h3><p class="sub">x = after training task k</p></div>
@@ -35,7 +37,7 @@ async function render() {
     </div>`;
   try { data = await get(`/results/continual?dataset=${dataset}&mode=${mode}`); }
   catch (e) { root.querySelector(".card").innerHTML = `<div class="empty">${esc(e.message)}</div>`; return; }
-  const models = data.models;
+  models = shownModels(data.models);              // one model by default (header toggle shows all)
   $("#cmp-rm", root).innerHTML = models.map((m) => `<option value="${m}">${esc(label(m))}</option>`).join("");
   $("#cmp-cm-model", root).innerHTML = $("#cmp-rm", root).innerHTML;
   $("#cmp-cm-task", root).innerHTML = data.tasks.map((t, i) => `<option value="${i}" ${i === data.tasks.length - 1 ? "selected" : ""}>after ${i + 1}. ${esc(t)}</option>`).join("");
@@ -54,7 +56,7 @@ function drawLine() {
   const fpr = key === "fpr_seen";
   const std = new Map((data.summary_std || []).map((r) => [`${r.model}|${r.after_task}`, r[key]]));
   const sets = [];
-  for (const m of data.models) {
+  for (const m of models) {
     const rows = data.summary.filter((r) => r.model === m && r[key] != null).sort((a, b) => a.after_task - b.after_task);
     const pts = rows.map((r) => ({ x: r.after_task + 1, y: r[key] }));
     if (!pts.length) continue;
@@ -82,7 +84,7 @@ function drawHeat() {
 }
 
 function drawBwt() {
-  const ms = data.models.filter((m) => data.forgetting[m]);
+  const ms = shownModels(data.models).filter((m) => data.forgetting[m]);
   mount($("#cmp-bwt", root), { type: "bar",
     data: { labels: ms.map((m) => (MODELS[m] || {}).short || m), datasets: [{ label: "BWT", data: ms.map((m) => data.forgetting[m].bwt),
       backgroundColor: ms.map((m) => color(m)), borderRadius: 6 }] },
