@@ -1,6 +1,7 @@
 // Graph Explorer: browse every window graph, colour by ground truth or by a model's mistakes.
 import { $, catColor, esc, get, HEADLINE, int, label, pct, prefs, toast } from "../lib/core.js";
 import { GraphView } from "../lib/graphview.js";
+import { showError, skeleton } from "../lib/ui.js";
 
 let root, view, catalog = [], current = null, serviceDataset = null;
 
@@ -17,12 +18,16 @@ export async function mount_(el) {
             <div class="seg" id="ex-mode" role="group" aria-label="edge colouring"><button data-v="truth" class="on">Ground truth</button><button data-v="errors">Model errors</button></div>
             <select id="ex-model" aria-label="model whose errors are overlaid">${HEADLINE.map((m) => `<option value="${m}">${esc(label(m))}</option>`).join("")}</select>
             <label class="inline">Hosts <input type="range" id="ex-nodes" min="30" max="400" step="10" value="${prefs.get("ex.nodes", "150")}"><span id="ex-nodes-v" class="num"></span></label>
+            <button class="icon-btn small" id="ex-fit" title="Zoom so the whole graph fits">⤢ Fit</button>
           </div></div>
         <div class="graph-stage" id="ex-stage"></div>
+        <p class="note">Click any line to ask the model why it judged that flow the way it did.</p>
         <div class="legend" id="ex-legend" style="margin-top:10px"></div>
       </div>
       <div class="grid" style="gap:16px;align-content:start">
         <div class="card"><h3>Window stats</h3><div id="ex-stats"><div class="empty">Pick a window from the list.</div></div></div>
+        <div class="card" id="ex-edge-card"><div class="card-head"><h3>Selected flow</h3></div>
+          <div id="ex-edge"><div class="empty"><span class="title">No flow selected</span>Click a line in the graph.</div></div></div>
         <div class="card"><div class="card-head"><h3>Windows</h3>
           <div class="toolbar"><select id="ex-task" aria-label="filter windows by task"><option value="">all tasks</option></select>
           <select id="ex-split" aria-label="filter windows by split"><option value="test">test</option><option value="val">val</option><option value="train">train</option><option value="">all</option></select>
@@ -41,6 +46,8 @@ export async function mount_(el) {
     view.mode = b.dataset.v; if (current) load(current);
   }));
   $("#ex-model", root).addEventListener("change", () => { if (current && view.mode === "errors") load(current); });
+  $("#ex-fit", root).addEventListener("click", () => view.fit());
+  view.onEdge = (edge) => explainEdge(edge);
   ["#ex-task", "#ex-split", "#ex-attack"].forEach((s) => $(s, root).addEventListener("change", renderList));
   try {
     const h = await get("/health");
@@ -89,7 +96,11 @@ async function load(wid) {
   const cats = Object.entries(g.category_counts);
   $("#ex-legend", root).innerHTML = cats.map(([c, v]) =>
     `<span class="item ${view.hidden.has(c) ? "off" : ""}" data-c="${esc(c)}"><i class="line" style="background:${catColor(c)}"></i>${esc(c)} <span class="muted num">${int(v)}</span></span>`).join("")
-    + `<span class="item" style="cursor:default"><i class="line" style="background:var(--critical);height:10px;width:10px;border-radius:50%"></i>host with attack flows</span>`;
+    + `<span class="item" style="cursor:default"><i class="line" style="background:var(--critical);height:10px;width:10px;border-radius:50%"></i>host with attack flows</span>`
+    + (view.mode === "errors"
+        ? `<span class="item" style="cursor:default"><i class="line" style="background:var(--warn)"></i>missed attack</span>
+           <span class="item" style="cursor:default"><i class="line" style="background:var(--critical)"></i>false alarm</span>`
+        : "");
   root.querySelectorAll("#ex-legend .item[data-c]").forEach((it) => it.addEventListener("click", () => {
     const c = it.dataset.c; view.hidden.has(c) ? view.hidden.delete(c) : view.hidden.add(c);
     it.classList.toggle("off"); view.draw();
@@ -106,4 +117,30 @@ async function load(wid) {
     <h3 style="margin-top:14px;font-size:15px">Busiest attack hosts</h3>
     ${topHosts.map((h) => `<div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--grid)">
       <span>Host #${h.id} <span class="muted">out ${int(h.out_degree)} · in ${int(h.in_degree)}</span></span><span class="num">${int(h.attack_degree)} attack</span></div>`).join("")}`;
+}
+
+/**
+ * A clicked line is one host pair. /graph aggregates flows per pair and returns no per-flow
+ * index, and /explain needs a flow index — so a per-flow explanation cannot be fetched from
+ * here without a backend change. We show everything the payload does carry, and point at the
+ * Incident queue, which has the per-flow evidence.
+ */
+function explainEdge(edge) {
+  const box = $("#ex-edge", root);
+  const wrong = edge.wrong || 0;
+  const benign = edge.flows - (edge.attack_flows || 0);
+  const kind = wrong === 0 ? "" : edge.attack_flows > 0
+    ? `<span class="tag warn">contains missed attacks</span>` : `<span class="tag bad">contains false alarms</span>`;
+  box.innerHTML = `
+    <p class="mono" style="font-size:13px">host #${int(edge.source.id ?? edge.source)} → host #${int(edge.target.id ?? edge.target)}</p>
+    <table class="data"><tbody>
+      <tr><td>Flows on this pair</td><td class="num">${int(edge.flows)}</td></tr>
+      <tr><td>Attack flows (ground truth)</td><td class="num">${int(edge.attack_flows)}</td></tr>
+      <tr><td>Benign flows</td><td class="num">${int(benign)}</td></tr>
+      <tr><td>Category</td><td>${edge.attack_flows > 0 ? `<span class="swatch" style="background:${catColor(edge.category)}"></span>${esc(edge.category)}` : "Benign"}</td></tr>
+      ${edge.predicted ? `<tr><td>Model predicted</td><td>${esc(edge.predicted)}</td></tr>` : ""}
+      ${view.mode === "errors" ? `<tr><td>Misclassified flows</td><td class="num">${int(wrong)} ${kind}</td></tr>` : ""}
+    </tbody></table>
+    <p class="note">This view groups flows by host pair. For the evidence behind an individual flow —
+      feature attribution, neighbourhood, structure — open the same window in the <b>Incident queue</b>.</p>`;
 }

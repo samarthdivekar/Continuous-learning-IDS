@@ -14,8 +14,11 @@ export class GraphView {
     this.hidden = new Set();  // categories hidden by the filter
     this.sim = null;
     this.hover = null;
+    this.selected = null;        // the clicked edge
+    this.onEdge = null;          // callback(edge) when an edge is clicked
     d3.select(this.canvas).call(d3.zoom().scaleExtent([0.2, 8]).on("zoom", (e) => { this.transform = e.transform; this.draw(); }));
     this.canvas.addEventListener("mousemove", (e) => this.onMove(e));
+    this.canvas.addEventListener("click", (e) => this.onClick(e));
     this.canvas.addEventListener("mouseleave", () => { this.hover = null; this.tip.classList.add("hidden"); this.draw(); });
     new ResizeObserver(() => this.resize()).observe(stage);
     this.resize();
@@ -45,6 +48,7 @@ export class GraphView {
       .force("collide", d3.forceCollide().radius((d) => this.radius(d) + 2))
       .alpha(1).alphaDecay(0.035)
       .on("tick", () => this.draw());
+    this.selected = null;
     this.transform = d3.zoomIdentity;
     d3.select(this.canvas).call(d3.zoom().transform, d3.zoomIdentity);
   }
@@ -52,8 +56,50 @@ export class GraphView {
   radius(n) { return 3 + 13 * Math.sqrt(n.degree / this.maxDeg); }
 
   edgeColor(l) {
-    if (this.mode === "errors") return l.wrong > 0 ? css("--critical") : css("--benign-edge");
+    if (this.mode === "errors") {
+      if (!l.wrong) return css("--benign-edge");
+      // benign traffic called an attack vs attack traffic missed — different failures, different colours
+      return l.attack_flows > 0 ? css("--warn") : css("--critical");
+    }
     return l.attack_flows > 0 ? catColor(l.category) : css("--benign-edge");
+  }
+
+  /** Nearest edge to a point, in graph coordinates. */
+  edgeAt(x, y, tolerance) {
+    let best = null, bestD = tolerance;
+    for (const l of this.links) {
+      const { x: x1, y: y1 } = l.source, { x: x2, y: y2 } = l.target;
+      const dx = x2 - x1, dy = y2 - y1;
+      const len2 = dx * dx + dy * dy || 1;
+      const t = Math.max(0, Math.min(1, ((x - x1) * dx + (y - y1) * dy) / len2));
+      const d = Math.hypot(x - (x1 + t * dx), y - (y1 + t * dy));
+      if (d < bestD) { bestD = d; best = l; }
+    }
+    return best;
+  }
+
+  onClick(e) {
+    if (!this.links) return;
+    const rect = this.canvas.getBoundingClientRect();
+    const [x, y] = this.transform.invert([e.clientX - rect.left, e.clientY - rect.top]);
+    const edge = this.edgeAt(x, y, 8 / this.transform.k);
+    this.selected = edge || null;
+    this.draw();
+    if (edge && this.onEdge) this.onEdge(edge);
+  }
+
+  /** Zoom so the whole graph fits the stage. */
+  fit() {
+    if (!this.nodes?.length) return;
+    const xs = this.nodes.map((n) => n.x), ys = this.nodes.map((n) => n.y);
+    const pad = 40;
+    const w = Math.max(1, Math.max(...xs) - Math.min(...xs)), h = Math.max(1, Math.max(...ys) - Math.min(...ys));
+    const k = Math.max(0.2, Math.min(8, Math.min((this.W - pad) / w, (this.H - pad) / h)));
+    const cx = (Math.min(...xs) + Math.max(...xs)) / 2, cy = (Math.min(...ys) + Math.max(...ys)) / 2;
+    const t = d3.zoomIdentity.translate(this.W / 2 - k * cx, this.H / 2 - k * cy).scale(k);
+    this.transform = t;
+    d3.select(this.canvas).call(d3.zoom().transform, t);
+    this.draw();
   }
 
   draw() {
@@ -75,6 +121,13 @@ export class GraphView {
         ctx.lineWidth = Math.min(1 + Math.log2(l.flows), 6) / this.transform.k * (hi ? 1.2 : 0.8);
         ctx.beginPath(); ctx.moveTo(l.source.x, l.source.y); ctx.lineTo(l.target.x, l.target.y); ctx.stroke();
       }
+    }
+    if (this.selected) {                               // the edge under review, drawn over everything
+      const l = this.selected;
+      ctx.globalAlpha = 1;
+      ctx.strokeStyle = css("--accent-2");
+      ctx.lineWidth = 3 / this.transform.k;
+      ctx.beginPath(); ctx.moveTo(l.source.x, l.source.y); ctx.lineTo(l.target.x, l.target.y); ctx.stroke();
     }
     ctx.globalAlpha = 1;
     for (const n of this.nodes) {

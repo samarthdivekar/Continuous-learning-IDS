@@ -2,6 +2,7 @@
 // see ADWIN flag drift and trigger adaptation; manual retrain; speed control.
 import { color, css, esc, get, HEADLINE, int, label, pct, post, toast } from "../lib/core.js";
 import { legend, lineOptions, markerPlugin, modelDataset, mount } from "../lib/charts.js";
+import { withBusy } from "../lib/ui.js";
 
 let root, timer, runId = null, lastIdx = -1, windows = {}, retrains = {}, charts = {};
 const OURS = "gnn_ewc_replay";
@@ -20,7 +21,13 @@ export async function mount_(el) {
       </div></div>
     <div class="card" style="margin-bottom:16px"><div class="card-head"><div><h3 id="lv-status">Idle</h3>
       <p class="sub" id="lv-run">run: –</p></div><div class="legend" id="lv-legend"></div></div>
-      <div class="progress"><i id="lv-prog"></i></div></div>
+      <div class="progress"><i id="lv-prog"></i></div>
+      <p class="note" id="lv-progress-text">not started</p>
+      <div id="lv-after" class="callout warn hidden" style="margin-top:10px">
+        <b>After a stream run the model service keeps serving the stream's models.</b> They are warm-started on task 1
+        only, so other tabs (Incident queue, Classify, Graph explorer) will under-report until the service is restarted
+        with <span class="mono">scripts/run_stack.ps1 -Stop</span> then started again.
+      </div></div>
     <div class="grid g3">
       <div class="card"><h3>Accuracy</h3><p class="sub">tasks seen so far · dashed = our adaptations</p><div class="chart"><canvas id="lv-acc"></canvas></div></div>
       <div class="card"><h3>Retention</h3><p class="sub">recall on the first attack category</p><div class="chart"><canvas id="lv-ret"></canvas></div></div>
@@ -38,18 +45,31 @@ export async function mount_(el) {
     <div class="card" style="margin-top:16px"><h3>Drift event feed</h3><div class="feed" id="lv-feed"></div></div>`;
   const sp = root.querySelector("#lv-speed");
   sp.addEventListener("input", () => { root.querySelector("#lv-speed-v").textContent = `${Number(sp.value).toFixed(2)} s/window`; });
-  root.querySelector("#lv-start").addEventListener("click", start);
-  root.querySelector("#lv-stop").addEventListener("click", () => post("/demo/stop").catch((e) => toast(e.message)));
-  root.querySelector("#lv-retrain").addEventListener("click", async () => {
-    try { const r = await post("/retrain"); toast(r.accepted ? "Adaptation cycle queued" : r.reason); } catch (e) { toast(e.message); }
+  const startBtn = root.querySelector("#lv-start");
+  const stopBtn = root.querySelector("#lv-stop");
+  const retrainBtn = root.querySelector("#lv-retrain");
+  startBtn.addEventListener("click", () => withBusy(startBtn, start));
+  stopBtn.addEventListener("click", () => withBusy(stopBtn, async () => {
+    try { await post("/demo/stop"); toast("stream stopped"); await tick(); } catch (e) { toast(e.message); }
+  }));
+  retrainBtn.addEventListener("click", () => withBusy(retrainBtn, async () => {
+    try { const r = await post("/retrain"); toast(r.accepted ? "Adaptation cycle queued" : r.reason); }
+    catch (e) { toast(e.message); }
+  }));
+  // one marker per adaptation, in that model's colour, so you can see who retrained when
+  const marks = () => HEADLINE.flatMap((m) => (retrains[m] || []).map((x) => ({ x, color: color(m), alpha: m === OURS ? 0.6 : 0.3 })));
+  // a 200-window stream polled every 2 s redraws a lot: decimate the points Chart.js keeps and
+  // never animate, so the line extends smoothly instead of flickering
+  const streaming = (opts) => ({
+    ...opts, animation: false, parsing: false, normalized: true,
+    plugins: { ...(opts.plugins || {}), decimation: { enabled: true, algorithm: "lttb", samples: 300 } },
   });
-  const marks = () => (retrains[OURS] || []).map((x) => ({ x, color: color(OURS) }));
   for (const [k, id, yMax] of [["accuracy", "#lv-acc", 1], ["retention_rate", "#lv-ret", 1], ["fpr", "#lv-fpr", null]]) {
     charts[k] = mount(root.querySelector(id), { type: "line", data: { datasets: [] }, plugins: [markerPlugin(marks)],
-      options: lineOptions({ yMax, xTitle: "stream window" }) });
+      options: streaming(lineOptions({ yMax, xTitle: "stream window" })) });
   }
   charts.err = mount(root.querySelector("#lv-err"), { type: "line", data: { datasets: [] }, plugins: [markerPlugin(marks)],
-    options: lineOptions({ yMax: 1, xTitle: "stream window" }) });
+    options: streaming(lineOptions({ yMax: 1, xTitle: "stream window" })) });
   legend(root.querySelector("#lv-legend"), HEADLINE, () => Object.values(charts));
   await tick();
   timer = setInterval(tick, 2000);
@@ -72,6 +92,10 @@ async function tick() {
   const alive = !!st.alive;
   root.querySelector("#lv-status").innerHTML = alive ? `<span class="pulse">●</span> ${esc(st.status)}` : esc(st.status || "idle");
   root.querySelector("#lv-prog").style.width = st.total ? `${(100 * st.position) / st.total}%` : "0";
+  root.querySelector("#lv-progress-text").textContent = st.total
+    ? `window ${int(st.position)} of ${int(st.total)} · ${esc(st.status || "")}`
+    : (st.status ? esc(st.status) : "not started");
+  root.querySelector("#lv-after").classList.toggle("hidden", !(st.run_id && !alive && st.position > 0));
   root.querySelector("#lv-start").disabled = alive;
   root.querySelector("#lv-stop").disabled = !alive;
   root.querySelector("#lv-retrain").disabled = !alive;
@@ -117,7 +141,8 @@ async function tick() {
     }).join("");
     root.querySelector("#lv-feed").innerHTML = ds.events.length ? ds.events.map((e) => `<div class="ev"><span class="num muted">w${e.stream_index ?? "–"}</span>
       <span><b style="color:${color(e.model)}">${esc(label(e.model))}</b> — error ${pct(e.prev_error)} → ${pct(e.new_error)}
-      ${e.triggered_retrain ? '<span class="tag good">adapted</span>' : `<span class="tag">${esc(e.reason || "logged")}</span>`}</span></div>`).join("")
+      ${e.triggered_retrain ? '<span class="tag good">retrained</span>'
+        : `<span class="tag warn">${esc(e.reason === "refractory" ? "refractory period" : e.reason || "logged")}</span>`}</span></div>`).join("")
       : `<div class="empty">No drift events yet.</div>`;
   }
 }
