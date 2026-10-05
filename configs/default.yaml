@@ -143,6 +143,7 @@ drift:
   label_budget: 0           # >0: an adaptation cycle gets labels for only this many flows (active learning)
   label_strategy: margin    # margin = least certain flows | hybrid = half least certain, half random
   periodic_every: 25        # for the periodic-retraining comparison
+  stream_order: chronological  # chronological = clean task blocks | mixed_pairs = two attacks interleaved per period
 
 ip_remap:
   pool_size: 65536

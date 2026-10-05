@@ -2,8 +2,14 @@
 
 Protocol
   1. Every model is trained on task 0's training windows ("deployment day").
-  2. The training windows of tasks 1..T-1 are replayed as a single
-     chronological stream (no task boundaries are revealed to the model).
+  2. The training windows of tasks 1..T-1 are replayed as a single stream
+     (no task boundaries are revealed to the model). `drift.stream_order`:
+       chronological  tasks arrive as clean blocks, in capture order (default)
+       mixed_pairs    consecutive stream tasks are paired (1+2, 3+4, ...) and the
+                      two tasks' windows are interleaved evenly across one period,
+                      so two attack categories arrive mixed rather than one block at
+                      a time. Boundaries (oracle adaptation, boundary evaluations)
+                      are then the boundaries between periods.
   3. For each incoming window the model predicts first (logged), then the
      window's labels become available (delayed-label assumption) and the
      monitored signal is fed to the adaptation policy.
@@ -90,11 +96,34 @@ class StreamRunner:
         cats = self.cfg["categories"]
         self.task0_cat = cats.index(self.data.task_categories[0])
         self.test = {t: self.data.graphs(t, "test") for t in range(self.data.n_tasks)}
+        self.period_of: dict[int, int] = {}      # window id -> period; empty = boundaries are tasks
 
     # ------------------------------------------------------------------
     def stream_graphs(self) -> list:
-        gs = [g for t in range(1, self.data.n_tasks) for g in self.data.graphs(t, "train")]
-        return sorted(gs, key=lambda g: g.window_id)
+        order = self.cfg["drift"].get("stream_order", "chronological")
+        per_task = {t: sorted(self.data.graphs(t, "train"), key=lambda g: g.window_id)
+                    for t in range(1, self.data.n_tasks)}
+        if order == "chronological":
+            self.period_of = {}
+            return sorted((g for gs in per_task.values() for g in gs), key=lambda g: g.window_id)
+        if order != "mixed_pairs":
+            raise ValueError(f"unknown drift.stream_order {order!r}")
+        return self._mixed_pairs(per_task)
+
+    def _mixed_pairs(self, per_task: dict) -> list:
+        """Pair consecutive stream tasks and interleave each pair's windows evenly: a window at
+        position i of n in its own task is placed at fraction (i + 0.5) / n of the period, so both
+        attacks are spread across the whole period in their own chronological order."""
+        tasks = sorted(per_task)
+        out, self.period_of = [], {}
+        for period, start in enumerate(range(0, len(tasks), 2), start=1):
+            members = tasks[start:start + 2]
+            keyed = [((i + 0.5) / len(per_task[t]), t, g) for t in members
+                     for i, g in enumerate(per_task[t])]
+            for _, _, g in sorted(keyed, key=lambda x: (x[0], x[1])):
+                self.period_of[int(g.window_id)] = period
+                out.append(g)
+        return out
 
     def evaluate(self, stream_index: int, seen_tasks: set[int], window_id: int, ts: str) -> dict:
         preds = {t: predict_graphs(self.learner, self.test[t], self.mode) for t in sorted(seen_tasks)}
@@ -226,12 +255,14 @@ class StreamRunner:
     def step(self, k: int, g) -> dict:
         """Process stream window number `k`: predict, log, monitor, maybe adapt."""
         task = int(g.task_id)
-        if task != self.prev_task:
+        # a boundary is a change of task, or of period when tasks are mixed (see stream_graphs)
+        boundary = self.period_of.get(int(g.window_id), task)
+        if boundary != self.prev_task:
             if self.policy == "oracle" and self.task_windows and self.learner.adapts:
                 self.adapt(self.task_windows, tag=f"oracle_task{self.prev_task}")
             self.evaluate(k, self.seen_tasks, int(g.window_id), g.window_start)
             self.task_windows.clear()
-            self.prev_task = task
+            self.prev_task = boundary
         self.seen_tasks.add(task)
 
         # 1) predict BEFORE labels are revealed
