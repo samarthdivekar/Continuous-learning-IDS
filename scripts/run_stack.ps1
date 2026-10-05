@@ -1,14 +1,14 @@
-# Run the full five-layer stack WITHOUT Docker, as local processes.
+# Run the full five-layer stack as local processes (the project's only deployment path).
 #
 #   powershell -ExecutionPolicy Bypass -File scripts\run_stack.ps1          # start
 #   powershell -ExecutionPolicy Bypass -File scripts\run_stack.ps1 -Stop    # stop
 #
-# Layers (same code as docker-compose, different packaging):
-#   data        SQLite at cache/app.db          (Postgres/TimescaleDB in compose)
+# Layers:
+#   data        SQLite at cache/app.db          (or PostgreSQL via DATABASE_URL)
 #   ingestion   prepare_data + db.seed          (one-shot, skipped if already done)
 #   ml          uvicorn src.api.ml_app:app      port 8001
 #   api         uvicorn src.api.app:app         port 8000  (ML_SERVICE_URL -> 8001)
-#   dashboard   python -m http.server           port 8080  (nginx in compose)
+#   dashboard   scripts/dashboard_server.py     port 8080  (static files + /api proxy)
 #
 # Set DATABASE_URL first if you want to use a real PostgreSQL instead of SQLite.
 param(
@@ -61,7 +61,7 @@ $ml = Start-Process -FilePath $py -PassThru -WindowStyle Hidden `
     -ArgumentList "-m", "uvicorn", "src.api.ml_app:app", "--host", "127.0.0.1", "--port", "$MlPort" `
     -RedirectStandardOutput "logs\stack_ml.log" -RedirectStandardError "logs\stack_ml.err.log"
 
-# ---- api layer (forwards ML calls to the ml service, exactly like compose)
+# ---- api layer (forwards ML calls to the ml service)
 $env:ML_SERVICE_URL = "http://127.0.0.1:$MlPort"
 $api = Start-Process -FilePath $py -PassThru -WindowStyle Hidden `
     -ArgumentList "-m", "uvicorn", "src.api.app:app", "--host", "127.0.0.1", "--port", "$ApiPort" `

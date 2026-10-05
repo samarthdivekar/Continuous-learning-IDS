@@ -1,14 +1,14 @@
 """Engine/session management.
 
 DATABASE_URL examples
-  postgresql+psycopg2://clgnn:clgnn@db:5432/clgnn   (docker-compose, TimescaleDB image)
-  sqlite:///cache/app.db                             (local default)
+  postgresql+psycopg2://clgnn:clgnn@localhost:5432/clgnn   (PostgreSQL, optionally with TimescaleDB)
+  sqlite:///cache/app.db                                    (local default)
 
 On PostgreSQL `init_db` additionally enables the timescaledb extension and
 turns the time-series tables into hypertables. Timescale requires every unique
 index to contain the partitioning column, so the single-column primary key is
-replaced by (id, ts) first. Verified with the timescale/timescaledb:latest-pg16
-image under docker compose: all five hypertables are created on first start.
+replaced by (id, ts) first. Verified on 2026-09-17 with the timescale/timescaledb:latest-pg16
+image (all five hypertables created on first start), under Docker packaging that has since been removed.
 """
 from __future__ import annotations
 

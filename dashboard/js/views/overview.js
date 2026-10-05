@@ -27,7 +27,7 @@ async function render() {
         <div class="chart" style="height:320px"><canvas id="ov-tasks"></canvas></div></div>
     </div>
     <div class="grid g-8-4" style="margin-top:16px">
-      <div class="card"><h3>System architecture</h3><p class="sub">Five layers — runs as Docker Compose or as local processes (scripts/run_stack.ps1).</p>${archSvg()}</div>
+      <div class="card"><h3>System architecture</h3><p class="sub">Five layers, run as local processes by scripts/run_stack.ps1.</p>${archSvg()}</div>
       <div class="card"><h3>Dataset</h3><div id="ov-data"></div></div>
     </div>`;
   const kpis = root.querySelector("#ov-kpis");

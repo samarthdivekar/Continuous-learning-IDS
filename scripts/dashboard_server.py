@@ -2,8 +2,8 @@
 
     python scripts/dashboard_server.py --port 8080 --api http://127.0.0.1:8000
 
-Same routing contract as docker/nginx.conf, so the dashboard code is identical
-in both deployments.
+The dashboard calls the API under /api on its own origin, so it never needs to know
+where the API runs.
 """
 from __future__ import annotations
 

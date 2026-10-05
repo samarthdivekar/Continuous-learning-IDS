@@ -6,7 +6,7 @@ Every endpoint is served both at the root (/health, /predict, ...) and under
 /api (used by the dashboard, and by the nginx container's reverse proxy).
 
 ML-heavy work (/predict, /retrain, /graph, /demo/*) is delegated to MLService.
-In docker-compose that service runs in its own container (src/api/ml_app.py)
+In the stack that service runs as its own process (src/api/ml_app.py)
 and this app forwards those calls to ML_SERVICE_URL; locally it runs in-process.
 """
 from __future__ import annotations

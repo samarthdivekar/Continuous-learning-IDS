@@ -1,6 +1,6 @@
 """Database schema (brief §8) as SQLAlchemy ORM models.
 
-Portable across PostgreSQL + TimescaleDB (docker-compose) and SQLite (local
+Portable across PostgreSQL + TimescaleDB (set DATABASE_URL) and SQLite (local
 development / tests). Differences are isolated in src/db/session.py:
   * `features` is JSONB on Postgres, JSON text on SQLite
   * on Postgres, time-series tables become Timescale hypertables

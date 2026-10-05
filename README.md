@@ -187,10 +187,10 @@ the command line and the processed-data hash.
 
 ## Running the system
 
-### Without Docker (recommended on a laptop)
+### Local stack
 
 `scripts/run_stack.ps1` runs the same five layers as local processes: SQLite for data, the ML service
-(port 8001), the public API (port 8000, forwarding ML calls exactly like the compose deployment) and a
+(port 8001), the public API (port 8000, forwarding ML calls to the ML service) and a
 small static server with an `/api` proxy in place of nginx (port 8080):
 
 ```bash
@@ -227,27 +227,13 @@ Interface details that matter in a demo:
 The live stream warm-starts from the task-1 checkpoints written by `run_continual` (first seed) in
 `cache/checkpoints/`; without them it trains task 1 itself first.
 
-### Docker Compose (PostgreSQL + TimescaleDB)
+### One deployment path
 
-```bash
-cp .env.example .env
-```
-
-```bash
-docker compose up --build
-```
-
-Dashboard: http://localhost:8080 · API: http://localhost:8000/docs. Five containers: `ingestion`
-(one-shot: prepare data + seed DB), `db` (TimescaleDB), `ml` (models, drift monitor, live stream),
-`api` (public REST, forwards ML calls to `ml`), `dashboard` (nginx). The data, cache and results folders
-are bind-mounted, so run the experiments on the host (GPU) first, or use
-`docker compose --profile reproduce run --rm experiments` (CPU, slow).
-
-Verified on the development machine (Docker Desktop 29.8, Compose 5.5): all five containers start,
-TimescaleDB creates the five hypertables, and every endpoint works through nginx; that run found and fixed
-two bugs (prediction storage in the split deployment, demo start-up time). Docker needs WSL 2 and hardware
-virtualisation; on a 24 GB laptop the Docker VM competes with training for RAM, which is why the
-Docker-free stack above is the day-to-day option.
+`scripts/run_stack.ps1` is the only supported way to run the system. The Docker packaging (`Dockerfile`,
+`docker-compose.yml`, `docker/`) was **deleted on 2026-10-06**: it had been verified once (2026-09-17) and not
+exercised since, and two deployment paths with one maintained is a liability. PostgreSQL remains an option
+for the database layer: set `DATABASE_URL` to a PostgreSQL URL before starting the stack (TimescaleDB
+hypertables are created when the extension is installed; plain PostgreSQL also works).
 
 ### API
 
@@ -779,11 +765,10 @@ src/product/        incident grouping, proposed response actions, CEF export for
 src/explain/        per-flow evidence (gradient x input, neighbourhood, structure)
 src/utils/          config, selection of tuned settings, safe checkpoint loading
 dashboard/          8-tab console (Chart.js + d3-force; served by FastAPI, nginx or scripts/dashboard_server.py)
-scripts/            run_stack.ps1 (Docker-free five-layer stack), dashboard_server.py, pcap_to_flows.py
+scripts/            run_stack.ps1 (the five-layer stack as local processes), dashboard_server.py, pcap_to_flows.py
 experiments/        every script that produces a reported number
 results/            committed CSV/JSON/PNG outputs + RESULTS.md
 tests/              pytest suite (synthetic fixtures only)
-docker/, Dockerfile, docker-compose.yml
 ```
 
 ## Appendix: topology augmentation

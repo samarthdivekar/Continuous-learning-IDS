@@ -86,8 +86,8 @@ containment rule that a human approves or rejects. Nothing is ever executed auto
 
 <h3>Why two backend services</h3>
 <p>The heavy model work runs in its own process (<span class="mono">src/api/ml_app.py</span>, port 8001) and
-the public API (<span class="mono">src/api/app.py</span>, port 8000) forwards model calls to it. This mirrors
-the Docker deployment, keeps model loading out of the request path, and lets the console stay usable when the
+the public API (<span class="mono">src/api/app.py</span>, port 8000) forwards model calls to it. This keeps
+model loading out of the request path, and lets the console stay usable when the
 model service is down: the results tabs read files and keep working, and a banner says which tabs do not.</p>
 
 <figure>
@@ -193,7 +193,7 @@ SECTIONS = [
      "Why one flow was flagged: feature attribution, how much evidence came from neighbouring flows, and the "
      "structural facts, summarised into a sentence by rules (no language model involved)."),
     ("3.10", "Database", "src/db",
-     "The schema shared by SQLite (local) and PostgreSQL/TimescaleDB (Docker), plus seeding."),
+     "The schema shared by SQLite (default) and PostgreSQL/TimescaleDB (via DATABASE_URL), plus seeding."),
     ("3.11", "Utilities", "src/utils",
      "Configuration loading and overrides, tuned-setting selection, and safe checkpoint loading."),
     ("3.12", "Serving", "src/api",
