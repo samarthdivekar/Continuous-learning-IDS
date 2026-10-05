@@ -8,13 +8,12 @@ const short = (m) => (MODELS[m] || { short: m }).short;
 
 let root;
 const METHOD = { energy: "Energy score", msp: "Max. softmax probability", prototype: "Distance to class prototype" };
+// Label budget: only all labels vs the recommended hybrid 100-label setting is shown. The other budget
+// variants (pure uncertainty sampling, label-free trigger) are one negative finding, stated in the note.
 const ADAPT = {
   drift: "ADWIN, all labels (baseline)",
+  drift_al100_hybrid: "ADWIN + 100 labels per update (half least certain, half random)",
   drift_gate: "ADWIN + safety gate (rollback if worse)",
-  drift_al100: "ADWIN + 100 labels per update",
-  drift_al20: "ADWIN + 20 labels per update",
-  drift_al100_hybrid: "ADWIN + 100 labels (half uncertain, half random)",
-  drift_labelfree_al100: "Label-free trigger + 100 labels",
 };
 
 export async function mount_(el) { root = el; await render(); }
@@ -124,8 +123,8 @@ async function adaptation(ds) {
   let r;
   try { r = await get(`/results/adaptation?dataset=${ds}`); } catch (e) { missing(el, e); return; }
   const rows = [];
-  for (const [k, list] of Object.entries(r)) {
-    for (const x of list) if (x.model === "gnn_ewc_replay" && (k !== "drift" || x.policy === "adwin")) rows.push({ variant: k, ...x });
+  for (const k of Object.keys(ADAPT)) {
+    for (const x of r[k] || []) if (x.model === "gnn_ewc_replay" && (k !== "drift" || x.policy === "adwin")) rows.push({ variant: k, ...x });
   }
   attachExport(el, { rows, name: `adaptation_${ds}` });
   el.innerHTML = table([
@@ -135,5 +134,8 @@ async function adaptation(ds) {
     { title: "Labels used", num: true, value: (x) => (!x.label_budget ? "all" : int(x.labels_used)) },
     { title: "Final macro-F1", num: true, value: (x) => f3(x.final_macro_f1_seen) },
     { title: "False-positive rate", num: true, value: (x) => pct(x.final_fpr_seen, 2) },
-  ], rows) + `<p class="note">Rows appear as each run finishes. “Labels used” counts flows an analyst would have had to label.</p>`;
+  ], rows) + `<p class="note">Single run each (seed 42), indicative only. “Labels used” counts flows an analyst would have had to
+       label. Spending the same budget only on the least certain flows, or triggering adaptation on confidence instead of
+       labelled error, failed: uncertainty sampling never labels a new attack the model confidently mistakes for an
+       old one, and because the model stays confident on new attacks, a confidence trigger rarely fires.</p>`;
 }

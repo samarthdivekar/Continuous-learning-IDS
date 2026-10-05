@@ -234,8 +234,8 @@ TABS = [
       "the clustering that proposes a candidate new category.",
       "<b>Abstention</b> &mdash; false alarms before and after the model is allowed to say 'not sure'.",
       "<b>Alert load</b> &mdash; how many incidents an analyst faces at each false-alarm budget.",
-      "<b>Label budget</b> &mdash; quality when only 20 or 100 flows per update are labelled, including the "
-      "negative results."],
+      "<b>Safe adaptation</b> &mdash; all labels against the recommended 100-label hybrid setting, plus the "
+      "safety gate (single runs, labelled as indicative). The failed budget variants are one sentence of prose."],
      {"dr-run": "which stream run to display",
       "tr-method": "which novelty score to chart (energy, max softmax, prototype distance)"}),
     ("6.10", "Reproducibility", "dashboard/js/views/repro.js", ["dashboard/js/views/repro.js"],
