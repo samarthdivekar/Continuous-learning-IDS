@@ -42,7 +42,11 @@ function Stop-Stack {
 }
 
 if ($Stop) { Stop-Stack; return }
-if (Test-Path $pidFile) { Write-Host "stack already running (see $pidFile); use -Stop first"; return }
+if (Test-Path $pidFile) {
+    Write-Host "stack already running (see $pidFile); use -Stop first"
+    if ($Open) { Start-Process "http://localhost:$DashboardPort/" }   # -Open still opens it
+    return
+}
 
 $env:DATASET = $Dataset
 $env:LABEL_MODE = $LabelMode
