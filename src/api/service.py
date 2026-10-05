@@ -332,6 +332,44 @@ class MLService:
                 "n_flows": int(len(fi)), "flagged_flows": int(sum(i["n_flows"] for i in inc)),
                 "metrics": metrics, "incidents": inc}
 
+    def scan_incidents(self, limit: int = 20, model: str = "gnn_ewc_replay", threshold: float = 0.0,
+                       split: str = "test", max_incidents: int = 100) -> dict:
+        """The queue across many windows, not just one: score the most recent `limit` windows of
+        `split` and return their incidents ranked by severity. This is what an analyst's shift
+        actually looks like; per-window scoring is cached, so a repeat scan is fast."""
+        from src.product.incidents import build_incidents
+        from src.product.response import propose_action
+        windows = sorted((wid for wid, (_, sp, _) in self.window_index().items() if sp == split),
+                         reverse=True)[:max(1, min(int(limit), 50))]
+        src, dst, ts = self._ips()
+        names = class_names(self.cfg)
+        out, per_window, flagged, flows = [], [], 0, 0
+        for wid in windows:
+            g = self.get_window(wid)
+            if g is None:
+                continue
+            probs = self._probs(g, model)
+            fi = g.flow_idx.numpy()
+            inc = build_incidents(src[fi], dst[fi], probs, names, threshold=threshold, ts=ts[fi], y_cat=g.y.numpy())
+            flows += int(len(fi))
+            flagged += int(sum(i["n_flows"] for i in inc))
+            per_window.append({"window_id": int(wid), "incidents": len(inc),
+                               "flagged_flows": int(sum(i["n_flows"] for i in inc))})
+            for i in inc:
+                i["proposed"] = propose_action(i)
+                i["sample_edges"] = i["flow_indices"][:5]
+                i["window_id"] = int(wid)
+                del i["flow_indices"]
+            out.extend(inc)
+        out.sort(key=lambda d: -d["severity"])
+        out = out[:max_incidents]
+        for rank, inc in enumerate(out, start=1):
+            inc["rank"] = rank                          # position in this queue; incident_id stays
+                                                        # the per-window id that /actions resolves
+        return {"model": model, "threshold": threshold, "split": split,
+                "windows_scanned": len(per_window), "n_flows": flows, "flagged_flows": flagged,
+                "incidents": out, "per_window": per_window}
+
     def incident_report(self, window_id: int, incident_id: int, model: str = "gnn_ewc_replay",
                         threshold: float = 0.0) -> dict:
         """Everything needed for a hand-off report: the incident, the proposed action and

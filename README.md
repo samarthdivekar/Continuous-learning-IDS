@@ -203,7 +203,7 @@ never a number.
 | Tab | What it shows |
 |---|---|
 | Overview | the result in plain words, headline KPIs, the "adapts / remembers" verdict table, attack timeline, architecture |
-| Incident queue | a window's alerts grouped into incidents; per-incident explanation (feature attribution, network context, plain-English summary); proposed containment rule; approve / reject with a decision log (dry run); filters, a printable report and a CEF download |
+| Incident queue | one window **or the last N windows** (a shift's queue); alerts grouped into incidents; per-incident explanation (feature attribution, network context, plain-English summary); proposed containment rule; approve / reject with a decision log (dry run); filters, a printable report and a CEF download |
 | Live stream | replays the stream through four models; ADWIN flags, adaptations, per-window counts, drift feed, speed control, forced retrain |
 | Graph explorer | any window graph as an interactive force layout (zoom, hover, category filters) with a per-flow **model-error overlay** |
 | Classify | run the models on a held-out window or on pasted/uploaded flows |
@@ -270,6 +270,7 @@ All routes are also served under `/api/…`. Interactive docs: `/docs`.
 | Endpoint | Purpose |
 |---|---|
 | `GET /incidents/{window}` | the window's alerts grouped into incidents, each with a proposed action |
+| `GET /incidents/scan?limit=N` | the same across the most recent N windows, ranked by severity — a shift's queue |
 | `GET /incidents/{window}/report?incident_id=N` | a printable one-page report (`fmt=json` for the raw payload) |
 | `GET /incidents/{window}/cef` | the same incidents as ArcSight **CEF** lines for a SIEM to ingest |
 | `GET /explain/{window}/{edge}` | feature, neighbourhood and structural evidence for one flow |

@@ -228,3 +228,20 @@ def test_api_key_blocks_everything_except_health(cfg, tmp_path, monkeypatch):
         assert c.get("/metrics", headers={"X-API-Key": "wrong"}).status_code == 401
         assert c.get("/metrics", headers={"X-API-Key": "s3cret"}).status_code == 200
         assert c.get("/metrics?api_key=s3cret").status_code == 200       # query form, for downloads
+
+
+def test_incident_scan_covers_many_windows(client):
+    """The shift view: incidents from several windows, ranked, each keeping its own window id."""
+    scan = client.get("/incidents/scan?limit=5&model=gnn_ewc_replay").json()
+    assert scan["windows_scanned"] >= 1 and scan["n_flows"] > 0
+    assert {"incidents", "per_window", "flagged_flows"} <= set(scan)
+    sev = [i["severity"] for i in scan["incidents"]]
+    assert sev == sorted(sev, reverse=True)                       # ranked, worst first
+    for rank, inc in enumerate(scan["incidents"], start=1):
+        assert inc["rank"] == rank
+        assert inc["window_id"] in {w["window_id"] for w in scan["per_window"]}
+        # incident_id stays the per-window id, so /actions and /report resolve it correctly
+        same = client.get(f"/incidents/{inc['window_id']}?model=gnn_ewc_replay").json()["incidents"]
+        assert any(x["incident_id"] == inc["incident_id"] and x["category"] == inc["category"] for x in same)
+    assert client.get("/incidents/scan?limit=0").status_code == 422
+    assert client.get("/incidents/scan?limit=999").status_code == 422

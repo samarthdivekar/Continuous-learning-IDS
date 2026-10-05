@@ -70,6 +70,14 @@ def predict(body: PredictBody):
         raise HTTPException(404, str(exc))
 
 
+@app.get("/incidents/scan")
+def scan_incidents(limit: int = 20, model: str = "gnn_ewc_replay", threshold: float = 0.0):
+    try:
+        return svc.scan_incidents(limit, model, threshold)
+    except KeyError as exc:
+        raise HTTPException(404, str(exc)) from exc
+
+
 @app.get("/incidents/{window_id}")
 def incidents(window_id: int, model: str = "gnn_ewc_replay", threshold: float = 0.0):
     try:

@@ -349,6 +349,18 @@ def create_app(database_url: str | None = None, service=None, load_models: bool 
         return [{"window_id": r.id, "task_id": r.task_id, "split": r.split, "n_nodes": r.n_nodes,
                  "n_edges": r.n_edges, "window_start": r.window_start.isoformat()} for r in rows]
 
+    @router.get("/incidents/scan")
+    def scan_incidents(limit: int = Query(20, ge=1, le=50), model: str = "gnn_ewc_replay",
+                       threshold: float = Query(0.0, ge=0.0, le=1.0)):
+        """The queue across the most recent windows, ranked by severity (a shift's worth of work)."""
+        if state.ml_url:
+            return _remote("GET", "/incidents/scan",
+                           params={"limit": limit, "model": model, "threshold": threshold})
+        try:
+            return state.service.scan_incidents(limit, model, threshold)
+        except KeyError as exc:
+            raise HTTPException(404, str(exc)) from exc
+
     @router.get("/incidents/{window_id}")
     def incidents(window_id: int, model: str = "gnn_ewc_replay", threshold: float = Query(0.0, ge=0.0, le=1.0)):
         """Improvement 3: the window's flagged flows grouped into incidents, each with a proposed action."""

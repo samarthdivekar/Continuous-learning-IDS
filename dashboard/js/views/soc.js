@@ -26,7 +26,13 @@ export async function mount_(el) {
       <b>why</b> it was flagged and the <b>containment we would propose</b>. You approve or reject; nothing is ever executed.</p></div>
       <span class="tag" id="soc-svc" title="The live model service serves one dataset, independent of the switch above"></span></div>
     <div class="card"><div class="toolbar">
-      <label class="inline">Traffic window <select id="soc-win" style="min-width:300px"></select></label>
+      <div class="seg" id="soc-scope" role="group" aria-label="scope">
+        <button data-v="window" class="on" title="Incidents in one traffic window">One window</button>
+        <button data-v="scan" title="Incidents across the most recent windows, like a shift's queue">Recent windows</button>
+      </div>
+      <label class="inline" id="soc-win-wrap">Traffic window <select id="soc-win" style="min-width:300px"></select></label>
+      <label class="inline hidden" id="soc-scan-wrap">Scan the last
+        <select id="soc-limit"><option>10</option><option selected>20</option><option>50</option></select> windows</label>
       <label class="inline">Model <select id="soc-model">${NEURAL.map((m) => `<option value="${m}">${esc(label(m))}</option>`).join("")}</select></label>
       <label class="inline" title="Hide alerts the model is less sure about than this">Min. confidence
         <input type="range" id="soc-th" min="0" max="0.99" step="0.01" value="0"><span id="soc-th-v" class="num">0%</span></label>
@@ -59,6 +65,13 @@ export async function mount_(el) {
     : `<option value="">no test windows with attacks</option>`;
   const th = $("#soc-th", root);
   th.addEventListener("input", () => { $("#soc-th-v", root).textContent = `${Math.round(th.value * 100)}%`; });
+  $$("#soc-scope button", root).forEach((b) => b.addEventListener("click", () => {
+    $$("#soc-scope button", root).forEach((x) => x.classList.toggle("on", x === b));
+    const scan = b.dataset.v === "scan";
+    $("#soc-win-wrap", root).classList.toggle("hidden", scan);
+    $("#soc-scan-wrap", root).classList.toggle("hidden", !scan);
+    $("#soc-go", root).textContent = scan ? "Scan windows" : "Load incidents";
+  }));
   $("#soc-go", root).addEventListener("click", load);
   $$("#soc-filter button", root).forEach((b) => b.addEventListener("click", () => {
     $$("#soc-filter button", root).forEach((x) => x.classList.toggle("on", x === b)); log(b.dataset.v);
@@ -71,6 +84,7 @@ export async function mount_(el) {
   });
   $("#soc-cef", root).addEventListener("click", () => {
     if (!current) { toast("load a window first"); return; }
+    if (current.window_id == null) { toast("CEF export covers one window — switch to One window"); return; }
     openApi(`/incidents/${current.window_id}/cef?model=${current.model}&threshold=${current.threshold || 0}`,
             { filename: `incidents_w${current.window_id}.cef` });
   });
@@ -82,18 +96,26 @@ export { mount_ as mount };
 export const activate = () => log(currentFilter());
 export const refresh = () => { if (current) renderList(); };
 const currentFilter = () => $("#soc-filter button.on", root)?.dataset.v || "";
+// a scan mixes windows, so each incident carries its own window id
+const windowOf = (i) => i?.window_id ?? current?.window_id;
+const uidOf = (i) => `${windowOf(i)}-${i.incident_id}`;
 
 async function load() {
+  const scan = $("#soc-scope button.on", root).dataset.v === "scan";
   const wid = $("#soc-win", root).value, model = $("#soc-model", root).value, th = $("#soc-th", root).value;
-  if (!wid) return;
+  if (!scan && !wid) return;
   prefs.set("soc.model", model);
-  $("#soc-list", root).innerHTML = `<div class="empty pulse">Grouping alerts into incidents…</div>`;
+  $("#soc-list", root).innerHTML = `<div class="empty pulse">${scan
+    ? `Scoring the last ${$("#soc-limit", root).value} windows…` : "Grouping alerts into incidents…"}</div>`;
   $("#soc-detail", root).innerHTML = `<div class="empty">Select an incident on the left.</div>`;
-  try { current = await get(`/incidents/${wid}?model=${model}&threshold=${th}`); }
-  catch (e) { $("#soc-list", root).innerHTML = `<div class="empty">${esc(e.message)}</div>`; return; }
+  try {
+    current = scan
+      ? await get(`/incidents/scan?limit=${$("#soc-limit", root).value}&model=${model}&threshold=${th}`)
+      : await get(`/incidents/${wid}?model=${model}&threshold=${th}`);
+  } catch (e) { $("#soc-list", root).innerHTML = `<div class="empty">${esc(e.message)}</div>`; return; }
   selected = null;
   renderKpis(); renderList();
-  if (current.incidents.length) pick(current.incidents[0].incident_id);
+  if (current.incidents.length) pick(uidOf(current.incidents[0]));
 }
 
 function kpi(title, value, detail) {
@@ -101,13 +123,20 @@ function kpi(title, value, detail) {
 }
 function renderKpis() {
   const c = current, m = c.metrics || {};
+  const scan = c.windows_scanned != null;
   const ratio = c.incidents.length ? c.flagged_flows / c.incidents.length : 0;
   $("#soc-kpis", root).innerHTML = [
-    kpi("Flows in window", int(c.n_flows), "network conversations analysed"),
-    kpi("Flagged flows", int(c.flagged_flows), `${pct(c.flagged_flows / Math.max(1, c.n_flows))} of the window`),
+    kpi(scan ? "Flows scanned" : "Flows in window", int(c.n_flows),
+        scan ? `${int(c.windows_scanned)} windows analysed` : "network conversations analysed"),
+    kpi("Flagged flows", int(c.flagged_flows),
+        `${pct(c.flagged_flows / Math.max(1, c.n_flows))} of ${scan ? "the scanned traffic" : "the window"}`),
     kpi("Incidents", int(c.incidents.length), c.incidents.length ? `≈ ${int(Math.round(ratio))} alerts folded into each` : "nothing to review"),
-    kpi("Incidents that are real", m.incident_precision == null ? "–" : pct(m.incident_precision, 0),
-        `${int(m.true_incidents)} of ${int(m.incidents)} · checked against ground truth (demo only)`),
+    scan
+      ? kpi("Busiest window", c.per_window?.length
+            ? `#${[...c.per_window].sort((a, b) => b.incidents - a.incidents)[0].window_id}` : "–",
+            "most incidents in this scan")
+      : kpi("Incidents that are real", m.incident_precision == null ? "–" : pct(m.incident_precision, 0),
+            `${int(m.true_incidents)} of ${int(m.incidents)} · checked against ground truth (demo only)`),
   ].join("");
 }
 
@@ -135,8 +164,8 @@ function renderList() {
   if (!shown.length) { list.innerHTML = `<div class="empty">No incident matches these filters.</div>`; return; }
   const maxSev = Math.max(...shown.map((i) => i.severity));
   list.innerHTML = shown.map((i) => `
-    <button data-id="${i.incident_id}" class="${selected === i.incident_id ? "on" : ""}" style="grid-template-columns:44px 1fr auto">
-      <span class="num muted">#${i.incident_id}</span>
+    <button data-id="${uidOf(i)}" class="${selected === uidOf(i) ? "on" : ""}" style="grid-template-columns:44px 1fr auto">
+      <span class="num muted">#${i.rank ?? i.incident_id}</span>
       <span><span class="swatch" style="background:${catColor(i.category)}"></span><b>${esc(i.category)}</b>
         · ${i.key_role === "source" ? "from" : "against"} <span class="mono">${esc(i.key_host)}</span>
         <div class="muted" style="font-size:13px">${int(i.n_flows)} flows · ${int(i.n_sources)} source(s) → ${int(i.n_destinations)} destination(s) · ${pct(i.mean_confidence, 0)} confident
@@ -145,17 +174,19 @@ function renderList() {
       <span>${sevTag(i)}</span>
     </button>`).join("") + (shown.length < current.incidents.length
       ? `<p class="note" style="padding:8px 6px">${current.incidents.length - shown.length} incident(s) hidden by the filters.</p>` : "");
-  $$("#soc-list button", root).forEach((b) => b.addEventListener("click", () => pick(Number(b.dataset.id))));
+  $$("#soc-list button", root).forEach((b) => b.addEventListener("click", () => pick(b.dataset.id)));
 }
 
-async function pick(id) {
-  selected = id;
-  $$("#soc-list button", root).forEach((b) => b.classList.toggle("on", Number(b.dataset.id) === id));
-  const i = current.incidents.find((x) => x.incident_id === id);
+async function pick(uid) {
+  selected = uid;
+  $$("#soc-list button", root).forEach((b) => b.classList.toggle("on", b.dataset.id === uid));
+  const i = current.incidents.find((x) => uidOf(x) === uid);
+  if (!i) return;
   const p = i.proposed || {};
   const det = $("#soc-detail", root);
   det.innerHTML = `
-    <div class="card-head"><div><h3>Incident #${i.incident_id} · ${esc(i.category)} ${sevTag(i)}</h3>
+    <div class="card-head"><div><h3>Incident #${i.rank ?? i.incident_id} · ${esc(i.category)} ${sevTag(i)}</h3>
+      ${i.window_id != null ? `<span class="tag">window ${i.window_id}</span>` : ""}
       <p class="sub">${i.start ? `${esc(i.start.replace("T", " ").slice(0, 19))} → ${esc(i.end.replace("T", " ").slice(11, 19))} · ` : ""}key host <span class="mono">${esc(i.key_host)}</span> (${esc(i.key_role)}, ${int(i.key_host_flows)} flows)</p></div></div>
     <h3 style="font-size:15px;margin-top:6px">Why was this flagged?</h3>
     <div id="soc-why"><div class="empty pulse" style="padding:18px">Explaining a representative flow…</div></div>
@@ -185,7 +216,7 @@ async function pick(id) {
     catch { toast("could not copy — select the text manually"); }
   });
   $("#soc-report", det).addEventListener("click", () => openApi(
-    `/incidents/${current.window_id}/report?incident_id=${i.incident_id}&model=${current.model}`
+    `/incidents/${windowOf(i)}/report?incident_id=${i.incident_id}&model=${current.model}`
     + `&threshold=${current.threshold || 0}`));
   $("#soc-approve", det).addEventListener("click", () => decide(i, "approve"));
   $("#soc-reject", det).addEventListener("click", () => decide(i, "reject"));
@@ -197,9 +228,9 @@ async function explain(i) {
   const edge = (i.sample_edges || [])[0];
   if (edge == null) { why.innerHTML = `<div class="empty">No sample flow available.</div>`; return; }
   let ex;
-  try { ex = await get(`/explain/${current.window_id}/${edge}?model=${current.model}`); }
+  try { ex = await get(`/explain/${windowOf(i)}/${edge}?model=${current.model}`); }
   catch (e) { why.innerHTML = `<div class="empty">${esc(e.message)}</div>`; return; }
-  if (selected !== i.incident_id) return;           // user moved on while this was loading
+  if (selected !== uidOf(i)) return;               // user moved on while this was loading
   const st = ex.structure;
   why.innerHTML = `
     <div class="callout">${esc(ex.summary)}</div>
@@ -240,7 +271,7 @@ async function decide(i, decision) {
   const analyst = $("#soc-analyst", root).value.trim() || "analyst";
   prefs.set("analyst", analyst);
   try {
-    const a = await post("/actions", { window_id: current.window_id, incident_id: i.incident_id, model: current.model,
+    const a = await post("/actions", { window_id: windowOf(i), incident_id: i.incident_id, model: current.model,
                                        threshold: current.threshold, category: i.category, target: i.proposed?.target });
     const d = a.status === "proposed"
       ? await post(`/actions/${a.id}/decision`, { decision, analyst, note: $("#soc-note", root).value.trim() || null })
