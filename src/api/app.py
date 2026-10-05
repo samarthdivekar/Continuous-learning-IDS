@@ -82,6 +82,7 @@ class State:
     Session = None
     service = None          # in-process MLService, or None when remote
     ml_url: str | None = None
+    ml_client: "httpx.Client | None" = None       # pooled: a fresh connection per call cost ~0.7 s
     ml_health: tuple[float, dict] | None = None   # (fetched_at, payload), see health()
 
 
@@ -90,7 +91,8 @@ state = State()
 
 def _remote(method: str, path: str, timeout: float = 120, **kw):
     try:
-        r = httpx.request(method, f"{state.ml_url}{path}", timeout=timeout, **kw)
+        client = state.ml_client or httpx
+        r = client.request(method, f"{state.ml_url}{path}", timeout=timeout, **kw)
     except httpx.HTTPError as exc:
         raise HTTPException(503, f"ML service unreachable: {exc}")
     if r.status_code >= 400:
@@ -137,6 +139,8 @@ def create_app(database_url: str | None = None, service=None, load_models: bool 
         state.ml_url = os.environ.get("ML_SERVICE_URL") or None
         if state.ml_url:
             state.service = None
+            state.ml_client = httpx.Client(base_url="", timeout=120,
+                                           limits=httpx.Limits(max_keepalive_connections=8, max_connections=16))
         elif service is not None:
             state.service = service
         else:
@@ -147,6 +151,9 @@ def create_app(database_url: str | None = None, service=None, load_models: bool 
         yield
         if state.service is not None:
             state.service.stop_demo()
+        if state.ml_client is not None:
+            state.ml_client.close()
+            state.ml_client = None
 
     app = FastAPI(title="Continual-learning GNN-IDS", version="1.0", lifespan=lifespan)
     # 2.2 MB of drift rows compress to a fraction of that; only bodies above 1 KB are touched.

@@ -8,6 +8,7 @@ from __future__ import annotations
 import os
 import pickle
 import threading
+from collections import OrderedDict
 import time
 import uuid
 from datetime import datetime, timezone
@@ -66,6 +67,12 @@ class MLService:
         self.model_errors: dict[str, str] = {}
         self.demo: DemoRunner | None = None
         self.lock = threading.RLock()
+        # Scoring a window costs ~0.8 s, and the incident queue scores the same window for the
+        # list, the explanation and the report. Cache the probabilities per window and model;
+        # `_model_epoch` is bumped whenever a model changes (adaptation / warm start) so a
+        # retrained model never serves stale predictions.
+        self._prob_cache: "OrderedDict[tuple, np.ndarray]" = OrderedDict()
+        self._model_epoch = 0
 
     # ------------------------------------------------------------------ data
     @property
@@ -125,6 +132,29 @@ class MLService:
             except FileNotFoundError as exc:
                 self.model_errors[name] = f"checkpoint missing: {exc.filename}"
         log.info("loaded models: %s; missing: %s", list(self.models), self.model_errors)
+
+    def invalidate_predictions(self) -> None:
+        """Call after any change to a model's weights."""
+        with self.lock:
+            self._model_epoch += 1
+            self._prob_cache.clear()
+
+    def _probs(self, g, model: str):
+        """Class probabilities for one window, cached per (window, model, model version)."""
+        with self.lock:
+            learners = self.active_learners()
+            if model not in learners:
+                raise KeyError(f"model {model} not loaded")
+            key = (int(g.window_id), model, self._model_epoch)
+            cached = self._prob_cache.get(key)
+            if cached is not None:
+                self._prob_cache.move_to_end(key)
+                return cached
+            probs = learners[model].predict_proba(g)
+            self._prob_cache[key] = probs
+            while len(self._prob_cache) > 24:            # a few MB at 5,000 flows per window
+                self._prob_cache.popitem(last=False)
+            return probs
 
     def warm_start(self, learner, task: int = 0) -> bool:
         """Restore `learner` to its state right after training task `task` from the
@@ -235,11 +265,7 @@ class MLService:
         pred_cat = y.copy()
         model_info = None
         if model:
-            with self.lock:
-                learners = self.active_learners()
-                if model not in learners:
-                    raise KeyError(f"model {model} not loaded")
-                p = learners[model].predict_proba(g)
+            p = self._probs(g, model)
             pred = p.argmax(1)
             truth = (y > 0).astype(int) if self.cfg["label_mode"] == "binary" else y
             wrong = pred != truth
@@ -289,11 +315,7 @@ class MLService:
         g = self.get_window(window_id)
         if g is None:
             raise KeyError(f"window {window_id} not found")
-        with self.lock:
-            learners = self.active_learners()
-            if model not in learners:
-                raise KeyError(f"model {model} not loaded")
-            probs = learners[model].predict_proba(g)
+        probs = self._probs(g, model)
         src, dst, ts = self._ips()
         fi = g.flow_idx.numpy()
         names = class_names(self.cfg)
@@ -469,6 +491,7 @@ class DemoRunner(threading.Thread):
                 manual = self.retrain_requested.is_set()
                 self.retrain_requested.clear()
                 with self.svc.lock:
+                    before = [r.retrains for r in self.runners]
                     for r in self.runners:
                         r.step(k, g)
                         if manual and r.manual_adapt(tag=f"manual_w{int(g.window_id)}"):
@@ -476,6 +499,8 @@ class DemoRunner(threading.Thread):
                                             "triggered_retrain": True, "model": r.learner.name, "stream_index": k,
                                             "window_id": int(g.window_id), "reason": "POST /retrain",
                                             "ts": g.window_start})
+                    if manual or [r.retrains for r in self.runners] != before:
+                        self.svc.invalidate_predictions()      # a model changed: cached scores are stale
                 self.position = k + 1
                 time.sleep(self.delay)
             with self.svc.lock:
