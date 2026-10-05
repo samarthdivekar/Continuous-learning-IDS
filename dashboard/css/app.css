@@ -98,6 +98,23 @@ a { color: var(--accent-2); }
 .icon-btn { font: inherit; border: 1px solid var(--border); background: var(--panel-2); color: var(--ink-2);
   border-radius: 10px; padding: 6px 10px; cursor: pointer; }
 
+/* Laptop and projector widths (1366x768 is the common lecture-room screen): keep the header
+   on one line so the first screen shows the results, not chrome. */
+@media (max-width: 1500px) {
+  .appbar { padding: 9px 18px; gap: 12px; }
+  .brand p { display: none; }
+  .brand h1 { font-size: 17px; }
+  .brand-mark { width: 32px; height: 32px; }
+  .controls { gap: 8px; }
+  .seg button { padding: 5px 10px; font-size: 13px; }
+  .pill { font-size: 12px; padding: 4px 8px; gap: 5px; }
+  .icon-btn { padding: 5px 9px; font-size: 13px; }
+  .switch span { font-size: 13px; }
+  main { padding: 16px 18px 40px; }
+  .tabs { padding: 0 18px; }
+  .tab { padding: 11px 13px; font-size: 14.5px; }
+}
+
 /* ---------------- tabs ---------------- */
 .tabs {
   display: flex; gap: 4px; padding: 0 24px; overflow-x: auto; scrollbar-width: none;
