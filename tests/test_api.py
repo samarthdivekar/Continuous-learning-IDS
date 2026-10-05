@@ -49,8 +49,13 @@ def test_health(client):
     assert client.get("/api/health").status_code == 200
 
 
+def _full_flow(client, i, src="10.0.0.1", dst="10.0.0.2"):
+    # every feature the models were trained on (the scaler's columns)
+    return {**_flow(i, src, dst), "features": {c: float(i % 7 + 1) for c in client.svc.scaler.columns}}
+
+
 def test_ingest_then_predict_by_flow_ids(client):
-    r = client.post("/ingest", json={"flows": [_flow(i) for i in range(5)]})
+    r = client.post("/ingest", json={"flows": [_full_flow(client, i) for i in range(5)]})
     assert r.status_code == 200 and r.json()["ingested"] == 5
     ids = r.json()["flow_ids"]
     p = client.post("/predict", json={"flow_ids": ids})
@@ -60,9 +65,25 @@ def test_ingest_then_predict_by_flow_ids(client):
     for m in ("gnn_ewc_replay", "xgboost_static"):
         assert len(body["models"][m]["labels"]) == 5
         assert all(0 <= c <= 1 for c in body["models"][m]["confidence"])
-    assert any("imputed" in w for w in body["warnings"])  # most features absent in this request
+    assert body["warnings"] == []                          # complete features: nothing to warn about
     with client.Session() as s:  # one stored prediction per flow per model
         assert s.query(Prediction).filter(Prediction.flow_id.in_(ids)).count() == 5 * len(body["models"])
+
+
+def test_flows_missing_trained_features_are_rejected_not_imputed(client):
+    # three features only: a verdict with the rest set to 0 would be meaningless
+    ids = client.post("/ingest", json={"flows": [_flow(i) for i in range(5)]}).json()["flow_ids"]
+    for body in ({"flow_ids": ids}, {"flows": [_flow(i) for i in range(5)]}):
+        r = client.post("/predict", json=body)
+        assert r.status_code == 422
+        detail = r.json()["detail"]
+        assert "missing" in detail and "not imputed" in detail
+    with client.Session() as s:                            # a rejected request stores no prediction
+        assert s.query(Prediction).filter(Prediction.flow_id.in_(ids)).count() == 0
+    # one flow complete, one not: still rejected, since the incomplete one would be imputed
+    partial = _full_flow(client, 1)
+    partial["features"].pop(next(iter(partial["features"])))
+    assert client.post("/predict", json={"flows": [_full_flow(client, 0), partial]}).status_code == 422
 
 
 def test_predict_window_and_validation(client):

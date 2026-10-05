@@ -210,7 +210,7 @@ never a number.
 | Incident queue | one window **or the last N windows** (a shift's queue); alerts grouped into incidents; per-incident explanation (feature attribution, network context, plain-English summary); proposed containment rule; approve / reject with a decision log (dry run); filters, a printable report and a CEF download |
 | Live stream | replays the stream through four models; ADWIN flags, adaptations, per-window counts, drift feed, speed control, forced retrain |
 | Graph explorer | any window graph as an interactive force layout (zoom, hover, category filters) with a per-flow **model-error overlay** |
-| Classify | run the models on a held-out window or on pasted/uploaded flows |
+| Classify | run the models on a held-out window or on an uploaded CSV with the full feature set (incomplete files are rejected, never imputed) |
 | Models | *Accuracy & forgetting* (metric over tasks with ±1 std bands, recall heatmaps, BWT, confusion matrix) and *Unseen attacks & IP leakage* (leave-one-attack-out, IP-remap) |
 | Adaptation & trust | *Drift & retraining* (ADWIN vs periodic vs oracle vs never) and *Trust* (open-set novelty, conformal abstention, alert → incident compression, gated / label-budgeted adaptation) |
 | Reproducibility | λ sweep, tuning table, EWC stability ratios, run metadata |

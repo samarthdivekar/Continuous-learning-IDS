@@ -68,6 +68,8 @@ def predict(body: PredictBody):
         return svc.predict(flows=body.flows, window_id=body.window_id, models=body.models)
     except KeyError as exc:
         raise HTTPException(404, str(exc))
+    except ValueError as exc:                  # MissingFeaturesError: incomplete flows are rejected, not imputed
+        raise HTTPException(422, str(exc))
 
 
 @app.get("/incidents/scan")

@@ -251,6 +251,8 @@ def create_app(database_url: str | None = None, service=None, load_models: bool 
                 raise HTTPException(404, str(exc))
             except FileNotFoundError as exc:
                 raise HTTPException(503, str(exc))
+            except ValueError as exc:          # MissingFeaturesError: incomplete flows are rejected, not imputed
+                raise HTTPException(422, str(exc))
         # Stored here (not in the ML service) so it works in both deployment modes.
         if body.store and flow_ids:
             store_predictions(state.Session, flow_ids, result)

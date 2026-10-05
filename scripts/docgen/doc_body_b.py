@@ -193,14 +193,17 @@ TABS = [
      "Run the models on demand: either a held-out window with ground truth, or your own flows.",
      ["<b>Window mode</b> &mdash; pick a test window; every loaded model classifies it and the counts are compared "
       "with the truth.",
-      "<b>Your own flows</b> &mdash; paste or upload a CICFlowMeter-style CSV; missing features are imputed as zero "
-      "and the panel says so rather than hiding it.",
+      "<b>Your own flows</b> &mdash; upload a CSV with every CICFlowMeter feature the models were trained on. "
+      "A file missing any feature in any flow is rejected with HTTP 422 naming the missing features; nothing is "
+      "imputed, because a verdict computed on zero-filled features would look authoritative and mean nothing. "
+      "There is no free-form paste box.",
       "<b>Output</b> &mdash; a logarithmic bar chart of predicted counts per category per model, a summary table, "
       "and for small inputs a per-flow verdict table with confidences."],
      {"cl-win": "chooses a held-out window to classify",
       "cl-run-w": "classifies that window with every loaded model (<span class='mono'>POST /predict</span>)",
-      "cl-run-f": "classifies the pasted CSV rows (parsed in the browser, then <span class='mono'>POST /predict</span>)",
-      "cl-file": "loads a CSV file into the text box (5 MB limit, stated in the interface)"}),
+      "cl-run-f": "classifies the uploaded file (parsed in the browser, then <span class='mono'>POST /predict</span>); "
+                  "disabled until a file with address columns is loaded",
+      "cl-file": "loads a CSV file and previews its rows and columns (5 MB limit, stated in the interface)"}),
     ("6.8", "Models", "dashboard/js/views/models.js (compare.js + general.js)",
      ["dashboard/js/views/compare.js", "dashboard/js/views/general.js"],
      "The evidence about model quality, in two sub-sections: <i>Accuracy &amp; forgetting</i> and "

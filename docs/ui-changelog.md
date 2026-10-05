@@ -96,7 +96,7 @@ the console works offline and the CSP stays as it was.
 
 ## Known limitations and things I chose not to do
 
-1. **A backend bug I did not fix (constraint: no changes under `src/`).** `DemoRunner` sets `ready = True` when
+1. **Fixed in Phase 5.** ~~A backend bug I did not fix (constraint: no changes under `src/`).~~ `DemoRunner` sets `ready = True` when
    the stream warm-starts, and `active_learners()` then serves the demo's models for *every* prediction. `ready`
    is only reset in the exception handler (`src/api/service.py:552`) — not when a run finishes or is stopped. So
    after any Live stream run, the Incident queue, Classify and Graph explorer answer from models warm-started on
@@ -106,7 +106,7 @@ the console works offline and the CSP stays as it was.
    flows per host pair and returns no per-flow index, while `/explain/{window}/{edge}` needs one. Rather than
    invent an endpoint, clicking an edge shows the host-pair facts the payload does carry and points at the
    Incident queue, which has per-flow evidence through `sample_edges`.
-3. **No Playwright smoke test.** Playwright is not installed and installing it would add a dependency without
+3. **No Playwright smoke test** (still true; Phase 5 asks before installing it). Playwright is not installed and installing it would add a dependency without
    asking. Verification above was done through the browser with console-error capture on every tab; the manual
    checklist is the Phase 4 table.
 4. **Small multiples were not added** to Models and Adaptation & trust. The existing single charts with the
@@ -114,3 +114,14 @@ the console works offline and the CSP stays as it was.
    would have cost more screen than it returned on a projector. Say the word and I will.
 5. **The decision log is not paginated.** It shows the most recent 100 actions, which is the API's own default.
 6. **Light theme is checked but dark is the designed-for theme**; the demo is expected to run dark.
+
+---
+
+## Phase 5 — defensibility pass
+
+Cuts and fixes made so that what the console shows can be defended. Newest last.
+
+| Change | Why | Where |
+|---|---|---|
+| **Demo no longer hijacks predictions.** `DemoRunner.ready` is reset when a stream run finishes, is stopped or fails, and cached predictions are dropped, so Classify, the Incident queue and the Graph explorer go back to the checkpoint-loaded models. A regression test fails on the old code. The Live-tab warning banner is removed. | Known limitation 1 above. | `src/api/service.py`, `tests/test_api.py`, `views/live.js` |
+| **Classify: paste box removed; incomplete files rejected.** Only file upload remains. The server rejects (HTTP 422) any request whose flows lack one of the 83 trained features, naming them, instead of imputing 0. The panel previews the file (rows, address columns, feature-column count) and says before sending that incomplete files are rejected. Checked in the browser: a 3-feature file is rejected listing the 80 missing features; a complete 40-flow file is classified by all four models. | An imputed verdict looked authoritative and meant nothing. | `views/classify.js`, `src/api/service.py`, `app.py`, `ml_app.py` |

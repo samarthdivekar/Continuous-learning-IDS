@@ -55,6 +55,18 @@ def service_config() -> dict:
     return apply_selection(load_config(dataset, overrides))
 
 
+class MissingFeaturesError(ValueError):
+    """User-supplied flows lack features the models were trained on. A verdict computed with those
+    features set to 0 would look authoritative and mean nothing, so the request is rejected."""
+
+    def __init__(self, missing: list[str], n_required: int):
+        self.missing = missing
+        shown = ", ".join(missing[:12]) + (f" and {len(missing) - 12} more" if len(missing) > 12 else "")
+        super().__init__(f"{len(missing)} of the {n_required} features the models were trained on are missing "
+                         f"or empty in at least one flow: {shown}. Supply a complete CICFlowMeter feature set; "
+                         f"missing features are not imputed.")
+
+
 class MLService:
     def __init__(self, cfg: dict | None = None, session_factory=None):
         self.cfg = cfg or service_config()
@@ -195,6 +207,8 @@ class MLService:
 
     # ------------------------------------------------------------ prediction
     def flows_to_graph(self, flows: list[dict]):
+        """Graph of user-supplied flows. Every feature the models were trained on must be present in
+        every flow: a missing feature is rejected (MissingFeaturesError), never imputed."""
         cols = self.scaler.columns
         X = np.zeros((len(flows), len(cols)), dtype=np.float64)
         missing: set[str] = set()
@@ -206,11 +220,12 @@ class MLService:
                     missing.add(c)
                     continue
                 X[i, j] = float(v) if np.isfinite(float(v)) else 0.0
+        if missing:
+            raise MissingFeaturesError(sorted(missing), len(cols))
         Xs = self.scaler.transform(X)
-        g = build_window_graph(np.array([f["src_ip"] for f in flows]), np.array([f["dst_ip"] for f in flows]),
-                               Xs, np.zeros(len(flows), dtype=np.int64), self.cfg["graph"]["node_features"],
-                               window_id=-1)
-        return g, sorted(missing)
+        return build_window_graph(np.array([f["src_ip"] for f in flows]), np.array([f["dst_ip"] for f in flows]),
+                                  Xs, np.zeros(len(flows), dtype=np.int64), self.cfg["graph"]["node_features"],
+                                  window_id=-1)
 
     def predict(self, flows: list[dict] | None = None, window_id: int | None = None,
                 models: list[str] | None = None, max_flows_returned: int = 500) -> dict:
@@ -220,9 +235,7 @@ class MLService:
             if g is None:
                 raise KeyError(f"window {window_id} not found")
         else:
-            g, missing = self.flows_to_graph(flows or [])
-            if missing:
-                warnings.append(f"{len(missing)} feature(s) absent and imputed as 0, e.g. {missing[:5]}")
+            g = self.flows_to_graph(flows or [])
         names = class_names(self.cfg)
         out = {"n_flows": int(g.edge_index.shape[1]), "n_nodes": int(g.num_nodes), "models": {},
                "warnings": warnings, "unavailable": {}}

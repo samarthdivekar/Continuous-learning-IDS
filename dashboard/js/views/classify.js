@@ -1,36 +1,31 @@
-// Classify: run every loaded model on a cached window or on pasted flows; compare verdicts.
+// Classify: run every loaded model on a cached window or on an uploaded CSV of flows; compare verdicts.
 import { $, catColor, color, esc, get, HEADLINE, int, label, pct, post, toast } from "../lib/core.js";
 import { mount } from "../lib/charts.js";
 import { showError, skeleton, withBusy } from "../lib/ui.js";
 
 let root, catalog = [];
-const SAMPLE = [
-  "src_ip,dst_ip,Flow Duration,Total Fwd Packet,Total Bwd packets,Dst Port,Protocol,Flow Bytes/s,SYN Flag Count",
-  "205.174.165.73,192.168.10.50,120,1,1,22,6,0,1",
-  "205.174.165.73,192.168.10.50,95,1,1,23,6,0,1",
-  "205.174.165.73,192.168.10.50,101,1,1,80,6,0,1",
-  "192.168.10.9,172.217.10.46,560231,12,10,443,6,8923.4,1",
-].join("\n");
+let fileText = "", fileName = "";     // the uploaded CSV; there is no free-form paste box
 
 export async function mount_(el) {
   root = el;
   root.innerHTML = `
     <div class="view-head"><div><h2>Classify traffic</h2>
       <p>Send flows through the ML service and compare every model's verdict side by side. Pick a real held-out window
-      (ground truth shown), or paste your own CICFlowMeter-style rows.</p></div></div>
+      (ground truth shown), or upload a CSV of flows with the full CICFlowMeter feature set.</p></div></div>
     <div class="grid g2">
       <div class="card"><h3>1 · A held-out window</h3><p class="sub">test-split windows only · ground truth is compared automatically</p>
         <div class="toolbar"><select id="cl-win" aria-label="held-out window to classify" style="min-width:320px"></select><button class="btn primary" id="cl-run-w">Classify window</button></div></div>
       <div class="card"><h3>2 · Your own flows</h3>
-        <p class="sub">CSV with src_ip, dst_ip and any CICFlowMeter columns (original or snake_case names).</p>
+        <p class="sub">CSV with src_ip, dst_ip and every CICFlowMeter feature the models were trained on (original or
+        snake_case names). A file missing any of them is rejected: a verdict with features filled in as 0 would look
+        authoritative and mean nothing.</p>
         <div id="cl-drop" class="dropzone">
           <b>Drop a CSV here</b>
           <label class="btn" style="cursor:pointer">Choose a file<input type="file" id="cl-file" accept=".csv,text/csv" hidden></label>
           <span class="note">up to 5 MB · 5,000 flows per request</span>
         </div>
-        <textarea id="cl-csv" aria-label="flow rows in CSV form">${SAMPLE}</textarea>
         <div id="cl-map"></div>
-        <div class="toolbar" style="margin-top:8px"><button class="btn primary" id="cl-run-f">Classify flows</button></div></div>
+        <div class="toolbar" style="margin-top:8px"><button class="btn primary" id="cl-run-f" disabled>Classify file</button></div></div>
     </div>
     <div class="card" style="margin-top:16px"><h3>Verdicts</h3><div id="cl-out"><div class="empty">Run a classification above.</div></div></div>`;
   try { catalog = (await get("/windows/catalog")).filter((w) => w.split === "test"); }
@@ -39,12 +34,13 @@ export async function mount_(el) {
   $("#cl-win", root).innerHTML = catalog.map((w) => `<option value="${w.window_id}" ${firstAttack && w.window_id === firstAttack.window_id ? "selected" : ""}>#${w.window_id} · task ${w.task_id + 1} ${esc(w.task_category)} · ${int(w.n_attack)} attack flows</option>`).join("");
   $("#cl-run-w", root).addEventListener("click", () => run({ window_id: Number($("#cl-win", root).value) }));
   $("#cl-run-f", root).addEventListener("click", () => {
-    try { run({ flows: parseCsv($("#cl-csv", root).value), store: false }); } catch (e) { toast(e.message); }
+    try { run({ flows: parseCsv(fileText), store: false }); } catch (e) { toast(e.message); }
   });
   const readFile = async (f) => {
     if (!f) return;
     if (f.size > 5e6) { toast("File too large for the browser demo (max 5 MB)"); return; }
-    $("#cl-csv", root).value = await f.text();
+    fileText = await f.text();
+    fileName = f.name;
     showMapping();
   };
   $("#cl-file", root).addEventListener("change", (e) => readFile(e.target.files[0]));
@@ -52,8 +48,6 @@ export async function mount_(el) {
   ["dragenter", "dragover"].forEach((ev) => drop.addEventListener(ev, (e) => { e.preventDefault(); drop.classList.add("over"); }));
   ["dragleave", "drop"].forEach((ev) => drop.addEventListener(ev, (e) => { e.preventDefault(); drop.classList.remove("over"); }));
   drop.addEventListener("drop", (e) => readFile(e.dataTransfer?.files?.[0]));
-  $("#cl-csv", root).addEventListener("input", debounce(showMapping, 400));
-  showMapping();
 }
 export { mount_ as mount };
 
@@ -76,7 +70,13 @@ async function run(body) {
   const out = $("#cl-out", root);
   out.innerHTML = `<div class="empty pulse">Classifying…</div>`;
   let r;
-  try { r = await post("/predict", body); } catch (e) { out.innerHTML = `<div class="empty">${esc(e.message)}</div>`; return; }
+  try { r = await post("/predict", body); }
+  catch (e) {
+    out.innerHTML = e.status === 422
+      ? `<div class="empty s422"><span class="title">File rejected</span>${esc(e.message)}</div>`
+      : `<div class="empty">${esc(e.message)}</div>`;
+    return;
+  }
   const models = HEADLINE.filter((m) => r.models[m]);
   const allLabels = [...new Set([...Object.keys(r.true_counts || {}), ...models.flatMap((m) => Object.keys(r.models[m].counts))])];
   out.innerHTML = `
@@ -104,20 +104,16 @@ async function run(body) {
 
 
 /* ------------------------------------------------------------------ column mapping */
-function debounce(fn, ms) {
-  let t;
-  return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); };
-}
-
 /**
- * What the server will do with these columns, shown before anything is sent: which ones map to
- * features, which expected features are absent (they are imputed as 0, which changes the verdict),
- * and which columns are ignored. The API reports the same thing afterwards; saying it up front is
- * the difference between a caveat and a surprise.
+ * What the file contains, shown before anything is sent: how many flows, which columns carry the
+ * addresses, how many feature columns. Whether every trained feature is present is decided by the
+ * server, which knows the full feature set and rejects an incomplete file with the missing names.
  */
 function showMapping() {
   const box = $("#cl-map", root);
-  const text = $("#cl-csv", root).value.trim();
+  const button = $("#cl-run-f", root);
+  const text = fileText.trim();
+  button.disabled = true;
   if (!text) { box.innerHTML = ""; return; }
   const lines = text.split(/\r?\n/).filter(Boolean);
   if (lines.length < 2) {
@@ -131,25 +127,16 @@ function showMapping() {
   const dstCol = head.find((h) => /^(dst[_ ]?ip|destination ip)$/i.test(h));
   const meta = new Set(["timestamp", "flow_id", "label", "protocol_name"]);
   const featureCols = head.filter((h) => h !== srcCol && h !== dstCol && !meta.has(canon(h)));
-  const expected = FEATURE_HINTS.map(canon);
-  const present = new Set(featureCols.map(canon));
-  const missing = FEATURE_HINTS.filter((f) => !present.has(canon(f)));
   const ignored = head.filter((h) => meta.has(canon(h)));
-
   const rows = Math.max(0, lines.length - 1);
+  button.disabled = !(srcCol && dstCol);
   box.innerHTML = `
-    <div class="callout ${missing.length ? "warn" : ""}" style="margin-top:10px">
-      <b>${int(rows)} flow${rows === 1 ? "" : "s"}</b> · ${srcCol && dstCol
+    <div class="callout" style="margin-top:10px">
+      <span class="mono">${esc(fileName)}</span> · <b>${int(rows)} flow${rows === 1 ? "" : "s"}</b> · ${srcCol && dstCol
         ? `addresses from <span class="mono">${esc(srcCol)}</span> and <span class="mono">${esc(dstCol)}</span>`
-        : `<span style="color:var(--critical)">no src_ip / dst_ip column — the request will be rejected</span>`}
+        : `<span style="color:var(--critical)">no src_ip / dst_ip column — the file cannot be classified</span>`}
       · ${featureCols.length} feature column${featureCols.length === 1 ? "" : "s"}${ignored.length ? ` · ${ignored.length} ignored (${ignored.map(esc).join(", ")})` : ""}
     </div>
-    ${missing.length ? `<p class="note"><b style="color:var(--warn)">${missing.length} common feature${missing.length === 1 ? " is" : "s are"} absent
-      and will be imputed as 0</b>, which shifts the verdict: ${missing.slice(0, 8).map((f) => `<span class="mono">${esc(f)}</span>`).join(", ")}${missing.length > 8 ? ` and ${missing.length - 8} more` : ""}.</p>`
-      : `<p class="note">Every commonly used feature is present.</p>`}`;
+    <p class="note">The server checks these columns against the full feature set the models were trained on and
+      rejects the file, naming what is missing, if any feature is absent from any flow.</p>`;
 }
-
-// the features the model leans on most; the full set is defined by the trained scaler server-side
-const FEATURE_HINTS = ["Flow Duration", "Total Fwd Packet", "Total Bwd packets", "Dst Port", "Protocol",
-                       "Flow Bytes/s", "Flow Packets/s", "SYN Flag Count", "RST Flag Count", "FIN Flag Count",
-                       "Fwd Packet Length Mean", "Bwd Packet Length Mean"];
