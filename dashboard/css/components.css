@@ -311,6 +311,28 @@ input[type="range"] { accent-color: var(--accent); width: 180px; }
 .palette li.on, .palette li:hover { background: var(--panel-hi); color: var(--ink); }
 .palette .none { padding: var(--s-4); color: var(--muted); font-size: var(--t-base); text-align: center; }
 
+/* stacked form field: label above its control, for the narrow filter pane */
+label.stacked {
+  display: flex; flex-direction: column; gap: var(--s-1); margin-bottom: var(--s-3);
+  font-size: var(--t-sm); color: var(--muted);
+}
+label.stacked select, label.stacked input[type="text"] { width: 100%; }
+label.stacked .num { float: right; }
+
+/* a section heading inside a panel */
+h4.section {
+  font-size: var(--t-base); margin: var(--s-4) 0 var(--s-2); color: var(--ink);
+  display: flex; align-items: center; gap: var(--s-2);
+}
+h4.section:first-of-type { margin-top: var(--s-2); }
+
+/* a firewall rule: monospace, selectable, never wrapped mid-token */
+pre.rule {
+  white-space: pre-wrap; overflow-wrap: anywhere; background: var(--panel-2);
+  border: 1px solid var(--border); border-radius: var(--r-md); padding: 10px;
+  font-size: var(--t-sm); margin: var(--s-2) 0 0; color: var(--ink-2);
+}
+
 /* ---------------- triage layout (incident queue) ---------------- */
 .triage { display: grid; grid-template-columns: 250px minmax(0, 1fr) minmax(0, 1.25fr); gap: var(--s-4); align-items: start; }
 @media (max-width: 1400px) { .triage { grid-template-columns: 220px minmax(0, 1fr); } }
