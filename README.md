@@ -32,7 +32,8 @@ support the expected story, the README says so.
 11. [Security notes](#security-notes)
 12. [Future work](#future-work-scoped-out-deliberately)
 13. [Repository layout](#repository-layout)
-14. [References](#references)
+14. [Appendix: topology augmentation](#appendix-topology-augmentation)
+15. [References](#references)
 
 ---
 
@@ -156,7 +157,7 @@ IP-remap → plots → `results/RESULTS.md` → database seed. Individual steps:
 | incidents (§7) | `python -m experiments.run_incidents --budgets 0 0.001 0.0001 0.00001` | `results/<ds>/multiclass/incidents/` |
 | safety gate (§7) | `python -m experiments.run_drift_stream --runs gnn_ewc_replay:adwin_gate --out-name drift_gate` | `results/<ds>/multiclass/drift_gate/` |
 | label budget (§7) | `python -m experiments.run_drift_stream --runs gnn_ewc_replay:adwin --out-name drift_al100_hybrid --set drift.label_budget=100 drift.label_strategy=hybrid` | `results/<ds>/multiclass/drift_al100_hybrid/` |
-| topology augmentation (§7) | `python -m experiments.run_continual --seeds 42 43 44 --models gnn_ewc_replay_topo` and `python -m experiments.run_ip_remap --models gnn_ewc_replay_topo` | `continual/`, `ip_remap/` |
+| topology augmentation (appendix) | `python -m experiments.run_continual --seeds 42 43 44 --models gnn_ewc_replay_topo --out-name appendix_topo --no-checkpoints` and `python -m experiments.run_ip_remap --models gnn_ewc_replay_topo` | `appendix_topo/`, `ip_remap/` |
 
 The §7 scripts need the per-task checkpoints written by the core-table step.
 
@@ -632,24 +633,6 @@ Flagged flows of the same predicted category are joined into connected attacker/
 
 On CSE-CIC-IDS2018 the budget helps both models. The GNN goes from 105 incidents at 81 % precision to 89 at 96 %, and the FFNN from 834 incidents at 12 % to 102 at 92 %. Without a budget, the FFNN's scattered false alarms would give an analyst 738 false incidents to dismiss.
 
-**Can the GNN be made less dependent on host identity?** (topology augmentation, CIC-IDS2017)
-During training, with probability 0.5 per window, every flow's source is reassigned to a random host from a pool of 65,536. This is the same perturbation as the `random_src` test. Macro-F1 after the last task:
-
-| Model | Normal | Hosts permuted | Sources randomised |
-|---|---|---|---|
-| GNN + EWC + replay (ours) | 0.950 | 0.950 | 0.427 |
-| … + topology augmentation | 0.969 | 0.969 | 0.914 |
-| FFNN + EWC + replay | 0.947 | 0.947 | 0.947 |
-
-The table above is a single run (seed 42). On the standard task sequence with 3 seeds, the augmentation has a cost:
-
-| Model | Macro-F1 (3 seeds) | BWT | WebAttack recall per seed |
-|---|---|---|---|
-| GNN + EWC + replay (ours) | 0.964 ± 0.020 | -0.021 | 96 %, 96 %, 96 % |
-| … + topology augmentation | 0.906 ± 0.043 | -0.135 | 12 %, 92 %, 12 % |
-
-**Verdict: a trade-off, not a free win.** Randomising sources during training makes the GNN far more robust when the attacker is not a single hub (0.427 → 0.914). It also erases the one-attacker-one-victim pattern of WebAttack, a class with only 24 test flows, which is lost in two of three seeds, and it adds forgetting. Identical runs also vary: seed 42 scored 0.969 in the IP-remap run and 0.874 here. The augmentation therefore stays an **option** (`gnn_ewc_replay_topo`) for deployments that expect spoofed or NAT-hidden sources. It is not the default model.
-
 **Can it adapt safely on a small label budget?** (CIC-IDS2017, drift stream as in §3)
 
 | Variant | Updates | Rolled back | Labels used | Final macro-F1 | FPR |
@@ -675,7 +658,7 @@ What this shows (single seed):
   macro-F1 while the per-flow FFNN is unaffected. On these lab datasets each attack comes from very few
   hosts; a real network with many or spoofed attackers could look much more like the randomised case.
   The graph's advantage (and its unseen-attack detection) should be read with this in mind.
-  Training with randomised sources (§7) recovers 0.914 under randomisation, but costs in-distribution
+  Training with randomised sources ([appendix](#appendix-topology-augmentation)) recovers 0.914 under randomisation, but costs in-distribution
   macro-F1 (0.906 ± 0.043 vs 0.964 ± 0.020, 3 seeds) and loses the small WebAttack class in two of three
   seeds. The dependence can be traded away, but not for free.
 * **The graph advantage is small in-distribution and does not replicate on 2018.** 0.964 vs 0.928
@@ -801,6 +784,18 @@ results/            committed CSV/JSON/PNG outputs + RESULTS.md
 tests/              pytest suite (synthetic fixtures only)
 docker/, Dockerfile, docker-compose.yml
 ```
+
+## Appendix: topology augmentation
+
+An appendix experiment, not a model the console offers. `gnn_ewc_replay_topo` is the headline model trained
+with each window's flow sources, with probability 0.5, reassigned to random hosts from a pool of 65,536 (the
+same perturbation as the `random_src` IP-remap test). It trades one weakness for others. Under randomised
+sources it keeps 0.914 macro-F1 where the default GNN falls to 0.427 (IP-remap run, seed 42 only; single run,
+indicative only). On the standard task sequence over seeds 42–44 it scored 0.906 ± 0.043 against the default
+model's 0.964 ± 0.020 in the same earlier run, with more forgetting (BWT −0.135 vs −0.021), and it lost the
+24-flow WebAttack test class in two of three seeds (recall 12 %, 92 %, 12 %), because randomising sources
+erases WebAttack's one-attacker-one-victim pattern. It is worth considering only where spoofed or NAT-hidden
+sources are expected, and it is not the default model.
 
 ## References
 

@@ -60,9 +60,8 @@ export const MODELS = {
   ffnn_naive:      { label: "FFNN naive retrain",        short: "FFNN naive", var: "--m-ffnn-naive" },
   gnn_ewc:         { label: "GNN + EWC only",            short: "GNN EWC", var: "--m-gnn-ewc" },
   gnn_replay:      { label: "GNN + replay only",         short: "GNN replay", var: "--m-gnn-replay" },
-  // trade-off variant: robust to randomised sources but weaker overall, so it stays out of the
-  // dashboard's comparisons and is discussed in the README instead
-  gnn_ewc_replay_topo: { label: "Ours + topology augmentation", short: "Ours+topo", var: "--m-ours-topo", secondary: true },
+  // gnn_ewc_replay_topo (topology augmentation) is an appendix experiment, discussed in the README only:
+  // it is deliberately absent here, and `known()` keeps it out of tables built from results files.
   gnn_joint:       { label: "GNN joint (upper bound)",   short: "GNN joint", var: "--m-joint", dashed: true },
   ffnn_joint:      { label: "FFNN joint (upper bound)",  short: "FFNN joint", var: "--muted", dashed: true },
 };
@@ -71,13 +70,14 @@ export const HEADLINE = ["gnn_ewc_replay", "gnn_naive", "xgboost_static", "ffnn_
 // What a chart should draw: the story (ours vs forgetting vs static) or every ablation.
 export const STORY = ["gnn_ewc_replay", "gnn_naive", "xgboost_static"];
 export const shownModels = (available) => {
-  const keep = state.compare ? Object.keys(MODELS).filter((m) => !MODELS[m].secondary) : STORY;
+  const keep = state.compare ? Object.keys(MODELS) : STORY;
   const picked = keep.filter((m) => available.includes(m));
   return picked.length ? picked : available.slice(0, state.compare ? available.length : 3);
 };
 export const css = (v) => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
 export const color = (m) => css((MODELS[m] || { var: "--muted" }).var);
 export const label = (m) => (MODELS[m] || { label: m }).label;
+export const known = (models) => models.filter((m) => m in MODELS);   // drop appendix-only models
 
 export const CATEGORY_COLORS = {
   Benign: "--benign-edge", BruteForce: "--m-ffnn", DoS: "--m-gnn-naive", WebAttack: "--m-ffnn-naive",

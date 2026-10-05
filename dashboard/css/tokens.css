@@ -45,7 +45,6 @@
 
   /* ---- model identities (unchanged) ---- */
   --m-ours: #3987e5;
-  --m-ours-topo: #22b8cf;
   --m-gnn-naive: #d95926;
   --m-xgb: #199e70;
   --m-ffnn: #c98500;
@@ -130,7 +129,6 @@
   --critical-ink: #c22f2f;
   --warn: #9a6a00;
   --m-ours: #2a78d6;
-  --m-ours-topo: #0e9bb0;
   --m-gnn-naive: #c7471b;
   --m-xgb: #12805a;
   --m-ffnn: #9a6a00;

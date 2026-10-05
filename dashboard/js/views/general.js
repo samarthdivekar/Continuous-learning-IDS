@@ -1,5 +1,5 @@
 // Generalisation: leave-one-attack-out (unseen attacks) and the IP-remap leakage test.
-import { $, attachExport, catColor, color, esc, f3, get, int, label, pct, state, table } from "../lib/core.js";
+import { $, attachExport, catColor, color, esc, f3, get, int, known, label, pct, state, table } from "../lib/core.js";
 import { mount } from "../lib/charts.js";
 import { makeSortable, showError } from "../lib/ui.js";
 
@@ -44,7 +44,7 @@ async function loao(dataset, mode) {
   try { rows = (await get(`/results/loao?dataset=${dataset}&mode=${mode}`)).rows; }
   catch (e) { showError($("#gn-loao-t", root), e, { what: "the unseen-attack results" }); return; }
   const cats = [...new Set(rows.map((r) => r.held_out_category))];
-  const models = [...new Set(rows.map((r) => r.model))];
+  const models = known([...new Set(rows.map((r) => r.model))]);
   const val = (c, m) => rows.find((r) => r.held_out_category === c && r.model === m)?.heldout_detection_rate ?? null;
   mount($("#gn-loao", root), { type: "bar", data: { labels: cats, datasets: models.map((m) => ({ label: loaoLabel(m), data: cats.map((c) => val(c, m)),
     backgroundColor: color(m), borderRadius: 5 })) },
@@ -69,7 +69,7 @@ async function ipremap(dataset) {
   let r;
   try { r = await get(`/results/ip_remap?dataset=${dataset}&mode=multiclass`); }
   catch (e) { showError($("#gn-ip-t", root), e, { what: "the IP-remap results" }); return; }
-  const models = [...new Set(r.final.map((x) => x.model))], modes = ["none", "permute", "random_src"];
+  const models = known([...new Set(r.final.map((x) => x.model))]), modes = ["none", "permute", "random_src"];
   const v = (m, k) => r.final.find((x) => x.model === m && x.ip_mode === k)?.macro_f1_seen ?? null;
   mount($("#gn-ip", root), { type: "bar", data: { labels: models.map(label), datasets: modes.map((k, i) => ({ label: k,
     data: models.map((m) => v(m, k)), backgroundColor: models.map((m) => color(m) + ["ff", "aa", "55"][i]), borderRadius: 5 })) },
