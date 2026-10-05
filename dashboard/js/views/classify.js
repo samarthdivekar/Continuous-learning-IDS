@@ -1,6 +1,7 @@
 // Classify: run every loaded model on a cached window or on pasted flows; compare verdicts.
 import { $, catColor, color, esc, get, HEADLINE, int, label, pct, post, toast } from "../lib/core.js";
 import { mount } from "../lib/charts.js";
+import { showError, skeleton, withBusy } from "../lib/ui.js";
 
 let root, catalog = [];
 const SAMPLE = [
@@ -20,10 +21,16 @@ export async function mount_(el) {
     <div class="grid g2">
       <div class="card"><h3>1 · A held-out window</h3><p class="sub">test-split windows only · ground truth is compared automatically</p>
         <div class="toolbar"><select id="cl-win" aria-label="held-out window to classify" style="min-width:320px"></select><button class="btn primary" id="cl-run-w">Classify window</button></div></div>
-      <div class="card"><h3>2 · Your own flows</h3><p class="sub">CSV with src_ip, dst_ip and any CICFlowMeter columns (original or snake_case names). Missing features are imputed as 0 and reported.</p>
+      <div class="card"><h3>2 · Your own flows</h3>
+        <p class="sub">CSV with src_ip, dst_ip and any CICFlowMeter columns (original or snake_case names).</p>
+        <div id="cl-drop" class="dropzone">
+          <b>Drop a CSV here</b>
+          <label class="btn" style="cursor:pointer">Choose a file<input type="file" id="cl-file" accept=".csv,text/csv" hidden></label>
+          <span class="note">up to 5 MB · 5,000 flows per request</span>
+        </div>
         <textarea id="cl-csv" aria-label="flow rows in CSV form">${SAMPLE}</textarea>
-        <div class="toolbar" style="margin-top:8px"><button class="btn primary" id="cl-run-f">Classify flows</button>
-          <label class="btn" style="cursor:pointer">Load CSV file<input type="file" id="cl-file" accept=".csv,text/csv" hidden></label></div></div>
+        <div id="cl-map"></div>
+        <div class="toolbar" style="margin-top:8px"><button class="btn primary" id="cl-run-f">Classify flows</button></div></div>
     </div>
     <div class="card" style="margin-top:16px"><h3>Verdicts</h3><div id="cl-out"><div class="empty">Run a classification above.</div></div></div>`;
   try { catalog = (await get("/windows/catalog")).filter((w) => w.split === "test"); } catch { catalog = []; }
@@ -33,11 +40,19 @@ export async function mount_(el) {
   $("#cl-run-f", root).addEventListener("click", () => {
     try { run({ flows: parseCsv($("#cl-csv", root).value), store: false }); } catch (e) { toast(e.message); }
   });
-  $("#cl-file", root).addEventListener("change", async (e) => {
-    const f = e.target.files[0]; if (!f) return;
+  const readFile = async (f) => {
+    if (!f) return;
     if (f.size > 5e6) { toast("File too large for the browser demo (max 5 MB)"); return; }
     $("#cl-csv", root).value = await f.text();
-  });
+    showMapping();
+  };
+  $("#cl-file", root).addEventListener("change", (e) => readFile(e.target.files[0]));
+  const drop = $("#cl-drop", root);
+  ["dragenter", "dragover"].forEach((ev) => drop.addEventListener(ev, (e) => { e.preventDefault(); drop.classList.add("over"); }));
+  ["dragleave", "drop"].forEach((ev) => drop.addEventListener(ev, (e) => { e.preventDefault(); drop.classList.remove("over"); }));
+  drop.addEventListener("drop", (e) => readFile(e.dataTransfer?.files?.[0]));
+  $("#cl-csv", root).addEventListener("input", debounce(showMapping, 400));
+  showMapping();
 }
 export { mount_ as mount };
 
@@ -85,3 +100,55 @@ async function run(body) {
       <td class="num">${int(r.n_flows - benign)}</td><td class="num">${acc(m)}</td></tr>`; }).join("")}</tbody></table></div>
     ${r.true_counts ? `<p class="note">Agreement compares per-class counts (an upper bound on accuracy). Use Graph Explorer → Model errors for exact per-flow mistakes.</p>` : ""}`;
 }
+
+
+/* ------------------------------------------------------------------ column mapping */
+function debounce(fn, ms) {
+  let t;
+  return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); };
+}
+
+/**
+ * What the server will do with these columns, shown before anything is sent: which ones map to
+ * features, which expected features are absent (they are imputed as 0, which changes the verdict),
+ * and which columns are ignored. The API reports the same thing afterwards; saying it up front is
+ * the difference between a caveat and a surprise.
+ */
+function showMapping() {
+  const box = $("#cl-map", root);
+  const text = $("#cl-csv", root).value.trim();
+  if (!text) { box.innerHTML = ""; return; }
+  const lines = text.split(/\r?\n/).filter(Boolean);
+  if (lines.length < 2) {
+    box.innerHTML = `<div class="empty s422" style="margin-top:10px"><span class="title">Need a header row</span>
+      The first line names the columns; every line after it is one flow.</div>`;
+    return;
+  }
+  const head = lines[0].split(",").map((h) => h.trim());
+  const canon = (h) => h.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "");
+  const srcCol = head.find((h) => /^(src[_ ]?ip|source ip)$/i.test(h));
+  const dstCol = head.find((h) => /^(dst[_ ]?ip|destination ip)$/i.test(h));
+  const meta = new Set(["timestamp", "flow_id", "label", "protocol_name"]);
+  const featureCols = head.filter((h) => h !== srcCol && h !== dstCol && !meta.has(canon(h)));
+  const expected = FEATURE_HINTS.map(canon);
+  const present = new Set(featureCols.map(canon));
+  const missing = FEATURE_HINTS.filter((f) => !present.has(canon(f)));
+  const ignored = head.filter((h) => meta.has(canon(h)));
+
+  const rows = Math.max(0, lines.length - 1);
+  box.innerHTML = `
+    <div class="callout ${missing.length ? "warn" : ""}" style="margin-top:10px">
+      <b>${int(rows)} flow${rows === 1 ? "" : "s"}</b> · ${srcCol && dstCol
+        ? `addresses from <span class="mono">${esc(srcCol)}</span> and <span class="mono">${esc(dstCol)}</span>`
+        : `<span style="color:var(--critical)">no src_ip / dst_ip column — the request will be rejected</span>`}
+      · ${featureCols.length} feature column${featureCols.length === 1 ? "" : "s"}${ignored.length ? ` · ${ignored.length} ignored (${ignored.map(esc).join(", ")})` : ""}
+    </div>
+    ${missing.length ? `<p class="note"><b style="color:var(--warn)">${missing.length} common feature${missing.length === 1 ? " is" : "s are"} absent
+      and will be imputed as 0</b>, which shifts the verdict: ${missing.slice(0, 8).map((f) => `<span class="mono">${esc(f)}</span>`).join(", ")}${missing.length > 8 ? ` and ${missing.length - 8} more` : ""}.</p>`
+      : `<p class="note">Every commonly used feature is present.</p>`}`;
+}
+
+// the features the model leans on most; the full set is defined by the trained scaler server-side
+const FEATURE_HINTS = ["Flow Duration", "Total Fwd Packet", "Total Bwd packets", "Dst Port", "Protocol",
+                       "Flow Bytes/s", "Flow Packets/s", "SYN Flag Count", "RST Flag Count", "FIN Flag Count",
+                       "Fwd Packet Length Mean", "Bwd Packet Length Mean"];

@@ -2,6 +2,7 @@
 // dataset/task timeline and the system architecture.
 import { color, esc, f3, get, int, label, modelCell, pct, shownModels, state, table } from "../lib/core.js";
 import { barOptions, mount } from "../lib/charts.js";
+import { showError, skeleton } from "../lib/ui.js";
 
 let root;
 const THRESH = 0.8; // "adapts" / "remembers" pass mark, shown in the UI
@@ -30,6 +31,8 @@ async function render() {
       <div class="card"><h3>Dataset</h3><div id="ov-data"></div></div>
     </div>`;
   const kpis = root.querySelector("#ov-kpis");
+  kpis.innerHTML = `<div class="card">${skeleton("kpi")}</div>`.repeat(4);
+  root.querySelector("#ov-verdict").innerHTML = skeleton("table");
   let c;
   try { c = await get(`/results/continual?dataset=${dataset}&mode=${mode}`); }
   catch (e) {
@@ -85,7 +88,16 @@ async function render() {
 async function dataPanel(dataset) {
   const box = root.querySelector("#ov-data");
   let d;
-  try { d = await get(`/results/data_summary?dataset=${dataset}`); } catch (e) { box.innerHTML = `<div class="empty">${esc(e.message)}</div>`; return; }
+  box.innerHTML = skeleton("lines");
+  try { d = await get(`/results/data_summary?dataset=${dataset}`); }
+  catch (e) {
+    // this is the one Overview panel that needs the model service: it reads the processed-data
+    // metadata through the ML stack. Everything else on this page comes from result files.
+    showError(box, e, { what: "the dataset panel (it reads processed-data metadata through the model service)" });
+    root.querySelector("#ov-tasks")?.closest(".card")?.classList.add("hidden");
+    return;
+  }
+  root.querySelector("#ov-tasks")?.closest(".card")?.classList.remove("hidden");
   box.innerHTML = `
     <div class="grid g2" style="gap:10px;margin:6px 0 12px">
       <div><div class="muted">Flows</div><div style="font-size:26px;font-weight:700">${int(d.n_flows)}</div></div>
@@ -115,20 +127,33 @@ function tile(title, value, detail, foot = "") {
 }
 
 function archSvg() {
-  const box = (x, y, w, t, s, hot) => `<rect class="box ${hot ? "hot" : ""}" x="${x}" y="${y}" width="${w}" height="64" rx="12"/>
-    <text x="${x + w / 2}" y="${y + 28}" text-anchor="middle">${t}</text><text class="small" x="${x + w / 2}" y="${y + 47}" text-anchor="middle">${s}</text>`;
-  return `<svg class="arch" viewBox="0 0 980 230" role="img" aria-label="architecture diagram">
+  // The request path as it actually runs: the browser only ever talks to 8080, which serves the
+  // files and proxies /api; model work is forwarded again to the service that owns the GPU.
+  const box = (x, y, w, t, s, hot) => `<rect class="box ${hot ? "hot" : ""}" x="${x}" y="${y}" width="${w}" height="62" rx="12"/>
+    <text x="${x + w / 2}" y="${y + 26}" text-anchor="middle">${t}</text>
+    <text class="small" x="${x + w / 2}" y="${y + 45}" text-anchor="middle">${s}</text>`;
+  const arrow = (d, label, lx, ly) => `<path class="flow" d="${d}"/>` +
+    (label ? `<text class="small" x="${lx}" y="${ly}" text-anchor="middle">${label}</text>` : "");
+  return `<svg class="arch" viewBox="0 0 980 250" role="img"
+      aria-label="Request path: browser to static server on 8080, to the public API on 8000, to the model service on 8001">
     <defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
       <path d="M0,0 L10,5 L0,10 z" fill="currentColor" style="color:var(--accent)"/></marker></defs>
-    ${box(10, 20, 170, "1 · Ingestion", "CSV → windows → graphs")}
-    ${box(210, 20, 170, "2 · Data layer", "TimescaleDB / SQLite")}
-    ${box(410, 20, 200, "3 · ML service", "E-GraphSAGE · EWC · replay", true)}
-    ${box(640, 20, 150, "4 · REST API", "FastAPI")}
-    ${box(820, 20, 150, "5 · Console", "this dashboard")}
-    <path class="flow" d="M180 52 H206"/><path class="flow" d="M380 52 H406"/><path class="flow" d="M610 52 H636"/><path class="flow" d="M790 52 H816"/>
-    ${box(410, 140, 200, "ADWIN drift monitor", "error ↑ → adaptation cycle")}
-    ${box(640, 140, 150, "Replay buffer", "subgraph reservoir")}
-    ${box(210, 140, 170, "Graph cache", "PyG Data per window")}
-    <path class="flow" d="M510 84 V136"/><path class="flow" d="M610 172 H636"/><path class="flow" d="M295 84 V136"/>
+
+    ${box(8, 24, 150, "Browser", "8 tabs · ES modules")}
+    ${box(208, 24, 170, "Static server", "8080 · serves + proxies /api")}
+    ${box(428, 24, 170, "Public API", "8000 · FastAPI")}
+    ${box(648, 24, 180, "Model service", "8001 · GPU · 4 models", true)}
+    ${arrow("M158 55 H204", "", 0, 0)}
+    ${arrow("M378 55 H424", "/api", 401, 48)}
+    ${arrow("M598 55 H644", "forward", 621, 48)}
+
+    ${box(428, 160, 170, "Database", "SQLite / TimescaleDB")}
+    ${box(648, 160, 180, "Graph + checkpoint cache", "windows · trained weights")}
+    ${box(208, 160, 170, "results/ files", "CSV · JSON · PNG")}
+    ${arrow("M513 86 V156")}
+    ${arrow("M738 86 V156")}
+    <path class="flow" d="M428 110 H300 V156"/>
+    <text class="small" x="300" y="128" text-anchor="middle">saved results</text>
   </svg>`;
 }
+

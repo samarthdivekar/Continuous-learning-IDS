@@ -333,6 +333,16 @@ pre.rule {
   font-size: var(--t-sm); margin: var(--s-2) 0 0; color: var(--ink-2);
 }
 
+/* file drop target (Classify) */
+.dropzone {
+  display: flex; align-items: center; gap: var(--s-3); flex-wrap: wrap;
+  border: 1px dashed var(--border-hi); border-radius: var(--r-md); padding: var(--s-3) var(--s-4);
+  margin-bottom: var(--s-2); color: var(--ink-2); background: var(--panel-2);
+  transition: border-color var(--dur-fast) var(--ease), background var(--dur-fast) var(--ease);
+}
+.dropzone.over { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, var(--panel-2)); }
+.dropzone .note { margin: 0; margin-left: auto; }
+
 /* ---------------- triage layout (incident queue) ---------------- */
 .triage { display: grid; grid-template-columns: 250px minmax(0, 1fr) minmax(0, 1.25fr); gap: var(--s-4); align-items: start; }
 @media (max-width: 1400px) { .triage { grid-template-columns: 220px minmax(0, 1fr); } }
