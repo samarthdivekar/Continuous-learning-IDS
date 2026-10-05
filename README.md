@@ -739,6 +739,14 @@ The system is a research prototype. Its threat model is "runs on a trusted host,
 * **Response actions are inert.** Firewall rules are generated, displayed and recorded. Nothing is executed,
   with or without approval.
 
+**Dependencies** (checked 2026-10-05 against published advisories)
+
+* `torch 2.14.0` — later than the 2.10.0 fix for CVE-2026-24747 (`weights_only` unpickler memory corruption).
+* `starlette 1.6.0` — later than the affected ranges of CVE-2026-54283 (urlencoded body limit bypass),
+  CVE-2025-62727 (`FileResponse` Range parsing) and CVE-2024-47874 (multipart buffering).
+* `requirements.lock.txt` pins the exact environment that produced the results; re-check before any
+  deployment, since advisories appear after a project is frozen.
+
 **Deliberately not solved (deployment concerns, not research claims)**
 
 * No TLS, no user accounts, no roles: put the API behind a reverse proxy that provides them.
