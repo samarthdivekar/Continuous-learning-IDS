@@ -9,9 +9,13 @@
   0.825) on both cost and quality (0.943), and the model without adaptation collapses to 0.155. On
   CIC-IDS2017 the same detector over-triggered (16 vs 8 periodic). The efficiency claim therefore holds
   on one dataset and not the other.
-* **GNN vs FFNN is inconclusive on 2018.** Single-seed results tie in multiclass (0.855 vs 0.850) and favour
-  the FFNN in binary (0.995 vs 0.977) with a lower false-positive rate. That is on attacks the models
-  were trained on.
+* **GNN vs FFNN on 2018, now over three seeds: the GNN leads, but not comfortably.** Multiclass macro-F1
+  is **0.881 ± 0.038** for the GNN against **0.836 ± 0.029** for the per-flow FFNN. The GNN is ahead in
+  every seed, but by only 0.004 and 0.009 in two of them; the mean gap of 0.045 is carried by the third
+  seed, where the GNN reached 0.925 and the FFNN fell to 0.802. With three seeds this is suggestive, not
+  conclusive, and the GNN's spread is the wider of the two. In binary mode (still one seed) the FFNN
+  remains ahead (0.995 vs 0.977) with a lower false-positive rate. This is all on attacks the models were
+  trained on; the unseen-attack result below is the clear-cut one.
 * **On attacks never seen in training, the graph model wins clearly, more so than on 2017.** Holding one
   category out, the GNN flags 99.7 % of unseen BruteForce, 98.6 % of DoS and 99.4 % of DDoS flows. The
   per-flow FFNN flags ≤ 0.1 % of each, and XGBoost flags 90.1 % of DoS and 0 % of the others. None of
@@ -24,7 +28,8 @@
   The whole gap is one class: the task-sequence run flagged **9,196** benign flows as Infiltration
   (FPR 0.51 %), the IP-remap run **3** (FPR 0.0014 %), with the same ~97–99 % Infiltration recall. Nothing
   differs between the runs except CUDA's non-deterministic scatter operations, so the GNN's decision
-  boundary between benign traffic and the NMAP-style Infiltration traffic is fragile. Single-seed 2018
-  numbers for the GNN should be read as one draw from a wide distribution.
+  boundary between benign traffic and the NMAP-style Infiltration traffic is fragile. The three-seed run
+  bears this out: the GNN's macro-F1 spans 0.855–0.925 across seeds (± 0.038) and its false-positive rate
+  averages 0.35 %, so any single 2018 GNN number should be read as one draw from a wide distribution.
 * **Topology dependence replicates, less severely.** Randomising source hosts drops the GNN from 0.948 to
   0.754 (2017: 0.950 → 0.427) while the FFNN is unaffected; host permutation changes nothing.

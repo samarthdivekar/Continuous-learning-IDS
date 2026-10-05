@@ -163,8 +163,10 @@ The §7 scripts need the per-task checkpoints written by the core-table step.
 Add `--dev` to any command for a fast 20 %-of-windows development run (written to `results/dev/`,
 never reported).
 
-**CSE-CIC-IDS2018** was run with one seed and without the two joint-retraining reference models (compute
-budget), reusing the CIC-IDS2017 validation selections (`tuning_from` in `configs/csecicids2018.yaml`).
+**CSE-CIC-IDS2018** multiclass was run with three seeds (42/43/44) for the four headline models; the
+remaining ablations, and binary mode, keep their single seed, and the two joint-retraining references were
+skipped (compute budget). It reuses the CIC-IDS2017 validation selections (`tuning_from` in
+`configs/csecicids2018.yaml`).
 The exact commands:
 
 ```bash
@@ -457,16 +459,16 @@ FPR to 1.99 %. See the limitations.
 ### 6. CSE-CIC-IDS2018
 
 CSE-CIC-IDS2018: 6 tasks (BruteForce → DoS → DDoS → WebAttack → Infiltration → Botnet), 15 % label-agnostic
-flow sample, **one seed (42)**, hyper-parameters reused from CIC-IDS2017, no joint-retraining references.
+flow sample, **3 seeds (42, 43, 44)**, hyper-parameters reused from CIC-IDS2017, no joint-retraining references.
 
 **Multiclass task sequence**
 
 | Model | Macro-F1 | Retention | FPR | BWT | Seeds |
 |---|---|---|---|---|---|
-| XGBoost static | 0.282 | 1.000 | 0.00 % | 0.000 | 1 |
-| GNN naive retrain | 0.280 | 0.000 | 0.50 % | -0.998 | 1 |
-| **GNN + EWC + replay (ours)** | 0.855 | 1.000 | 0.51 % | -0.032 | 1 |
-| FFNN + EWC + replay (ablation) | 0.850 | 1.000 | 0.07 % | -0.028 | 1 |
+| XGBoost static | 0.282 | 1.000 | 0.00 % | 0.000 | 3 |
+| GNN naive retrain | 0.298 ± 0.015 | 0.000 | 0.49 ± 0.02 % | -0.912 | 3 |
+| **GNN + EWC + replay (ours)** | 0.881 ± 0.038 | 1.000 | 0.35 ± 0.29 % | -0.022 | 3 |
+| FFNN + EWC + replay (ablation) | 0.836 ± 0.029 | 1.000 | 0.12 ± 0.10 % | -0.008 | 3 |
 | GNN + replay only | 0.872 | 1.000 | 0.51 % | -0.041 | 1 |
 | GNN + EWC only | 0.286 | 0.000 | 0.00 % | -0.831 | 1 |
 | FFNN naive retrain | 0.282 | 0.000 | 0.00 % | -0.970 | 1 |
@@ -525,9 +527,13 @@ flow sample, **one seed (42)**, hyper-parameters reused from CIC-IDS2017, no joi
   0.825) on both cost and quality (0.943), and the model without adaptation collapses to 0.155. On
   CIC-IDS2017 the same detector over-triggered (16 vs 8 periodic). The efficiency claim therefore holds
   on one dataset and not the other.
-* **GNN vs FFNN is inconclusive on 2018.** Single-seed results tie in multiclass (0.855 vs 0.850) and favour
-  the FFNN in binary (0.995 vs 0.977) with a lower false-positive rate. That is on attacks the models
-  were trained on.
+* **GNN vs FFNN on 2018, now over three seeds: the GNN leads, but not comfortably.** Multiclass macro-F1
+  is **0.881 ± 0.038** for the GNN against **0.836 ± 0.029** for the per-flow FFNN. The GNN is ahead in
+  every seed, but by only 0.004 and 0.009 in two of them; the mean gap of 0.045 is carried by the third
+  seed, where the GNN reached 0.925 and the FFNN fell to 0.802. With three seeds this is suggestive, not
+  conclusive, and the GNN's spread is the wider of the two. In binary mode (still one seed) the FFNN
+  remains ahead (0.995 vs 0.977) with a lower false-positive rate. This is all on attacks the models were
+  trained on; the unseen-attack result below is the clear-cut one.
 * **On attacks never seen in training, the graph model wins clearly, more so than on 2017.** Holding one
   category out, the GNN flags 99.7 % of unseen BruteForce, 98.6 % of DoS and 99.4 % of DDoS flows. The
   per-flow FFNN flags ≤ 0.1 % of each, and XGBoost flags 90.1 % of DoS and 0 % of the others. None of
@@ -540,8 +546,9 @@ flow sample, **one seed (42)**, hyper-parameters reused from CIC-IDS2017, no joi
   The whole gap is one class: the task-sequence run flagged **9,196** benign flows as Infiltration
   (FPR 0.51 %), the IP-remap run **3** (FPR 0.0014 %), with the same ~97–99 % Infiltration recall. Nothing
   differs between the runs except CUDA's non-deterministic scatter operations, so the GNN's decision
-  boundary between benign traffic and the NMAP-style Infiltration traffic is fragile. Single-seed 2018
-  numbers for the GNN should be read as one draw from a wide distribution.
+  boundary between benign traffic and the NMAP-style Infiltration traffic is fragile. The three-seed run
+  bears this out: the GNN's macro-F1 spans 0.855–0.925 across seeds (± 0.038) and its false-positive rate
+  averages 0.35 %, so any single 2018 GNN number should be read as one draw from a wide distribution.
 * **Topology dependence replicates, less severely.** Randomising source hosts drops the GNN from 0.948 to
   0.754 (2017: 0.950 → 0.427) while the FFNN is unaffected; host permutation changes nothing.
 
@@ -677,8 +684,8 @@ What this shows (single seed):
   The GNN's clearest advantage is detecting *unseen* attack types (§4).
 * **The GNN is unstable on 2018 Infiltration.** Two runs of the identical configuration differ by 0.09
   macro-F1 because one flags 9,196 benign flows as Infiltration and the other 3 (§6). CUDA scatter
-  non-determinism is enough to tip it; 2018 was run with one seed, so its GNN numbers carry that
-  uncertainty. More seeds on 2018 are the first thing to add.
+  non-determinism is enough to tip it. Three seeds confirm the spread rather than remove it: macro-F1
+  ranges 0.855–0.925 (± 0.038), the widest of any model here, so a single 2018 GNN number means little.
 * **ADWIN's efficiency is dataset-dependent.** On CIC-IDS2017 it over-triggers (16 retrains vs 8 periodic,
   6 oracle, with slightly lower quality); on CSE-CIC-IDS2018 it beats the periodic schedule on both cost
   and quality (24 vs 48 retrains, 0.943 vs 0.825). The refractory period and adaptation window were fixed
@@ -691,8 +698,8 @@ What this shows (single seed):
 * **Validation selections are within noise.** The chosen λ = 10, γ = 0.9 beats neighbouring settings by
   < 0.001 validation macro-F1, driven by a handful of WebAttack/Botnet flows; GNN training is not bit-exact
   on CUDA (±0.01 between identical runs). Other λ in the flat region would give similar test results.
-* **CSE-CIC-IDS2018 is a 15 % label-agnostic flow sample, one seed, no joint references**, with
-  hyper-parameters reused from 2017 (compute budget).
+* **CSE-CIC-IDS2018 is a 15 % label-agnostic flow sample with no joint references**, three seeds for the
+  headline multiclass models and one seed elsewhere, with hyper-parameters reused from 2017 (compute budget).
 * **Delayed-label assumption.** Drift detection uses the model's error, so it assumes ground truth arrives
   (e.g. from analysts) shortly after traffic; the label-free confidence signal is implemented but not evaluated.
 * **Labels, not payloads.** Layer 3/4 flow features only; "Infiltration" in CIC-IDS2017 is mostly the

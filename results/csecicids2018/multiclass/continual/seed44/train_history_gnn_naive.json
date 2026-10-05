@@ -1,0 +1,44 @@
+[
+  {
+    "tag": "task0",
+    "seconds": 45.98775243759155,
+    "steps": 1250,
+    "final_loss": 0.00011527157039381564,
+    "extra": {}
+  },
+  {
+    "tag": "task1",
+    "seconds": 98.3365650177002,
+    "steps": 2690,
+    "final_loss": 7.867798634819678e-10,
+    "extra": {}
+  },
+  {
+    "tag": "task2",
+    "seconds": 125.45038986206055,
+    "steps": 3380,
+    "final_loss": 2.0996656530769542e-05,
+    "extra": {}
+  },
+  {
+    "tag": "task3",
+    "seconds": 69.90062808990479,
+    "steps": 1890,
+    "final_loss": 0.0,
+    "extra": {}
+  },
+  {
+    "tag": "task4",
+    "seconds": 101.1093077659607,
+    "steps": 2760,
+    "final_loss": 5.1069509936496615e-05,
+    "extra": {}
+  },
+  {
+    "tag": "task5",
+    "seconds": 49.86886930465698,
+    "steps": 1330,
+    "final_loss": 2.874219035220449e-06,
+    "extra": {}
+  }
+]
