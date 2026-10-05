@@ -459,15 +459,15 @@ flow sample, **one seed (42)**, hyper-parameters reused from CIC-IDS2017, no joi
 
 **Multiclass task sequence**
 
-| Model | Macro-F1 | Retention | FPR | BWT |
-|---|---|---|---|---|
-| XGBoost static | 0.282 | 1.000 | 0.00 % | 0.000 |
-| GNN naive retrain | 0.280 | 0.000 | 0.50 % | -0.998 |
-| **GNN + EWC + replay (ours)** | 0.855 | 1.000 | 0.51 % | -0.032 |
-| FFNN + EWC + replay (ablation) | 0.850 | 1.000 | 0.07 % | -0.028 |
-| GNN + replay only | 0.872 | 1.000 | 0.51 % | -0.041 |
-| GNN + EWC only | 0.286 | 0.000 | 0.00 % | -0.831 |
-| FFNN naive retrain | 0.282 | 0.000 | 0.00 % | -0.970 |
+| Model | Macro-F1 | Retention | FPR | BWT | Seeds |
+|---|---|---|---|---|---|
+| XGBoost static | 0.282 | 1.000 | 0.00 % | 0.000 | 1 |
+| GNN naive retrain | 0.280 | 0.000 | 0.50 % | -0.998 | 1 |
+| **GNN + EWC + replay (ours)** | 0.855 | 1.000 | 0.51 % | -0.032 | 1 |
+| FFNN + EWC + replay (ablation) | 0.850 | 1.000 | 0.07 % | -0.028 | 1 |
+| GNN + replay only | 0.872 | 1.000 | 0.51 % | -0.041 | 1 |
+| GNN + EWC only | 0.286 | 0.000 | 0.00 % | -0.831 | 1 |
+| FFNN naive retrain | 0.282 | 0.000 | 0.00 % | -0.970 | 1 |
 
 **Binary task sequence**
 
@@ -781,9 +781,12 @@ src/training/       continual learners (uniform interface over all models)
 src/drift/          ADWIN monitor
 src/evaluation/     metrics, task-sequence harness, streaming simulation
 src/db/             SQLAlchemy schema, session (SQLite/Timescale), seeding
-src/api/            FastAPI public app, ML service app, service layer + live demo
-dashboard/          10-tab console (Chart.js + d3-force; served by FastAPI, nginx or scripts/dashboard_server.py)
-scripts/            run_stack.ps1 (Docker-free five-layer stack), dashboard_server.py
+src/api/            FastAPI public app, ML service app, service layer + live demo, printable report
+src/product/        incident grouping, proposed response actions, CEF export for SIEMs
+src/explain/        per-flow evidence (gradient x input, neighbourhood, structure)
+src/utils/          config, selection of tuned settings, safe checkpoint loading
+dashboard/          8-tab console (Chart.js + d3-force; served by FastAPI, nginx or scripts/dashboard_server.py)
+scripts/            run_stack.ps1 (Docker-free five-layer stack), dashboard_server.py, pcap_to_flows.py
 experiments/        every script that produces a reported number
 results/            committed CSV/JSON/PNG outputs + RESULTS.md
 tests/              pytest suite (synthetic fixtures only)
