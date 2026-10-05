@@ -42,6 +42,6 @@ def calibration_errors(probs: np.ndarray, y: np.ndarray, n_bins: int = 15) -> di
     weights = np.array([r["n"] for r in rows]) / len(y)
     onehot = np.zeros_like(probs)
     onehot[np.arange(len(y)), y] = 1.0
-    return {"n": int(len(y)), "ece": float((weights * gaps).sum()), "mce": float(gaps.max()),
+    return {"n": len(y), "ece": float((weights * gaps).sum()), "mce": float(gaps.max()),
             "brier": float(((probs - onehot) ** 2).sum(1).mean()),
             "mean_confidence": float(probs.max(1).mean()), "accuracy": float((probs.argmax(1) == y).mean())}

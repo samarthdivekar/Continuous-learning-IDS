@@ -10,7 +10,12 @@ Outputs: results/<ds>/multiclass/calibration/{calibration.csv, reliability.csv, 
 import numpy as np
 import pandas as pd
 
-from experiments.common import apply_selection, base_parser, config_from_args, results_dir
+from experiments.common import (
+    apply_selection,
+    base_parser,
+    config_from_args,
+    results_dir,
+)
 from experiments.run_conformal import gather
 from src.evaluation.calibration import calibration_errors, reliability
 from src.preprocessing.pipeline import load_processed, prepare_dataset
