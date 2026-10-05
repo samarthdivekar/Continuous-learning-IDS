@@ -105,3 +105,72 @@ def test_topology_augmented_learner_trains_and_masks_labels(cfg):
     assert stats.steps > 0 and np.isfinite(stats.final_loss)
     logits, z = L.predict_details(gs[0])
     assert logits.shape == (5, 8) and z.shape[0] == 5
+
+
+def test_temporal_split_trains_on_past_and_tests_on_future():
+    """Per task: every train window precedes every val window, which precedes every test window,
+    with gap windows dropped so no test window is adjacent to a training window."""
+    import numpy as np
+    import pandas as pd
+    from src.graph.window_builder import SPLIT_CODES, temporal_split
+
+    win_task = pd.Series([0] * 20 + [1] * 10, index=range(30))        # window_id -> task
+    ordinal = win_task.groupby(win_task).cumcount()
+    split = temporal_split(ordinal, win_task, {"train": 0.7, "val": 0.1, "gap": 1})
+    for task in (0, 1):
+        s = split[win_task == task]
+        o = ordinal[win_task == task]
+        tr, va, te = (o[s == SPLIT_CODES[k]] for k in ("train", "val", "test"))
+        assert len(tr) and len(va) and len(te)
+        assert tr.max() < va.min() and va.max() < te.min()          # strictly chronological
+        assert va.min() - tr.max() >= 2 and te.min() - va.max() >= 2  # a gap window between blocks
+        assert (s == -1).sum() == 2                                   # exactly two gap windows per task
+    # task 0 (20 windows): 12 train, gap, 2 val, gap, 4 test — test is the last 20%
+    s0 = split[win_task == 0].to_numpy()
+    assert list(np.bincount(s0[s0 >= 0], minlength=3)) == [12, 2, 4]
+    # a short task (10 windows) still keeps a test and a validation block
+    s1 = split[win_task == 1].to_numpy()
+    assert list(np.bincount(s1[s1 >= 0], minlength=3)) == [5, 1, 2]
+
+
+def test_temporal_split_drops_gap_windows_and_keeps_interleaved_cache_key(cfg):
+    import pandas as pd
+    from src.graph.window_builder import assign_windows_and_splits, cache_key
+    from src.utils.config import apply_overrides
+
+    ts = pd.date_range("2017-07-03", periods=300, freq="s")
+    df = pd.DataFrame({"ts": ts, "segment_id": 0, "task_id": 0})
+    win = {"mode": "count", "flows_per_window": 10}
+    out = assign_windows_and_splits(df, win, {"strategy": "temporal", "temporal": {"train": 0.7, "val": 0.1, "gap": 1}})
+    per_window = out.groupby("window_id")["split"].first()
+    assert set(per_window.unique()) <= {0, 1, 2}                      # no gap code reaches the pipeline
+    assert out["window_id"].nunique() == 30 - 2                       # two gap windows removed
+    # interleaved keeps its historical hash; temporal gets a different one
+    inter = apply_overrides(cfg, ["split.strategy=interleaved"])
+    assert cache_key(inter) == cache_key({**cfg, "split": {k: v for k, v in cfg["split"].items()
+                                                         if k not in ("strategy", "temporal")}})
+    assert cache_key(apply_overrides(cfg, ["split.strategy=temporal"])) != cache_key(inter)
+
+
+def test_attack_aware_temporal_split_keeps_test_traffic_for_an_early_attack():
+    """An attack that happens only early in its task has no test traffic under a plain temporal
+    split; the attack-aware split still trains on its earliest windows and tests on its latest."""
+    import pandas as pd
+    from src.graph.window_builder import SPLIT_CODES, attack_aware_temporal_split, temporal_split
+
+    # 40 windows in one task; the attack ("Web") appears only in windows 0-14
+    rows = [{"window_id": w, "task_id": 0, "category": "Web" if w < 15 else "Benign"} for w in range(40)]
+    df = pd.DataFrame(rows)
+    win_task = df.groupby("window_id", sort=True)["task_id"].first()
+    ordinal = win_task.groupby(win_task).cumcount()
+    tcfg = {"train": 0.7, "val": 0.1, "gap": 1}
+
+    plain = temporal_split(ordinal, win_task, tcfg)
+    attack_windows = win_task.index[win_task.index < 15]
+    assert (plain.loc[attack_windows] == SPLIT_CODES["test"]).sum() == 0     # the failure being fixed
+
+    aware = attack_aware_temporal_split(df, ordinal, win_task, {0: "Web"}, tcfg)
+    att = aware.loc[attack_windows]
+    assert (att == SPLIT_CODES["test"]).sum() >= 1 and (att == SPLIT_CODES["train"]).sum() >= 1
+    # still chronological inside the attack's span: every training window precedes every test window
+    assert att[att == SPLIT_CODES["train"]].index.max() < att[att == SPLIT_CODES["test"]].index.min()

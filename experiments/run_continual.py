@@ -67,11 +67,22 @@ def main():
     p.add_argument("--seeds", nargs="*", type=int, default=[42])
     p.add_argument("--split", default="test", choices=["test", "val"])
     p.add_argument("--no-selected", action="store_true", help="ignore validation-selected settings")
+    p.add_argument("--out-name", default=None,
+                   help="results sub-folder (default: continual, or continual_temporal for the temporal split)")
+    p.add_argument("--no-checkpoints", action="store_true",
+                   help="never write cache/checkpoints/ (the API, open-set and conformal experiments read them); "
+                        "use when adding seeds or running a non-default split")
     args = p.parse_args()
     base_cfg = config_from_args(args) if args.no_selected else apply_selection(config_from_args(args), args)
     prepare_dataset(base_cfg)
     data = load_processed(base_cfg)
-    root = results_dir(base_cfg, args, "continual" if args.split == "test" else "continual_val")
+    temporal = base_cfg["split"].get("strategy", "interleaved") != "interleaved"
+    default_name = ("continual_temporal" if temporal else "continual") + ("" if args.split == "test" else "_val")
+    name = args.out_name or default_name
+    if temporal and name in ("continual", "continual_val"):
+        # mixing temporal seeds into the interleaved folder would silently average two protocols
+        raise SystemExit("temporal-split results must not go into the interleaved results folder; use --out-name")
+    root = results_dir(base_cfg, args, name)
     root.mkdir(parents=True, exist_ok=True)
 
     for i, seed in enumerate(args.seeds):
@@ -84,7 +95,8 @@ def main():
             "models": args.models, "eval_split": args.split, "task_categories": data.task_categories,
             "data_meta": {k: data.meta[k] for k in ("n_flows", "n_windows", "n_features", "cache_key")}})
         ckpt = None
-        if i == 0 and args.split == "test" and not args.dev:
+        # Only the default protocol's first seed may refresh the served checkpoints.
+        if i == 0 and args.split == "test" and not args.dev and not args.no_checkpoints and not temporal:
             ckpt = resolve_path(cfg, "checkpoints") / cfg["dataset"] / cfg["label_mode"]
         run_task_sequence(cfg, data, args.models, out, eval_split=args.split, checkpoint_dir=ckpt)
 

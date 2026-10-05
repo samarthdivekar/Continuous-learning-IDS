@@ -52,9 +52,21 @@ split:
   # Windows inside each task are assigned by position modulo `period`.
   # Deterministic, reproducible, keeps whole windows intact and spreads
   # test windows across the entire task period (attacks are bursty).
+  # interleaved: position modulo `period` (the original protocol; test windows sit between
+  #              training windows of the same attack session — optimistic)
+  # temporal:    train on the first 70% of each task, validate on the next 10%, test on the
+  #              last 20%, dropping `gap` windows between blocks (train on past, test on future).
+  #              On bursty data some attacks never reach a task's last 20% and get no test traffic.
+  # temporal_attack: the same chronological split applied separately to the windows carrying
+  #              each task's new attack and to the rest, so every attack keeps a test block
+  strategy: interleaved
   period: 10
   val_positions: [5]
   test_positions: [2, 8]
+  temporal:
+    train: 0.7
+    val: 0.1
+    gap: 1
 
 label_mode: multiclass      # multiclass | binary
 

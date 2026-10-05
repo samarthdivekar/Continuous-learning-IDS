@@ -54,8 +54,62 @@ def _window_local_ids(ts: np.ndarray, window_cfg: dict) -> np.ndarray:
     raise ValueError(f"Unknown window mode {window_cfg['mode']!r}")
 
 
+def temporal_split(ordinal: pd.Series, win_task: pd.Series, tcfg: dict) -> pd.Series:
+    """Per-task chronological split. Returns split codes indexed like `ordinal`; gap windows get -1.
+
+    Blocks are carved from the END of each task: the last `1 - train - val` fraction tests, the
+    `val` fraction before it validates, and everything earlier trains, with `gap` windows dropped
+    between blocks. Carving from the end guarantees every task keeps at least one test and one
+    validation window even when it is short; the gap windows come out of the training block,
+    which is the largest, so the 70/10/20 proportions bend least there.
+    """
+    f_train = float(tcfg.get("train", 0.7))
+    f_val = float(tcfg.get("val", 0.1))
+    f_test = max(0.0, 1.0 - f_train - f_val)
+    gap = int(tcfg.get("gap", 1))
+    n = win_task.groupby(win_task).transform("size")
+    n_test = np.maximum(1, np.round(f_test * n)).astype(int)
+    n_val = np.maximum(1, np.round(f_val * n)).astype(int)
+    test_start = n - n_test
+    val_start = test_start - gap - n_val
+    train_end = val_start - gap
+    if (train_end < 1).any():
+        small = sorted(set(win_task[train_end < 1]))
+        raise ValueError(f"temporal split: tasks {small} are too short to hold train, val and test blocks")
+    split = pd.Series(-1, index=ordinal.index, dtype=np.int8)               # -1 = gap, dropped
+    split[ordinal < train_end] = SPLIT_CODES["train"]
+    split[(ordinal >= val_start) & (ordinal < val_start + n_val)] = SPLIT_CODES["val"]
+    split[ordinal >= test_start] = SPLIT_CODES["test"]
+    return split
+
+
+def attack_aware_temporal_split(df: pd.DataFrame, ordinal: pd.Series, win_task: pd.Series,
+                                task_categories: dict[int, str], tcfg: dict) -> pd.Series:
+    """Temporal split over each attack's own active span.
+
+    A plain per-task temporal split fails on bursty data: an attack that happens early in its
+    task period has no traffic in the task's last 20%, so it cannot be evaluated at all (on
+    CIC-IDS2017 WebAttack and Botnet would have zero test flows, DoS eleven). Here each task's
+    windows are divided into those carrying the task's new attack and the rest, and each group is
+    split chronologically on its own: the model trains on an attack's earliest windows and is
+    tested on its latest, never seeing attack traffic from after the test boundary.
+    """
+    new_cat = df["task_id"].map(task_categories)
+    carries = (df["category"] == new_cat).groupby(df["window_id"]).any().reindex(win_task.index, fill_value=False)
+    split = pd.Series(-1, index=win_task.index, dtype=np.int8)
+    for flag in (True, False):
+        idx = win_task.index[carries.to_numpy() == flag]
+        if len(idx) == 0:
+            continue
+        group_task = win_task.loc[idx]
+        group_ord = group_task.groupby(group_task).cumcount()       # order within the group, per task
+        split.loc[idx] = temporal_split(group_ord, group_task, tcfg).to_numpy()
+    return split
+
+
 def assign_windows_and_splits(df: pd.DataFrame, window_cfg: dict, split_cfg: dict,
-                              window_fraction: float | None = None) -> pd.DataFrame:
+                              window_fraction: float | None = None,
+                              task_categories: dict[int, str] | None = None) -> pd.DataFrame:
     """Add `window_id` (global, chronological) and `split` columns.
 
     `df` must be sorted by ts and carry `segment_id`/`task_id`.
@@ -74,20 +128,40 @@ def assign_windows_and_splits(df: pd.DataFrame, window_cfg: dict, split_cfg: dic
         next_id += int(local.max()) + 1
     df["window_id"] = window_id
 
-    # Split by the window's ordinal position inside its task.
-    period = int(split_cfg["period"])
     win_task = df.groupby("window_id", sort=True)["task_id"].first()
-    ordinal = win_task.groupby(win_task).cumcount()
-    pos = ordinal % period
-    split = pd.Series(SPLIT_CODES["train"], index=win_task.index, dtype=np.int8)
-    split[pos.isin(split_cfg["val_positions"])] = SPLIT_CODES["val"]
-    split[pos.isin(split_cfg["test_positions"])] = SPLIT_CODES["test"]
+    ordinal = win_task.groupby(win_task).cumcount()          # chronological position inside its task
+    strategy = split_cfg.get("strategy", "interleaved")
+    if strategy == "interleaved":
+        # Position modulo `period`: test windows are spread across the whole task period,
+        # interleaved with training windows from the same attack session.
+        period = int(split_cfg["period"])
+        pos = ordinal % period
+        split = pd.Series(SPLIT_CODES["train"], index=win_task.index, dtype=np.int8)
+        split[pos.isin(split_cfg["val_positions"])] = SPLIT_CODES["val"]
+        split[pos.isin(split_cfg["test_positions"])] = SPLIT_CODES["test"]
+    elif strategy == "temporal":
+        # Train on the past, test on the future: per task, the first `train` fraction of windows
+        # trains, the next `val` fraction validates, the rest tests, with `gap` windows dropped
+        # between blocks so no test window sits next to a training window.
+        split = temporal_split(ordinal, win_task, split_cfg.get("temporal", {}))
+    elif strategy == "temporal_attack":
+        if task_categories is None:
+            raise ValueError("temporal_attack needs the task -> new-attack mapping")
+        split = attack_aware_temporal_split(df, ordinal, win_task, task_categories, split_cfg.get("temporal", {}))
+    else:
+        raise ValueError(f"unknown split.strategy {strategy!r} (interleaved | temporal | temporal_attack)")
+    gap = split < 0
+    if gap.any():
+        df = df[~df["window_id"].isin(split.index[gap])].reset_index(drop=True)
+        split = split[~gap]
+        log.info("%s split: dropped %d gap windows", strategy, int(gap.sum()))
     df["split"] = df["window_id"].map(split).astype(np.int8)
 
     if window_fraction:
-        # Keep whole `period` blocks so the train/val/test proportions survive.
+        # Keep whole blocks so the train/val/test proportions survive.
+        period = int(split_cfg.get("period", 10))
         stride = max(1, int(round(1.0 / window_fraction)))
-        keep_windows = win_task.index[((ordinal // period) % stride) == 0]
+        keep_windows = [w for w in win_task.index[((ordinal // period) % stride) == 0] if w in split.index]
         before = df["window_id"].nunique()
         df = df[df["window_id"].isin(keep_windows)].reset_index(drop=True)
         log.info("window_fraction=%s kept %d/%d windows", window_fraction, df["window_id"].nunique(), before)
@@ -176,9 +250,15 @@ def cache_key(cfg: dict) -> str:
         # draws random numbers at 1.0). Any real sampling gets a new, distinct key.
         pre.pop("flow_sample_fraction", None)
         pre["benign_keep_fraction"] = 1.0
+    split = dict(cfg["split"])
+    if split.get("strategy", "interleaved") == "interleaved":
+        # The default strategy hashes exactly as before the option existed, so every cache and
+        # result produced with interleaved splits keeps its id. Temporal gets a new, distinct key.
+        split.pop("strategy", None)
+        split.pop("temporal", None)
     relevant = {
         "dataset": cfg["dataset"], "pre": pre, "window": cfg["window"],
-        "split": cfg["split"], "node_features": cfg["graph"]["node_features"],
+        "split": split, "node_features": cfg["graph"]["node_features"],
         "categories": cfg["categories"], "seed": cfg["seed"], "v": 3,
     }
     return hashlib.sha1(json.dumps(relevant, sort_keys=True).encode()).hexdigest()[:12]

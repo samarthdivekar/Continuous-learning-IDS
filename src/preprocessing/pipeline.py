@@ -64,7 +64,8 @@ def prepare_dataset(cfg: dict, force: bool = False, csv_files: list[Path] | None
     df["y_multi"] = df["category"].map({c: i for i, c in enumerate(cfg["categories"])}).astype(np.int8)
 
     # 4. windows + splits -----------------------------------------------------
-    df = assign_windows_and_splits(df, cfg["window"], cfg["split"], pre.get("window_fraction"))
+    df = assign_windows_and_splits(df, cfg["window"], cfg["split"], pre.get("window_fraction"),
+                                   task_categories=task_categories)
 
     # 5. scale (fit on task 0 train only) --------------------------------------
     feats = feature_columns(df)
