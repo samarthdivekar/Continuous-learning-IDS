@@ -9,7 +9,7 @@ and periodic evaluations. Compares retrain counts and final quality of
 """
 import pandas as pd
 
-from experiments.common import apply_selection, base_parser, config_from_args, results_dir
+from experiments.common import apply_selection, base_parser, config_from_args, results_dir, data_config
 from src.evaluation.stream import StreamRunner
 from src.preprocessing.pipeline import load_processed, prepare_dataset
 from src.training.learners import make_learner
@@ -34,8 +34,8 @@ def main():
     p.add_argument("--out-name", default="drift", help="results sub-folder (keeps variants apart from the main run)")
     args = p.parse_args()
     cfg = apply_selection(config_from_args(args), args)
-    prepare_dataset(cfg)
-    data = load_processed(cfg)
+    prepare_dataset(data_config(cfg))          # data never depends on the training seed
+    data = load_processed(data_config(cfg))
     out = results_dir(cfg, args, args.out_name)
     out.mkdir(parents=True, exist_ok=True)
     write_run_info(out / "run_info.json", cfg, {"runs": args.runs, "task_categories": data.task_categories})

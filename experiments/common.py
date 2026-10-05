@@ -63,3 +63,15 @@ def results_dir(cfg: dict, args, *parts: str) -> Path:
     if getattr(args, "dev", False):
         base = base / "dev"
     return base.joinpath(cfg["dataset"], cfg["label_mode"], *parts)
+
+
+def data_config(cfg: dict) -> dict:
+    """`cfg` with the dataset's reference seed, for preparing and loading data.
+
+    The seed is part of the data cache key, and on CSE-CIC-IDS2018 it also drives the 15 % flow
+    sample. Running a second training seed must therefore never touch the data: prepare and load it
+    with this config, and keep `cfg` (with the run's own seed) for training and randomised tests.
+    """
+    from src.utils.config import apply_overrides
+    reference = load_config(cfg["dataset"])["seed"]
+    return cfg if cfg["seed"] == reference else apply_overrides(cfg, [f"seed={reference}"])

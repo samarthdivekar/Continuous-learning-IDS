@@ -16,7 +16,7 @@ import pandas as pd
 import torch
 from torch_geometric.data import Data
 
-from experiments.common import apply_selection, base_parser, config_from_args, results_dir
+from experiments.common import apply_selection, base_parser, config_from_args, results_dir, data_config
 from src.evaluation.continual import predict_graphs
 from src.evaluation.metrics import core_metrics
 from src.preprocessing.pipeline import load_processed, prepare_dataset
@@ -43,11 +43,13 @@ def drop_category_edges(g: Data, cat_id: int) -> Data:
 def main():
     p = base_parser(__doc__)
     p.add_argument("--models", nargs="*", default=DEFAULT_MODELS)
+    p.add_argument("--out-name", default="loao",
+                   help="results sub-folder; use one per extra seed so seed 42 is never overwritten")
     args = p.parse_args()
     cfg = apply_selection(config_from_args(args), args)
-    prepare_dataset(cfg)
-    data = load_processed(cfg)
-    out = results_dir(cfg, args, "loao")
+    prepare_dataset(data_config(cfg))          # data never depends on the training seed
+    data = load_processed(data_config(cfg))
+    out = results_dir(cfg, args, args.out_name)
     out.mkdir(parents=True, exist_ok=True)
     write_run_info(out / "run_info.json", cfg, {"models": args.models, "task_categories": data.task_categories,
                                                   "protocol": "joint training on all other tasks; "
