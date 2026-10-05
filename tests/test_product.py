@@ -74,3 +74,28 @@ def test_incident_metrics_are_json_safe_when_nothing_is_flagged():
     assert inc == [] and np.isnan(m["incident_precision"])  # the raw ratio is undefined ...
     safe = {k: (None if isinstance(v, float) and not np.isfinite(v) else v) for k, v in m.items()}
     json.dumps(safe, allow_nan=False)                        # ... and the service's cleaned form is valid JSON
+
+
+def test_cluster_proposal_survives_an_empty_cluster():
+    """k-means can leave a cluster empty; the purity summary must not crash on it."""
+    import numpy as np
+    from src.evaluation import open_set
+
+    rng = np.random.default_rng(0)
+    z = np.r_[rng.normal(0, 0.01, (60, 4)) + 5.0, rng.normal(0, 0.01, (60, 4)) - 5.0]
+    cats = np.r_[np.full(60, 2), np.full(60, 3)]
+
+    class _FakeKMeans:                      # labels 0 and 2 used, 1 left empty
+        def __init__(self, n_clusters, **kw):
+            self.k = n_clusters
+
+        def fit(self, Z):
+            self.labels_ = np.where(np.arange(len(Z)) < len(Z) // 2, 0, min(2, self.k - 1))
+            return self
+
+    import unittest.mock as mock
+    with mock.patch.object(open_set, "KMeans", _FakeKMeans), \
+         mock.patch.object(open_set, "silhouette_score", lambda *a, **k: 0.5):
+        out = open_set.propose_clusters(z, cats, k_range=range(3, 4))
+    assert out["k"] == 3 and 0.0 <= out["weighted_purity"] <= 1.0
+    assert out["majority_category"] in (2, 3)

@@ -94,7 +94,8 @@ def propose_clusters(z_flagged: np.ndarray, cat_flagged: np.ndarray, k_range=ran
     big = int(sizes.argmax())
     members = C[lab == big]
     vals, cnt = np.unique(members, return_counts=True)
-    weighted = sum(np.bincount(C[lab == j]).max() for j in range(k)) / len(C)
+    # k-means can return an empty cluster; np.bincount([]).max() would raise
+    weighted = sum(np.bincount(C[lab == j]).max() for j in range(k) if (lab == j).any()) / len(C)
     return {"n_flagged": n, "k": int(k), "largest_cluster_share": float(sizes[big] / len(C)),
             "purity_largest": float(cnt.max() / len(members)), "majority_category": int(vals[cnt.argmax()]),
             "weighted_purity": float(weighted)}
