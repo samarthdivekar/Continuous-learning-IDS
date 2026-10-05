@@ -14,8 +14,8 @@ export async function mount_(el) {
       <div class="card">
         <div class="card-head"><div><h3 id="ex-title">Select a window</h3><p class="sub" id="ex-sub">–</p></div>
           <div class="toolbar">
-            <div class="seg" id="ex-mode"><button data-v="truth" class="on">Ground truth</button><button data-v="errors">Model errors</button></div>
-            <select id="ex-model">${HEADLINE.map((m) => `<option value="${m}">${esc(label(m))}</option>`).join("")}</select>
+            <div class="seg" id="ex-mode" role="group" aria-label="edge colouring"><button data-v="truth" class="on">Ground truth</button><button data-v="errors">Model errors</button></div>
+            <select id="ex-model" aria-label="model whose errors are overlaid">${HEADLINE.map((m) => `<option value="${m}">${esc(label(m))}</option>`).join("")}</select>
             <label class="inline">Hosts <input type="range" id="ex-nodes" min="30" max="400" step="10" value="${prefs.get("ex.nodes", "150")}"><span id="ex-nodes-v" class="num"></span></label>
           </div></div>
         <div class="graph-stage" id="ex-stage"></div>
@@ -24,8 +24,8 @@ export async function mount_(el) {
       <div class="grid" style="gap:16px;align-content:start">
         <div class="card"><h3>Window stats</h3><div id="ex-stats"><div class="empty">Pick a window from the list.</div></div></div>
         <div class="card"><div class="card-head"><h3>Windows</h3>
-          <div class="toolbar"><select id="ex-task"><option value="">all tasks</option></select>
-          <select id="ex-split"><option value="test">test</option><option value="val">val</option><option value="train">train</option><option value="">all</option></select>
+          <div class="toolbar"><select id="ex-task" aria-label="filter windows by task"><option value="">all tasks</option></select>
+          <select id="ex-split" aria-label="filter windows by split"><option value="test">test</option><option value="val">val</option><option value="train">train</option><option value="">all</option></select>
           <label class="inline"><input type="checkbox" id="ex-attack" checked> attacks only</label></div></div>
           <div class="window-list" id="ex-list"></div></div>
       </div>

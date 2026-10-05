@@ -121,9 +121,15 @@ main { padding: var(--s-5) var(--s-6) var(--s-10); max-width: 1680px; margin: 0 
 :root[data-presentation="on"] .view-head p { font-size: var(--t-md); }
 
 /* ---------------- responsive ---------------- */
+.brand-short { display: none; }
+
 @media (max-width: 1500px) {
-  .appbar { padding: 9px var(--s-5); gap: var(--s-3); }
+  .appbar { padding: 9px var(--s-5); gap: var(--s-2); }
   .brand p { display: none; }
+  .brand-full { display: none; }
+  .brand-short { display: inline; }
+  .pill .pill-text { display: none; }      /* the dot and its tooltip carry the meaning */
+  .btn-text { display: none; }             /* ▶ and ? keep their meaning as icons */
   .brand h1 { font-size: var(--t-lg); }
   .brand-mark { width: 32px; height: 32px; }
   .controls { gap: 6px; }
@@ -140,8 +146,8 @@ main { padding: var(--s-5) var(--s-6) var(--s-10); max-width: 1680px; margin: 0 
    labels rather than the controls themselves. */
 @media (max-width: 1300px) {
   .brand h1 { font-size: var(--t-md); }
-  .pill .pill-text { display: none; }
   .pill { padding: 5px 7px; }
+  #pill-stream { max-width: 118px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 }
 
 @media (max-width: 1200px) {

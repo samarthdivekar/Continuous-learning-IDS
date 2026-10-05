@@ -18,7 +18,7 @@
       <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><circle cx="5" cy="6" r="2.2"/><circle cx="19" cy="6" r="2.2"/><circle cx="12" cy="18" r="2.2"/><circle cx="12" cy="10" r="1.6"/><path d="M6.8 7.2 10.6 9.3M17.2 7.2l-3.8 2.1M12 11.7V15.8"/></svg>
     </div>
     <div>
-      <h1>GNN-IDS Security Console</h1>
+      <h1><span class="brand-full">GNN-IDS Security Console</span><span class="brand-short">GNN-IDS</span></h1>
       <p>Continual-learning graph intrusion detection · EWC + subgraph replay + ADWIN</p>
     </div>
   </div>
@@ -38,9 +38,9 @@
       <span class="pill" id="pill-stream"><i class="dot"></i><span>Stream idle</span></span>
     </div>
     <label class="inline switch" title="Off: the deployed model only. On: every baseline and ablation.">
-      <input type="checkbox" id="compare-toggle"><span>Compare models</span></label>
-    <button class="icon-btn" id="tour-btn" title="A five-step guided walk through the console">▶ Tour</button>
-    <button class="icon-btn" id="help-btn" title="How to use this console (?)">? Help</button>
+      <input type="checkbox" id="compare-toggle"><span>Compare<span class="btn-text"> models</span></span></label>
+    <button class="icon-btn" id="tour-btn" aria-label="Start the guided tour" title="A five-step guided walk through the console">▶<span class="btn-text"> Tour</span></button>
+    <button class="icon-btn" id="help-btn" aria-label="Help and glossary" title="How to use this console (?)">?<span class="btn-text"> Help</span></button>
     <button class="icon-btn" id="present-btn" title="Presentation mode: larger type and thicker lines for a projector"
             aria-pressed="false">⛶</button>
     <button class="icon-btn" id="theme-btn" title="Toggle light/dark" aria-label="Toggle light or dark theme">◐</button>
@@ -86,6 +86,8 @@
   </ol>
   <p class="muted">Use the switches at the top to change dataset (2017 / 2018) and whether attacks are named (multiclass) or only
   attack/benign (binary). Keys <span class="kbd">1</span>&ndash;<span class="kbd">8</span> switch tabs, <span class="kbd">?</span> opens this panel.
+  <span class="kbd">Ctrl</span>+<span class="kbd">K</span> opens the command palette: jump to any tab, switch dataset,
+  open an incident by number, or start and stop the stream.
   Turn on <b>Compare models</b> to see every baseline next to the deployed model.</p>
   <h3>Glossary</h3>
   <dl class="gloss">

@@ -1,7 +1,8 @@
 // App shell: tab routing (hash-based), global dataset/mode context, health pills, theme.
-import { $, $$, esc, get, onContextChange, prefs, setApiKey, setContext, state, toast } from "./lib/core.js";
+import { $, $$, esc, get, onContextChange, post, prefs, setApiKey, setContext, state, toast } from "./lib/core.js";
 import { applyDefaults } from "./lib/charts.js";
 import * as tour from "./lib/tour.js";
+import * as palette from "./lib/palette.js";
 
 const VIEWS = {
   overview: () => import("./views/overview.js"),
@@ -73,8 +74,71 @@ function initControls() {
   $("#help-close").addEventListener("click", () => help(false));
   $("#help-scrim").addEventListener("click", () => help(false));
   const order = $$(".tab").map((t) => t.dataset.view);
+
+  // ---- command palette -------------------------------------------------
+  const go = (view) => { location.hash = view; };
+  const TAB_KEYWORDS = {
+    overview: ["results", "summary", "headline", "verdict", "kpi"],
+    soc: ["incidents", "alerts", "triage", "queue", "approve", "reject", "containment", "explain", "report"],
+    live: ["stream", "demo", "replay", "retrain", "adapt", "drift events"],
+    explorer: ["graph", "network", "topology", "hosts", "edges", "window"],
+    classify: ["predict", "csv", "flows", "upload", "pcap"],
+    models: ["accuracy", "forgetting", "bwt", "unseen", "leave-one-attack-out", "ip leakage", "confusion", "recall"],
+    adapt: ["drift", "adwin", "retraining", "novelty", "open set", "conformal", "abstention", "alert load", "labels"],
+    repro: ["seeds", "lambda", "sweep", "tuning", "metadata", "reproduce", "commit"],
+  };
+  const tabActions = $$(".tab").map((t) => ({
+    label: `Go to ${t.textContent.replace("LIVE", "").trim()}`, group: "tab",
+    keywords: TAB_KEYWORDS[t.dataset.view] || [], run: () => go(t.dataset.view),
+  }));
+  const streamAction = async (path, label) => {
+    try {
+      const r = await post(path, path === "/demo/start" ? { delay_seconds: 0.3, eval_every: 10 } : {});
+      toast(r?.accepted === false ? r.reason || `${label} refused` : `${label}`);
+      go("live");
+    } catch (e) { toast(`${label} failed: ${e.message}`); }
+  };
+  palette.setActions([
+    ...tabActions,
+    { label: "Dataset: CIC-IDS2017", group: "context",
+      run: () => { syncSeg("ds-seg", "cicids2017"); setContext({ dataset: "cicids2017" }); } },
+    { label: "Dataset: CSE-CIC-IDS2018", group: "context",
+      run: () => { syncSeg("ds-seg", "csecicids2018"); setContext({ dataset: "csecicids2018" }); } },
+    { label: "Labels: multiclass (named attacks)", group: "context",
+      run: () => { syncSeg("mode-seg", "multiclass"); setContext({ mode: "multiclass" }); } },
+    { label: "Labels: binary (attack vs benign)", group: "context",
+      run: () => { syncSeg("mode-seg", "binary"); setContext({ mode: "binary" }); } },
+    { label: () => `Compare models: turn ${state.compare ? "off" : "on"}`, group: "context",
+      run: () => { const on = !state.compare; $("#compare-toggle").checked = on; setContext({ compare: on }); } },
+    { label: "Start the live stream", group: "stream", run: () => streamAction("/demo/start", "stream started") },
+    { label: "Retrain now", group: "stream", run: () => streamAction("/retrain", "adaptation requested") },
+    { label: "Stop the live stream", group: "stream", run: () => streamAction("/demo/stop", "stream stopped") },
+    { // a bare number jumps straight to that incident in the queue
+      label: (q) => `Open incident #${q || "…"}`, group: "incident", priority: 10,
+      match: (q) => /^\d+$/.test(q),
+      run: (q) => {
+        go("soc");
+        const id = Number(q);
+        const tryOpen = (left) => {
+          if (loaded.soc?.openIncident?.(id)) return;
+          if (left) setTimeout(() => tryOpen(left - 1), 400);
+          else toast(`Incident #${id} is not in the current queue — load a window first`);
+        };
+        setTimeout(() => tryOpen(12), 300);
+      } },
+    { label: () => `Theme: switch to ${document.documentElement.dataset.theme === "dark" ? "light" : "dark"}`,
+      group: "view", run: () => $("#theme-btn").click() },
+    { label: () => `Presentation mode: turn ${document.documentElement.dataset.presentation === "on" ? "off" : "on"}`,
+      group: "view", run: () => present.click() },
+    { label: "Open help and glossary", group: "view", run: () => help(true) },
+    { label: "Start the guided tour", group: "view", run: () => { help(false); tour.start(); } },
+  ]);
   window.addEventListener("keydown", (e) => {
-    if (e.ctrlKey || e.metaKey || e.altKey || /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement?.tagName)) return;
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") { e.preventDefault(); palette.open(); }
+  });
+  window.addEventListener("keydown", (e) => {
+    if (e.ctrlKey || e.metaKey || e.altKey || palette.isOpen()
+        || /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement?.tagName)) return;
     if (e.key === "Escape") help(false);
     else if (e.key === "?") help($("#help").classList.contains("hidden"));
     else if (/^[0-9]$/.test(e.key)) { const i = e.key === "0" ? 9 : Number(e.key) - 1; if (order[i]) location.hash = order[i]; }

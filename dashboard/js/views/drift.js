@@ -22,7 +22,7 @@ async function render() {
     </div>
     <div class="card" style="margin-top:16px"><div class="card-head"><div><h3>Error timeline</h3>
       <p class="sub">dashed = adaptation cycles · grey band = true attack share of each window · ▼ = drift flag</p></div>
-      <select id="dr-run"></select></div><div class="chart tall"><canvas id="dr-time"></canvas></div></div>
+      <select id="dr-run" aria-label="stream run to display"></select></div><div class="chart tall"><canvas id="dr-time"></canvas></div></div>
     <div class="card" style="margin-top:16px"><h3>Quality over the stream</h3><p class="sub">macro-F1 on held-out test windows of all tasks seen so far</p>
       <div class="chart"><canvas id="dr-eval"></canvas></div></div>`;
   try { d = await get(`/results/drift?dataset=${dataset}&mode=multiclass`); }

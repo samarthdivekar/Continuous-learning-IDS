@@ -19,9 +19,9 @@ export async function mount_(el) {
       (ground truth shown), or paste your own CICFlowMeter-style rows.</p></div></div>
     <div class="grid g2">
       <div class="card"><h3>1 · A held-out window</h3><p class="sub">test-split windows only · ground truth is compared automatically</p>
-        <div class="toolbar"><select id="cl-win" style="min-width:320px"></select><button class="btn primary" id="cl-run-w">Classify window</button></div></div>
+        <div class="toolbar"><select id="cl-win" aria-label="held-out window to classify" style="min-width:320px"></select><button class="btn primary" id="cl-run-w">Classify window</button></div></div>
       <div class="card"><h3>2 · Your own flows</h3><p class="sub">CSV with src_ip, dst_ip and any CICFlowMeter columns (original or snake_case names). Missing features are imputed as 0 and reported.</p>
-        <textarea id="cl-csv">${SAMPLE}</textarea>
+        <textarea id="cl-csv" aria-label="flow rows in CSV form">${SAMPLE}</textarea>
         <div class="toolbar" style="margin-top:8px"><button class="btn primary" id="cl-run-f">Classify flows</button>
           <label class="btn" style="cursor:pointer">Load CSV file<input type="file" id="cl-file" accept=".csv,text/csv" hidden></label></div></div>
     </div>

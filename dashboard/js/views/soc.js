@@ -42,18 +42,18 @@ export async function mount_(el) {
     <div class="grid g-5-7" style="margin-top:16px">
       <div class="card"><div class="card-head"><div><h3>Incidents</h3><p class="sub">most severe first · severity = size × confidence</p></div>
         <div class="card-tools">
-          <select id="soc-cat" title="Filter by attack category"><option value="">All categories</option></select>
-          <select id="soc-sev" title="Filter by severity">
+          <select id="soc-cat" aria-label="filter by attack category" title="Filter by attack category"><option value="">All categories</option></select>
+          <select id="soc-sev" aria-label="filter by severity" title="Filter by severity">
             <option value="">Any severity</option><option value="6">Critical only</option><option value="3">High and above</option></select>
-          <button class="icon-btn small" id="soc-csv" title="Download these incidents as CSV">⤓ CSV</button>
-          <button class="icon-btn small" id="soc-cef" title="Download for a SIEM (ArcSight CEF)">⤓ CEF</button>
+          <button class="icon-btn small" id="soc-csv" aria-label="Download these incidents as CSV" title="Download these incidents as CSV">⤓ CSV</button>
+          <button class="icon-btn small" id="soc-cef" aria-label="Download for a SIEM in CEF format" title="Download for a SIEM (ArcSight CEF)">⤓ CEF</button>
         </div></div>
         <div id="soc-list" class="window-list" style="max-height:640px"><div class="empty">Choose a window and press <b>Load incidents</b>.</div></div></div>
       <div class="card" id="soc-detail"><div class="empty">Select an incident on the left.</div></div>
     </div>
     <div class="card" style="margin-top:16px"><div class="card-head"><div><h3>Decision log</h3>
       <p class="sub">every proposed action and the analyst's decision · dry run only</p></div>
-      <div class="seg" id="soc-filter"><button data-v="" class="on">All</button><button data-v="proposed">Pending</button>
+      <div class="seg" id="soc-filter" role="group" aria-label="decision log filter"><button data-v="" class="on">All</button><button data-v="proposed">Pending</button>
         <button data-v="approved">Approved</button><button data-v="rejected">Rejected</button></div></div>
       <div id="soc-log"></div></div>`;
   get("/health").then((h) => { $("#soc-svc", root).textContent = `live models: ${h.ml?.dataset || "?"} · ${h.ml?.label_mode || ""}`; })
@@ -94,6 +94,15 @@ export async function mount_(el) {
 }
 export { mount_ as mount };
 export const activate = () => log(currentFilter());
+
+/** Called by the command palette ("open incident 7"). True when the incident exists here. */
+export function openIncident(id) {
+  const match = current?.incidents?.find((i) => (i.rank ?? i.incident_id) === id);
+  if (!match) return false;
+  pick(uidOf(match));
+  $("#soc-detail", root)?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  return true;
+}
 export const refresh = () => { if (current) renderList(); };
 const currentFilter = () => $("#soc-filter button.on", root)?.dataset.v || "";
 // a scan mixes windows, so each incident carries its own window id

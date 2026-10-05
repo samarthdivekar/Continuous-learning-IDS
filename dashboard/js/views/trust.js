@@ -29,7 +29,7 @@ async function render() {
     <div class="grid g2">
       <div class="card"><div class="card-head"><div><h3>1 · Does it notice an attack it was never taught?</h3>
         <p class="sub">after each task, the <i>next</i> attack category is still unknown · higher = better at telling “new” from “known” (0.5 = coin flip)</p></div>
-        <select id="tr-method">${Object.entries(METHOD).map(([k, v]) => `<option value="${k}">${v}</option>`).join("")}</select></div>
+        <select id="tr-method" aria-label="novelty score">${Object.entries(METHOD).map(([k, v]) => `<option value="${k}">${v}</option>`).join("")}</select></div>
         <div class="chart"><canvas id="tr-os"></canvas></div><div id="tr-os-note"></div></div>
       <div class="card"><h3>Grouping the unknown into candidate new categories</h3>
         <p class="sub">flows flagged as novel are clustered; a pure cluster is a ready-made proposal for a new attack class</p><div id="tr-cl"></div></div>

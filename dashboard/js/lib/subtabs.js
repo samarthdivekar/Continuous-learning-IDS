@@ -27,7 +27,7 @@ export function subTabs(key, sections, { intro } = {}) {
       root = el;
       root.innerHTML = `
         ${intro ? `<p class="view-intro">${esc(intro)}</p>` : ""}
-        <div class="seg sub-nav" id="sub-nav-${key}" role="tablist">
+        <div class="seg sub-nav" id="sub-nav-${key}" role="tablist" aria-label="${esc(key)} sections">
           ${sections.map((s, i) => `<button data-sub="${s.id}" class="${i === 0 ? "on" : ""}">${esc(s.label)}</button>`).join("")}
         </div>
         ${sections.map((s, i) => `<section class="sub-panel ${i === 0 ? "on" : ""}" id="sub-${key}-${s.id}"></section>`).join("")}`;

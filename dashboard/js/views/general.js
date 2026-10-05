@@ -17,7 +17,7 @@ async function render() {
     <div class="view-head"><div><h2>Generalisation</h2>
       <p><b>Unseen attacks:</b> train on every category except one, then test on the held-out one. <b>IP leakage:</b> scramble host
       identities at test time — a model that memorised attacker IPs would collapse.</p></div>
-      <div class="seg" id="gn-mode"><button data-v="binary" class="on">Binary</button><button data-v="multiclass">Multiclass</button></div></div>
+      <div class="seg" id="gn-mode" role="group" aria-label="label mode for the unseen-attack test"><button data-v="binary" class="on">Binary</button><button data-v="multiclass">Multiclass</button></div></div>
     <div class="grid g2">
       <div class="card"><h3>Detection of an attack never seen in training</h3><p class="sub">share of held-out attack flows flagged as any attack · each model trained once, jointly, on all other categories</p>
         <div class="chart tall"><canvas id="gn-loao"></canvas></div></div>

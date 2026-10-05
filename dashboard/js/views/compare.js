@@ -21,18 +21,18 @@ async function render() {
       <p>${state.compare ? "Every baseline and ablation" : "The deployed model and its two reference points"} through the identical
       chronological task sequence (${esc(dataset)}, ${esc(mode)}). Use <b>Compare models</b> in the header to ${state.compare ? "narrow this down" : "show all of them"}.
       Mean over seeds; the band shows ± 1 std.</p></div>
-      <div class="toolbar"><select id="cmp-metric">${METRICS.map(([k, t]) => `<option value="${k}">${t}</option>`).join("")}</select></div></div>
+      <div class="toolbar"><select id="cmp-metric" aria-label="metric to plot over the task sequence">${METRICS.map(([k, t]) => `<option value="${k}">${t}</option>`).join("")}</select></div></div>
     <div class="card"><div class="card-head"><div><h3 id="cmp-title"></h3><p class="sub">x = after training task k</p></div>
       <div class="legend" id="cmp-legend"></div></div><div class="chart tall"><canvas id="cmp-line"></canvas></div></div>
     <div class="grid g2" style="margin-top:16px">
       <div class="card"><div class="card-head"><div><h3>Per-category recall matrix</h3><p class="sub">row = after task i · column = category evaluated</p></div>
-        <select id="cmp-rm"></select></div><div id="cmp-heat"></div></div>
+        <select id="cmp-rm" aria-label="model for the per-category recall matrix"></select></div><div id="cmp-heat"></div></div>
       <div class="card"><h3>Forgetting</h3><p class="sub">Backward transfer (BWT) — negative = forgetting. Closer to 0 is better.</p>
         <div class="chart"><canvas id="cmp-bwt"></canvas></div></div>
     </div>
     <div class="grid g2" style="margin-top:16px">
       <div class="card"><div class="card-head"><div><h3>Confusion matrix</h3><p class="sub">test windows of all tasks seen · seed 42</p></div>
-        <div class="toolbar"><select id="cmp-cm-model"></select><select id="cmp-cm-task"></select></div></div><div id="cmp-cm"></div></div>
+        <div class="toolbar"><select id="cmp-cm-model" aria-label="model for the confusion matrix"></select><select id="cmp-cm-task" aria-label="task after which the confusion matrix is taken"></select></div></div><div id="cmp-cm"></div></div>
       <div class="card"><h3>Final scoreboard</h3><p class="sub">after the last task</p><div id="cmp-table"></div></div>
     </div>`;
   try { data = await get(`/results/continual?dataset=${dataset}&mode=${mode}`); }
