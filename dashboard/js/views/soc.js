@@ -1,7 +1,7 @@
 // SOC queue: a window's alerts grouped into incidents, with a plain-English explanation of
 // why each was flagged and a proposed containment action that an analyst approves or rejects.
 // Nothing is ever executed — approval is recorded as a dry run.
-import { $, $$, catColor, esc, get, int, label, pct, post, prefs, table, toast } from "../lib/core.js";
+import { $, $$, apiUrl, catColor, downloadCsv, esc, get, int, label, pct, post, prefs, table, toast } from "../lib/core.js";
 import { mount } from "../lib/charts.js";
 
 let root, catalog = [], current = null, selected = null;
@@ -34,7 +34,14 @@ export async function mount_(el) {
     </div></div>
     <div class="grid g4" id="soc-kpis" style="margin-top:16px"></div>
     <div class="grid g-5-7" style="margin-top:16px">
-      <div class="card"><div class="card-head"><div><h3>Incidents</h3><p class="sub">most severe first · severity = size × confidence</p></div></div>
+      <div class="card"><div class="card-head"><div><h3>Incidents</h3><p class="sub">most severe first · severity = size × confidence</p></div>
+        <div class="card-tools">
+          <select id="soc-cat" title="Filter by attack category"><option value="">All categories</option></select>
+          <select id="soc-sev" title="Filter by severity">
+            <option value="">Any severity</option><option value="6">Critical only</option><option value="3">High and above</option></select>
+          <button class="icon-btn small" id="soc-csv" title="Download these incidents as CSV">⤓ CSV</button>
+          <button class="icon-btn small" id="soc-cef" title="Download for a SIEM (ArcSight CEF)">⤓ CEF</button>
+        </div></div>
         <div id="soc-list" class="window-list" style="max-height:640px"><div class="empty">Choose a window and press <b>Load incidents</b>.</div></div></div>
       <div class="card" id="soc-detail"><div class="empty">Select an incident on the left.</div></div>
     </div>
@@ -56,6 +63,16 @@ export async function mount_(el) {
   $$("#soc-filter button", root).forEach((b) => b.addEventListener("click", () => {
     $$("#soc-filter button", root).forEach((x) => x.classList.toggle("on", x === b)); log(b.dataset.v);
   }));
+  $$("#soc-cat, #soc-sev", root).forEach((el) => el.addEventListener("change", renderList));
+  $("#soc-csv", root).addEventListener("click", () => {
+    const rows = visibleIncidents().map(({ proposed, sample_edges, ...keep }) => ({
+      ...keep, action: proposed?.action, target: proposed?.target, rationale: proposed?.rationale }));
+    downloadCsv(`incidents_window${current?.window_id}.csv`, rows);
+  });
+  $("#soc-cef", root).addEventListener("click", () => {
+    if (!current) { toast("load a window first"); return; }
+    window.open(apiUrl(`/incidents/${current.window_id}/cef?model=${current.model}&threshold=${current.threshold || 0}`), "_blank");
+  });
   $("#soc-model", root).value = prefs.get("soc.model", "gnn_ewc_replay");
   log("");
   if (catalog.length) load();
@@ -97,11 +114,26 @@ function sevTag(i) {
   const s = i.severity;
   return s >= 6 ? `<span class="tag bad">critical</span>` : s >= 3 ? `<span class="tag warn">high</span>` : `<span class="tag">low</span>`;
 }
+/** Incidents after the category / severity filters. */
+function visibleIncidents() {
+  if (!current) return [];
+  const cat = $("#soc-cat", root)?.value || "";
+  const minSev = Number($("#soc-sev", root)?.value || 0);
+  return current.incidents.filter((i) => (!cat || i.category === cat) && i.severity >= minSev);
+}
+
 function renderList() {
   const list = $("#soc-list", root);
   if (!current.incidents.length) { list.innerHTML = `<div class="empty">No flows above the confidence threshold in this window.</div>`; return; }
-  const maxSev = Math.max(...current.incidents.map((i) => i.severity));
-  list.innerHTML = current.incidents.map((i) => `
+  const cats = [...new Set(current.incidents.map((i) => i.category))].sort();
+  const catSel = $("#soc-cat", root);
+  const keep = catSel.value;
+  catSel.innerHTML = `<option value="">All categories</option>` + cats.map((c) => `<option value="${esc(c)}">${esc(c)}</option>`).join("");
+  catSel.value = cats.includes(keep) ? keep : "";
+  const shown = visibleIncidents();
+  if (!shown.length) { list.innerHTML = `<div class="empty">No incident matches these filters.</div>`; return; }
+  const maxSev = Math.max(...shown.map((i) => i.severity));
+  list.innerHTML = shown.map((i) => `
     <button data-id="${i.incident_id}" class="${selected === i.incident_id ? "on" : ""}" style="grid-template-columns:44px 1fr auto">
       <span class="num muted">#${i.incident_id}</span>
       <span><span class="swatch" style="background:${catColor(i.category)}"></span><b>${esc(i.category)}</b>
@@ -110,7 +142,8 @@ function renderList() {
           ${i.true_attack_share != null ? (i.true_attack_share > 0.5 ? ` · <span style="color:var(--good)">real attack</span>` : ` · <span style="color:var(--critical)">false alarm</span>`) : ""}</div>
         <div class="bar-mini"><i style="width:${(100 * i.severity / maxSev).toFixed(1)}%"></i></div></span>
       <span>${sevTag(i)}</span>
-    </button>`).join("");
+    </button>`).join("") + (shown.length < current.incidents.length
+      ? `<p class="note" style="padding:8px 6px">${current.incidents.length - shown.length} incident(s) hidden by the filters.</p>` : "");
   $$("#soc-list button", root).forEach((b) => b.addEventListener("click", () => pick(Number(b.dataset.id))));
 }
 
@@ -130,6 +163,10 @@ async function pick(id) {
     ${p.rules && (p.rules.linux || p.rules.windows) ? `
       <div class="seg" id="soc-rule-seg" style="margin-top:10px"><button data-v="linux" class="on">Linux (iptables)</button><button data-v="windows">Windows Firewall</button></div>
       <pre class="mono" id="soc-rule" style="white-space:pre-wrap;background:var(--panel-2);border:1px solid var(--border);border-radius:10px;padding:10px;font-size:12.5px;margin:8px 0 0">${esc(p.rules.linux || "")}</pre>` : ""}
+    <div class="toolbar" style="margin-top:10px">
+      <button class="btn" id="soc-copy" title="Copy the rule shown above">Copy rule</button>
+      <button class="btn" id="soc-report" title="Open a printable report (Print → Save as PDF)">Open report</button>
+    </div>
     <div class="toolbar" style="margin-top:12px">
       <input type="text" id="soc-analyst" placeholder="your name" value="${esc(prefs.get("analyst", ""))}" style="width:150px" maxlength="64">
       <input type="text" id="soc-note" placeholder="note (optional)" style="flex:1;min-width:140px" maxlength="1000">
@@ -140,6 +177,15 @@ async function pick(id) {
     $$("#soc-rule-seg button", det).forEach((x) => x.classList.toggle("on", x === b));
     $("#soc-rule", det).textContent = p.rules[b.dataset.v] || "";
   }));
+  $("#soc-copy", det).addEventListener("click", async () => {
+    const rule = $("#soc-rule", det)?.textContent || "";
+    if (!rule) { toast("no rule for this incident"); return; }
+    try { await navigator.clipboard.writeText(rule); toast("rule copied to the clipboard"); }
+    catch { toast("could not copy — select the text manually"); }
+  });
+  $("#soc-report", det).addEventListener("click", () => window.open(
+    apiUrl(`/incidents/${current.window_id}/report?incident_id=${i.incident_id}&model=${current.model}`
+           + `&threshold=${current.threshold || 0}`), "_blank"));
   $("#soc-approve", det).addEventListener("click", () => decide(i, "approve"));
   $("#soc-reject", det).addEventListener("click", () => decide(i, "reject"));
   explain(i);

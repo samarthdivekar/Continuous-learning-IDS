@@ -1,5 +1,5 @@
 // Generalisation: leave-one-attack-out (unseen attacks) and the IP-remap leakage test.
-import { $, catColor, color, esc, f3, get, int, label, pct, state, table } from "../lib/core.js";
+import { $, attachExport, catColor, color, esc, f3, get, int, label, pct, state, table } from "../lib/core.js";
 import { mount } from "../lib/charts.js";
 
 let root;
@@ -50,6 +50,7 @@ async function loao(dataset, mode) {
     options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: true, position: "bottom" },
       tooltip: { callbacks: { label: (c) => ` ${c.dataset.label}: ${pct(c.parsed.y)}` } } },
       scales: { x: { grid: { display: false } }, y: { min: 0, max: 1, ticks: { callback: (v) => pct(v, 0) } } } } });
+  attachExport($("#gn-loao-t", root), { rows, canvas: () => $("#gn-loao", root), name: `unseen_attacks_${dataset}_${mode}` });
   $("#gn-loao-t", root).innerHTML = table([
     { title: "Held-out", html: (r) => `<span class="swatch" style="background:${catColor(r.held_out_category)}"></span>${esc(r.held_out_category)}` },
     { title: "Model", value: (r) => loaoLabel(r.model) },

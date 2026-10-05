@@ -1,7 +1,7 @@
 // Trust & Novelty: can the system notice attacks it was never taught, know when not to decide,
 // keep analysts out of alert floods, and adapt safely on a small label budget?
 // Every number is read from results/ files written by the experiment scripts.
-import { $, catColor, color, esc, f3, get, int, label, MODELS, pct, state, table } from "../lib/core.js";
+import { $, attachExport, catColor, color, esc, f3, get, int, label, MODELS, pct, state, table } from "../lib/core.js";
 import { barOptions, mount } from "../lib/charts.js";
 const short = (m) => (MODELS[m] || { short: m }).short;
 
@@ -64,6 +64,7 @@ async function openSet(ds) {
     options: { ...barOptions({ yFmt: f3 }), plugins: { legend: { display: true, position: "bottom" },
       tooltip: { callbacks: { label: (c) => ` ${c.dataset.label}: AUROC ${f3(c.parsed.y)}` } } } } });
   const mean = (m) => { const a = cats.map((c) => v(m, c)).filter((x) => x != null); return a.reduce((s, x) => s + x, 0) / a.length; };
+  attachExport($("#tr-os", root), { rows: osData.rows, canvas: () => $("#tr-os", root), name: `novelty_${ds}` });
   $("#tr-os-note", root).innerHTML = `<div class="callout" style="margin-top:10px">Average AUROC (${esc(METHOD[method])}): ${models.map((m) =>
     `<b style="color:${color(m)}">${esc(label(m))}</b> ${f3(mean(m))}`).join(" · ")}</div>`;
   const cl = osData.clusters.filter((r) => r.model === "gnn_ewc_replay");
@@ -91,6 +92,7 @@ async function conformal(ds) {
     { label: `${short(m)} · abstain when unsure`, data: alphas.map((a) => pick(m, a)?.false_alarms_after_abstention ?? null), backgroundColor: color(m), borderRadius: 4 }]) },
     options: { ...barOptions({ yMax: null, yFmt: int }), plugins: { legend: { display: true, position: "bottom", labels: { boxWidth: 12 } },
       tooltip: { callbacks: { label: (c) => ` ${c.dataset.label}: ${int(c.parsed.y)} false alarms` } } } } });
+  attachExport($("#tr-cf-t", root), { rows, canvas: () => $("#tr-cf", root), name: `conformal_${ds}` });
   $("#tr-cf-t", root).innerHTML = table([
     { title: "Model", html: (x) => `<span class="swatch" style="background:${color(x.model)}"></span>${esc(short(x.model))}` }, { title: "α", num: true, value: (x) => x.alpha },
     { title: "False alarms → after", num: true, value: (x) => `${int(x.false_alarms_argmax)} → ${int(x.false_alarms_after_abstention)}` },
@@ -103,6 +105,7 @@ async function conformal(ds) {
 async function incidents(ds) {
   let r;
   try { r = await get(`/results/incidents?dataset=${ds}`); } catch (e) { missing($("#tr-inc", root), e); return; }
+  attachExport($("#tr-inc", root), { rows: r.rows, name: `incidents_${ds}` });
   $("#tr-inc", root).innerHTML = table([
     { title: "Model", html: (x) => `<span class="swatch" style="background:${color(x.model)}"></span>${esc(short(x.model))}` },
     { title: "False-alarm budget", num: true, value: (x) => (x.budget ? `${x.budget}` : "none") },
@@ -123,6 +126,7 @@ async function adaptation(ds) {
   for (const [k, list] of Object.entries(r)) {
     for (const x of list) if (x.model === "gnn_ewc_replay" && (k !== "drift" || x.policy === "adwin")) rows.push({ variant: k, ...x });
   }
+  attachExport(el, { rows, name: `adaptation_${ds}` });
   el.innerHTML = table([
     { title: "Variant", value: (x) => ADAPT[x.variant] || x.variant },
     { title: "Updates", num: true, value: (x) => int(x.retrains) },

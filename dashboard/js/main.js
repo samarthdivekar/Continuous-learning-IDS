@@ -1,6 +1,7 @@
 // App shell: tab routing (hash-based), global dataset/mode context, health pills, theme.
 import { $, $$, esc, get, onContextChange, prefs, setApiKey, setContext, state, toast } from "./lib/core.js";
 import { applyDefaults } from "./lib/charts.js";
+import * as tour from "./lib/tour.js";
 
 const VIEWS = {
   overview: () => import("./views/overview.js"),
@@ -56,7 +57,8 @@ function initControls() {
     $("#help").classList.toggle("hidden", !open); $("#help-scrim").classList.toggle("hidden", !open);
     if (open) prefs.set("helpSeen", "1");
   };
-  $("#help-btn").addEventListener("click", () => help(true));
+  $("#tour-btn").addEventListener("click", () => { help(false); tour.start(); });
+  $("#help-btn").addEventListener("click", () => { tour.stop(); help(true); });
   $("#help-close").addEventListener("click", () => help(false));
   $("#help-scrim").addEventListener("click", () => help(false));
   const order = $$(".tab").map((t) => t.dataset.view);

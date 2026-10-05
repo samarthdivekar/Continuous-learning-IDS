@@ -132,6 +132,7 @@ main { padding: 22px 24px 48px; max-width: 1680px; margin: 0 auto; }
 .g-5-7 { grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); }
 .span-2 { grid-column: span 2; }
 .card {
+  position: relative;
   background: linear-gradient(180deg, var(--panel), var(--panel-2)); border: 1px solid var(--border);
   border-radius: var(--radius); padding: 16px 18px; box-shadow: var(--shadow); min-width: 0;
 }
@@ -255,6 +256,16 @@ input[type="range"] { accent-color: var(--accent); width: 180px; }
 .switch { gap: 6px; user-select: none; cursor: pointer; }
 .switch input { accent-color: var(--accent); width: 15px; height: 15px; }
 .card-tools { display: flex; gap: 6px; align-items: center; }
+.card-tools.floating { position: absolute; top: 12px; right: 14px; }
+
+/* ---------------- guided tour ---------------- */
+.tour { position: fixed; right: 20px; bottom: 20px; z-index: 56; width: min(380px, calc(100vw - 40px));
+  background: var(--panel); border: 1px solid var(--border-hi); border-radius: var(--radius);
+  box-shadow: var(--shadow); padding: 14px 16px; animation: fade 0.2s ease; }
+.tour p { color: var(--ink-2); font-size: 14px; margin: 8px 0 12px; }
+.tour-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; font-size: 15px; }
+.tour-foot { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+.tour-foot .btn { margin-left: 6px; }
 
 /* ---------------- help drawer ---------------- */
 .drawer { position: fixed; top: 0; right: 0; bottom: 0; width: min(460px, 100vw); z-index: 60; overflow-y: auto;

@@ -1,5 +1,5 @@
 // Model Comparison: metric-over-tasks for all models, recall heatmap, forgetting, confusion matrix.
-import { $, color, esc, f3, get, heatColor, label, MODELS, modelCell, pct, shownModels, state, table } from "../lib/core.js";
+import { $, attachExport, color, esc, f3, get, heatColor, label, MODELS, modelCell, pct, shownModels, state, table } from "../lib/core.js";
 import { barOptions, legend, lineOptions, modelDataset, mount } from "../lib/charts.js";
 
 let root, data, charts = {};
@@ -48,6 +48,7 @@ async function render() {
   charts.line = mount($("#cmp-line", root), { type: "line", data: { datasets: [] }, options: lineOptions({ xTitle: "after task" }) });
   legend($("#cmp-legend", root), models, () => [charts.line]);
   drawLine(); drawHeat(); drawBwt(); drawCm(); drawTable();
+  attachExport($("#cmp-line", root), { rows: data.summary, canvas: () => $("#cmp-line", root), name: `continual_${dataset}_${mode}` });
 }
 
 function drawLine() {

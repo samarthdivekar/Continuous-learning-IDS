@@ -51,7 +51,9 @@ export const MODELS = {
   ffnn_naive:      { label: "FFNN naive retrain",        short: "FFNN naive", var: "--m-ffnn-naive" },
   gnn_ewc:         { label: "GNN + EWC only",            short: "GNN EWC", var: "--m-gnn-ewc" },
   gnn_replay:      { label: "GNN + replay only",         short: "GNN replay", var: "--m-gnn-replay" },
-  gnn_ewc_replay_topo: { label: "Ours + topology augmentation", short: "Ours+topo", var: "--m-ours-topo" },
+  // trade-off variant: robust to randomised sources but weaker overall, so it stays out of the
+  // dashboard's comparisons and is discussed in the README instead
+  gnn_ewc_replay_topo: { label: "Ours + topology augmentation", short: "Ours+topo", var: "--m-ours-topo", secondary: true },
   gnn_joint:       { label: "GNN joint (upper bound)",   short: "GNN joint", var: "--m-joint", dashed: true },
   ffnn_joint:      { label: "FFNN joint (upper bound)",  short: "FFNN joint", var: "--muted", dashed: true },
 };
@@ -60,7 +62,7 @@ export const HEADLINE = ["gnn_ewc_replay", "gnn_naive", "xgboost_static", "ffnn_
 // What a chart should draw: the story (ours vs forgetting vs static) or every ablation.
 export const STORY = ["gnn_ewc_replay", "gnn_naive", "xgboost_static"];
 export const shownModels = (available) => {
-  const keep = state.compare ? Object.keys(MODELS) : STORY;
+  const keep = state.compare ? Object.keys(MODELS).filter((m) => !MODELS[m].secondary) : STORY;
   const picked = keep.filter((m) => available.includes(m));
   return picked.length ? picked : available.slice(0, state.compare ? available.length : 3);
 };
@@ -124,18 +126,33 @@ export function downloadChart(canvas, name) {
   out.toBlob((b) => download(name, b));
 }
 /** A small ⤓ menu for a card: CSV of the rows, PNG of the chart. */
-export function exportButton(id, { rows, canvas, name }) {
-  setTimeout(() => {
-    const el = document.getElementById(id);
-    if (!el || el.dataset.wired) return;
-    el.dataset.wired = "1";
-    el.addEventListener("click", () => {
-      if (typeof rows === "function" ? rows()?.length : rows?.length) downloadCsv(`${name}.csv`, typeof rows === "function" ? rows() : rows);
-      const c = typeof canvas === "function" ? canvas() : canvas;
-      if (c) downloadChart(c, `${name}.png`);
-    });
-  }, 0);
-  return `<button class="icon-btn small" id="${id}" title="Download this panel (CSV / PNG)">⤓</button>`;
+/** Put a ⤓ button in the card that contains `el`: CSV of its rows, PNG of its chart. */
+export function attachExport(el, { rows, canvas, name }) {
+  const card = el?.closest?.(".card");
+  const head = card?.querySelector("h3");
+  if (!head) return;
+  const headRow = card.querySelector(".card-head");
+  let tools = card.querySelector(".card-tools");
+  if (!tools) {
+    tools = document.createElement("span");
+    // inside a header row it sits at the end; otherwise it floats in the card's top-right corner
+    tools.className = headRow ? "card-tools" : "card-tools floating";
+    if (headRow) tools.style.marginLeft = "auto";
+    (headRow || card).appendChild(tools);
+  }
+  if (tools.querySelector(`[data-export="${name}"]`)) return;      // already there
+  const btn = document.createElement("button");
+  btn.className = "icon-btn small";
+  btn.dataset.export = name;
+  btn.textContent = "⤓";
+  btn.title = `Download this panel${rows ? " (CSV" : ""}${rows && canvas ? " + PNG)" : rows ? ")" : canvas ? " (PNG)" : ""}`;
+  btn.addEventListener("click", () => {
+    const r = typeof rows === "function" ? rows() : rows;
+    if (r?.length) downloadCsv(`${name}.csv`, r);
+    const c = typeof canvas === "function" ? canvas() : canvas;
+    if (c) downloadChart(c, `${name}.png`);
+  });
+  tools.appendChild(btn);
 }
 
 export const modelCell = (m) => `<span class="swatch" style="background:${color(m)}"></span>${esc(label(m))}`;
