@@ -82,7 +82,9 @@ class StreamRunner:
 
     def __post_init__(self):
         d = self.cfg["drift"]
-        self.monitor = ADWINMonitor(d["delta"], d["min_windows_between"])
+        # built only for ADWIN policies: periodic / oracle / never do not need a detector
+        # (and river, which ADWIN uses, may be unavailable on a locked-down machine)
+        self.monitor = ADWINMonitor(d["delta"], d["min_windows_between"]) if self.uses_adwin else None
         self.recent: deque = deque(maxlen=int(d["adapt_windows"]))
         self.mode = self.cfg["label_mode"]
         cats = self.cfg["categories"]
@@ -182,7 +184,8 @@ class StreamRunner:
                                   "accepted": accepted, "reasons": "; ".join(reasons),
                                   **{f"before_{k}": v for k, v in before.items()},
                                   **{f"after_{k}": v for k, v in after.items()}})
-        self.monitor.notify_adapted()
+        if self.monitor is not None:
+            self.monitor.notify_adapted()
 
     def run(self, max_windows: int | None = None) -> None:
         stream = self.stream_graphs()

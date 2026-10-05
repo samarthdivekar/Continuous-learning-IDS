@@ -80,14 +80,15 @@ class State:
     Session = None
     service = None          # in-process MLService, or None when remote
     ml_url: str | None = None
+    ml_health: tuple[float, dict] | None = None   # (fetched_at, payload), see health()
 
 
 state = State()
 
 
-def _remote(method: str, path: str, **kw):
+def _remote(method: str, path: str, timeout: float = 120, **kw):
     try:
-        r = httpx.request(method, f"{state.ml_url}{path}", timeout=120, **kw)
+        r = httpx.request(method, f"{state.ml_url}{path}", timeout=timeout, **kw)
     except httpx.HTTPError as exc:
         raise HTTPException(503, f"ML service unreachable: {exc}")
     if r.status_code >= 400:
@@ -157,10 +158,19 @@ def create_app(database_url: str | None = None, service=None, load_models: bool 
         except Exception:
             db_ok = False
         if state.ml_url:
-            try:
-                ml = _remote("GET", "/health")
-            except HTTPException as exc:
-                ml = {"status": "unreachable", "detail": exc.detail}
+            # The dashboard polls /health every few seconds. A down ML service costs a TCP
+            # connect timeout per probe (Windows drops rather than refuses), so probe with a
+            # short connect timeout and reuse the answer for a moment.
+            import time as _time
+            cached = state.ml_health
+            if cached is not None and _time.monotonic() - cached[0] < 3.0:
+                ml = cached[1]
+            else:
+                try:
+                    ml = _remote("GET", "/health", timeout=httpx.Timeout(5.0, connect=0.4))
+                except HTTPException as exc:
+                    ml = {"status": "unreachable", "detail": exc.detail}
+                state.ml_health = (_time.monotonic(), ml)
         else:
             svc = state.service
             ml = {"status": "in-process", "dataset": svc.cfg["dataset"], "label_mode": svc.cfg["label_mode"],

@@ -42,7 +42,21 @@ from __future__ import annotations
 from dataclasses import asdict, dataclass
 
 import numpy as np
-from river import drift
+
+try:
+    from river import drift
+except Exception as exc:                # pragma: no cover - depends on the machine
+    # river ships a compiled extension. Some Windows machines (Smart App Control /
+    # WDAC) refuse to load it. Everything except live drift detection works without
+    # river, so the failure is deferred to the point where ADWIN is actually used.
+    drift, _RIVER_IMPORT_ERROR = None, exc
+else:
+    _RIVER_IMPORT_ERROR = None
+
+
+def river_available() -> tuple[bool, str | None]:
+    """(usable, reason). Lets callers report a missing detector instead of crashing."""
+    return drift is not None, None if drift is not None else str(_RIVER_IMPORT_ERROR)
 
 
 @dataclass
@@ -60,6 +74,11 @@ class DriftEvent:
 
 class ADWINMonitor:
     def __init__(self, delta: float = 0.002, min_windows_between: int = 5):
+        if drift is None:
+            raise RuntimeError(
+                "ADWIN drift detection needs the 'river' package, which could not be imported on this "
+                f"machine: {_RIVER_IMPORT_ERROR}. Everything else (prediction, incidents, explanations, "
+                "the results tabs) works without it; see the README troubleshooting note.")
         self.delta = float(delta)
         self.min_windows_between = int(min_windows_between)
         self.detector = drift.ADWIN(delta=self.delta)

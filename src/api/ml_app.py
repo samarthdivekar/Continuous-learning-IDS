@@ -46,7 +46,15 @@ app = FastAPI(title="GNN-IDS ML service", lifespan=lifespan)
 def health():
     return {"status": "ok", "dataset": svc.cfg["dataset"], "label_mode": svc.cfg["label_mode"],
             "data_available": svc.data_available, "models_loaded": sorted(svc.models),
-            "model_errors": svc.model_errors, "device": str(svc.device), "gpu": _gpu_name()}
+            "model_errors": svc.model_errors, "device": str(svc.device), "gpu": _gpu_name(),
+            "drift_detector": _drift_status()}
+
+
+def _drift_status():
+    """ADWIN needs river, whose compiled extension some machines block: say so instead of failing."""
+    from src.drift.adwin_monitor import river_available
+    ok, reason = river_available()
+    return {"available": ok, "reason": reason}
 
 
 def _gpu_name():

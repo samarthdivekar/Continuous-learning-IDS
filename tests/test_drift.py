@@ -1,4 +1,8 @@
-from src.drift.adwin_monitor import ADWINMonitor
+import pytest
+
+pytest.importorskip("river", reason="river's compiled extension is unavailable on this machine")
+
+from src.drift.adwin_monitor import ADWINMonitor  # noqa: E402
 
 
 def _feed(mon, values, start=0):

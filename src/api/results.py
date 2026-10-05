@@ -207,8 +207,11 @@ def run_info(dataset: str = "cicids2017", mode: str = "multiclass", experiment: 
 @router.get("/data_summary")
 def data_summary(dataset: str = "cicids2017"):
     """Task segmentation and per-split counts from the processed-data metadata."""
-    from src.preprocessing.pipeline import processed_dir
-    from src.utils.config import load_config
+    try:
+        from src.preprocessing.pipeline import processed_dir
+        from src.utils.config import load_config
+    except (ImportError, OSError) as exc:          # e.g. torch's DLLs blocked by a system policy
+        raise HTTPException(503, f"ML libraries unavailable on this machine: {exc}") from exc
     cfg = load_config(dataset)
     d = processed_dir(cfg)
     meta = _read_json(d / "meta.json")
