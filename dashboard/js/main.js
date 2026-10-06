@@ -1,5 +1,5 @@
 // App shell: sidebar routing (hash-based), global dataset/mode context, service status, theme.
-import { $, $$, esc, get, onContextChange, post, prefs, setApiKey, setContext, state, toast } from "./lib/core.js";
+import { $, $$, esc, get, onContextChange, post, prefs, setApiKey, setContext, state, toast, withdrawn } from "./lib/core.js";
 import { applyDefaults } from "./lib/charts.js";
 import * as tour from "./lib/tour.js";
 import * as palette from "./lib/palette.js";
@@ -46,8 +46,17 @@ const LEGACY = { compare: "models", general: "models", drift: "adapt", trust: "a
 
 function syncSeg(id, value) { $$(`#${id} button`).forEach((b) => b.classList.toggle("on", b.dataset.v === value)); }
 
-function initControls() {
+/** Keep the switches honest: Binary is unavailable for CSE-CIC-IDS2018 (see core.js `withdrawn`). */
+function syncContext() {
   syncSeg("ds-seg", state.dataset); syncSeg("mode-seg", state.mode);
+  const binary = $('#mode-seg button[data-v="binary"]');
+  const off = withdrawn(state.dataset, "binary");
+  binary.disabled = off;
+  binary.title = off ? "Withdrawn for CSE-CIC-IDS2018: the binary task sequence had one seed" : "";
+}
+
+function initControls() {
+  syncContext();
   $$("#ds-seg button").forEach((b) => b.addEventListener("click", () => { syncSeg("ds-seg", b.dataset.v); setContext({ dataset: b.dataset.v }); }));
   $$("#mode-seg button").forEach((b) => b.addEventListener("click", () => { syncSeg("mode-seg", b.dataset.v); setContext({ mode: b.dataset.v }); }));
   $$(".tab").forEach((t) => t.addEventListener("click", () => { location.hash = t.dataset.view; }));
@@ -69,6 +78,7 @@ function initControls() {
     applyDefaults();
     Object.values(loaded).forEach((m) => m.refresh && m.refresh());
   });
+  onContextChange(syncContext);
   onContextChange(() => Object.values(loaded).forEach((m) => m.refresh && m.refresh()));
   const help = (open) => {
     $("#help").classList.toggle("hidden", !open); $("#help-scrim").classList.toggle("hidden", !open);

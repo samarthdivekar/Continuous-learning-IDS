@@ -7,9 +7,15 @@ export const state = {
   compare: localGet("compare", "0") === "1",   // off = one model; on = every ablation
   listeners: new Set(),
 };
+// CSE-CIC-IDS2018 binary was run with a single seed, so its task-sequence results are withdrawn
+// (README, results §6): the console never offers that combination. Its unseen-attack (binary) results
+// are a separate experiment and stay.
+export const withdrawn = (dataset, mode) => dataset === "csecicids2018" && mode === "binary";
+if (withdrawn(state.dataset, state.mode)) state.mode = "multiclass";
 export function onContextChange(fn) { state.listeners.add(fn); }
 export function setContext(patch) {
   Object.assign(state, patch);
+  if (withdrawn(state.dataset, state.mode)) state.mode = "multiclass";
   localSet("ds", state.dataset); localSet("mode", state.mode); localSet("compare", state.compare ? "1" : "0");
   state.listeners.forEach((fn) => { try { fn(); } catch (e) { console.error(e); } });
 }

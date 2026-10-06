@@ -394,3 +394,4 @@ pre.rule {
 .mono.small { font-size: var(--t-xs); }
 select { max-width: 100%; text-overflow: ellipsis; }
 table.data td { overflow-wrap: anywhere; }
+.seg button:disabled { opacity: 0.38; cursor: not-allowed; }
