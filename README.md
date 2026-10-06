@@ -543,12 +543,15 @@ EWC was given a λ/γ grid; this gives replay the same treatment. Replay-only GN
 |---|---|---|---|---|---|
 | Macro-F1 | 0.304 ± 0.007 | 0.702 ± 0.058 | 0.952 ± 0.012 | 0.948 ± 0.016 | 0.957 ± 0.039 |
 | Retention (task-1 recall) | 0.000 | 0.667 | 1.000 | 1.000 | 1.000 |
+| EWC + replay, macro-F1 | 0.343 ± 0.070 | 0.747 ± 0.025 | – | 0.964 ± 0.020 | – |
 
 With no stored windows replay-only is naive retraining (0.304, retention 0, as it should be). One window per
 category recovers most of the forgetting; from five upwards the curve is flat and replay alone sits within
-noise of EWC + replay at the default budget (0.964 ± 0.020). EWC alone fails at every λ of its sweep. So on the
-interleaved split the conclusion is now evidenced symmetrically: **replay is what prevents forgetting, a small
-buffer is enough, and EWC adds no detectable gain on top of it.** The temporal split is the exception above,
+noise of EWC + replay at the default budget (0.964 ± 0.020). EWC alone fails at every λ of its sweep. Adding EWC
+when replay is scarce does not rescue it either: +0.039 at budget 0 (CI [−0.003, +0.114]) and +0.044 at budget 1
+(CI [−0.017, +0.112]), both carried by one seed, with identical retention. So on the interleaved split the
+conclusion is now evidenced symmetrically: **replay is what prevents forgetting, a small buffer is enough, and EWC
+adds no detectable gain on top of it, at any budget tested.** The temporal split is the exception above,
 where EWC prevented two replay-only collapses; the sweep was not repeated there.
 * **The expected forgetting pattern holds on both splits.** The static model never learns new attacks;
   naive retraining forgets the first attack completely; our model learns every new category and keeps

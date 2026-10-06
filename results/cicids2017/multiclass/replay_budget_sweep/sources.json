@@ -5,14 +5,18 @@
     "replay_budget_1",
     "replay_budget_5",
     "continual",
-    "replay_budget_20"
+    "replay_budget_20",
+    "replay_budget_0_ewc",
+    "replay_budget_1_ewc"
   ],
   "labels": [
     "0",
     "1",
     "5",
     "10",
-    "20"
+    "20",
+    "0",
+    "1"
   ],
   "seeds": [
     42,
