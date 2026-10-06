@@ -40,12 +40,14 @@ async function render() {
 }
 
 async function loao(dataset, mode) {
-  let rows;
-  try { rows = (await get(`/results/loao?dataset=${dataset}&mode=${mode}`)).rows; }
+  let rows, res;
+  try { res = await get(`/results/loao?dataset=${dataset}&mode=${mode}`); rows = res.rows; }
   catch (e) { showError($("#gn-loao-t", root), e, { what: "the unseen-attack results" }); return; }
   const cats = [...new Set(rows.map((r) => r.held_out_category))];
   const models = known([...new Set(rows.map((r) => r.model))]);
   const val = (c, m) => rows.find((r) => r.held_out_category === c && r.model === m)?.heldout_detection_rate ?? null;
+  // a multi-seed summary (experiments.aggregate_seeds) adds per-row seed counts; otherwise this is one run
+  const seedRow = res.seeds ? (r) => res.seeds.find((x) => x.held_out_category === r.held_out_category && x.model === r.model) : null;
   mount($("#gn-loao", root), { type: "bar", data: { labels: cats, datasets: models.map((m) => ({ label: loaoLabel(m), data: cats.map((c) => val(c, m)),
     backgroundColor: color(m), borderRadius: 5 })) },
     options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: true, position: "bottom" },
@@ -58,11 +60,21 @@ async function loao(dataset, mode) {
     { title: "Unseen flows", num: true, value: (r) => int(r.n_heldout_flows) },
     { title: "Detected", num: true, value: (r) => pct(r.heldout_detection_rate) },
     { title: "FPR", num: true, value: (r) => pct(r.fpr, 2) },
+    ...(seedRow ? [
+      { title: "Seeds", num: true, value: (r) => seedRow(r)?.n ?? 1 },
+      { title: "Per seed", html: (r) => {
+        const s = seedRow(r);
+        return s && s.n > 1 ? `<span class="mono small">${s.heldout_detection_rate_per_seed.split(" ").map((v) => esc(pct(Number(v)))).join(" · ")}</span>` : "–";
+      } }] : []),
   ], rows);
   makeSortable($("#gn-loao-t", root));
   const mean = (m) => { const v = cats.map((c) => val(c, m)).filter((x) => x != null); return v.length ? v.reduce((a, b) => a + b, 0) / v.length : null; };
   $("#gn-callout", root).innerHTML = `<div class="callout">Mean detection of unseen attacks: ${models.map((m) => `<b style="color:${color(m)}">${esc(loaoLabel(m))}</b> ${pct(mean(m))}`).join(" · ")}
-    ${cats.length < 7 ? ` <span class="muted">(${cats.length} of 7 categories finished)</span>` : ""}</div>`;
+    ${cats.length < 7 ? ` <span class="muted">(${cats.length} of 7 categories finished)</span>` : ""}</div>
+    <p class="note">${res.seeds
+      ? `Bars and the "Detected" column are seed ${esc(res.seed ?? "42")}. "Seeds" and "Per seed" show which rows were repeated with another
+         seed: compare them before trusting a single bar.`
+      : `Single run (seed ${esc(res.seed ?? "?")}), indicative only.`}</p>`;
 }
 
 async function ipremap(dataset) {
@@ -76,5 +88,6 @@ async function ipremap(dataset) {
     options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: true, position: "bottom" } },
       scales: { x: { grid: { display: false } }, y: { min: 0, max: 1 } } } });
   $("#gn-ip-t", root).innerHTML = table([{ title: "Model", value: (m) => label(m) },
-    ...modes.map((k) => ({ title: k, num: true, value: (m) => f3(v(m, k)) }))], models);
+    ...modes.map((k) => ({ title: k, num: true, value: (m) => f3(v(m, k)) }))], models)
+    + `<p class="note">${r.seeds ? `${esc(r.seeds[0]?.n ?? "?")} seeds summarised in the README.` : `Single run (seed ${esc(r.seed ?? "?")}), indicative only.`}</p>`;
 }

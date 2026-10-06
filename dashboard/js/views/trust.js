@@ -25,7 +25,8 @@ async function render() {
   root.innerHTML = `
     <div class="view-head"><div><h2>Trust &amp; novelty</h2>
       <p>Four questions a security team asks before trusting an automated detector. Each panel answers one, using measured results
-      (${ds === "cicids2017" ? "CIC-IDS2017" : "CSE-CIC-IDS2018"}, multiclass).</p></div></div>
+      (${ds === "cicids2017" ? "CIC-IDS2017" : "CSE-CIC-IDS2018"}, multiclass). Panels 1–3 evaluate the served models, trained
+      with seed 42: single run, indicative only.</p></div></div>
     <div class="grid g2">
       <div class="card"><div class="card-head"><div><h3>1 · Does it notice an attack it was never taught?</h3>
         <p class="sub">after each task, the <i>next</i> attack category is still unknown · higher = better at telling “new” from “known” (0.5 = coin flip)</p></div>

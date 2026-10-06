@@ -181,6 +181,26 @@ def test_results_endpoints_read_files_and_404_when_missing(client, tmp_path, mon
     assert idx["cicids2017"]["multiclass"]["continual"] is True
 
 
+def test_results_report_seed_count_and_multi_seed_summary(client, tmp_path, monkeypatch):
+    import pandas as pd
+
+    import src.api.results as results
+    base = tmp_path / "res_root" / "csecicids2018" / "binary"
+    (base / "loao").mkdir(parents=True)
+    pd.DataFrame([{"held_out_category": "DoS", "model": "gnn_ewc_replay", "heldout_detection_rate": 0.98,
+                   "fpr": 0.001}]).to_csv(base / "loao" / "loao.csv", index=False)
+    (base / "loao" / "run_info.json").write_text('{"seed": 42}')
+    monkeypatch.setattr(results, "RESULTS", tmp_path / "res_root")
+    r = client.get("/results/loao?dataset=csecicids2018&mode=binary").json()
+    assert r["seed"] == 42 and r["seeds"] is None                       # one seed: the console says so
+    (base / "loao_seeds").mkdir()
+    pd.DataFrame([{"held_out_category": "DoS", "model": "gnn_ewc_replay", "n": 3, "seeds": "42 43 44",
+                   "heldout_detection_rate_mean": 0.9, "heldout_detection_rate_std": float("nan")}]
+                 ).to_csv(base / "loao_seeds" / "summary.csv", index=False)
+    s = client.get("/results/loao?dataset=csecicids2018&mode=binary").json()["seeds"]
+    assert s[0]["n"] == 3 and s[0]["heldout_detection_rate_std"] is None    # NaN is served as null
+
+
 def test_incidents_explain_and_action_workflow(client):
     cat = client.get("/windows/catalog").json()
     wid = next(w["window_id"] for w in cat if w["n_attack"] > 0)

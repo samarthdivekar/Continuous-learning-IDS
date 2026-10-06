@@ -53,6 +53,13 @@ def _read_json(path: Path):
     return json.loads(path.read_text(encoding="utf-8")) if path.exists() else None
 
 
+def _seeds(base: Path, name: str) -> list[dict] | None:
+    """The multi-seed summary written by experiments.aggregate_seeds (<name>_seeds/summary.csv), or None
+    when the experiment has only one seed, so the console can say "single run" instead of guessing."""
+    f = base / f"{name}_seeds" / "summary.csv"
+    return _records(pd.read_csv(f)) if f.exists() else None
+
+
 @router.get("/index")
 def index():
     """Which experiments exist on disk, per dataset and label mode."""
@@ -125,19 +132,24 @@ def drift(dataset: str = "cicids2017", mode: str = "multiclass"):
             "drift_flag", "retrained", "pred_benign", "pred_known_attack", "pred_novel_drifted"]
     return {"summary": _records(summary), "eval": _records(ev),
             "windows": _records(win[[c for c in keep if c in win]]) if len(win) else [],
-            "events": _records(de) if len(de) else []}
+            "events": _records(de) if len(de) else [], "seed": (_read_json(base / "run_info.json") or {}).get("seed"),
+            "seeds": _seeds(base.parent, "drift")}
 
 
 @router.get("/loao")
 def loao(dataset: str = "cicids2017", mode: str = "binary"):
-    return {"rows": _records(_read_csv(_check(dataset, mode) / "loao" / "loao.csv"))}
+    base = _check(dataset, mode)
+    return {"rows": _records(_read_csv(base / "loao" / "loao.csv")),
+            "seed": (_read_json(base / "loao" / "run_info.json") or {}).get("seed"), "seeds": _seeds(base, "loao")}
 
 
 @router.get("/ip_remap")
 def ip_remap(dataset: str = "cicids2017", mode: str = "multiclass"):
-    df = _read_csv(_check(dataset, mode) / "ip_remap" / "summary.csv")
+    base = _check(dataset, mode)
+    df = _read_csv(base / "ip_remap" / "summary.csv")
     last = df[df["after_task"] == df["after_task"].max()]
-    return {"final": _records(last), "all": _records(df)}
+    return {"final": _records(last), "all": _records(df),
+            "seed": (_read_json(base / "ip_remap" / "run_info.json") or {}).get("seed"), "seeds": _seeds(base, "ip_remap")}
 
 
 @router.get("/tuning")

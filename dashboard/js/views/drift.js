@@ -52,7 +52,9 @@ async function render() {
     { title: "Retrains", num: true, value: (r) => int(r.retrains) },
     { title: "Macro-F1", num: true, value: (r) => f3(r.final_macro_f1_seen) },
     { title: "Retention", num: true, value: (r) => pct(r.final_retention_rate, 0) },
-  ], s, { highlight: (r) => r.model === "gnn_ewc_replay" && r.policy === "adwin" });
+  ], s, { highlight: (r) => r.model === "gnn_ewc_replay" && r.policy === "adwin" })
+    + `<p class="note">${d.seeds ? `${esc(d.seeds[0]?.n ?? "?")} seeds summarised in the README; this table is seed ${esc(d.seed ?? "?")}.`
+                                 : `Single run (seed ${esc(d.seed ?? "?")}), indicative only.`}</p>`;
   const a = s.find((r) => r.model === "gnn_ewc_replay" && r.policy === "adwin");
   const p = s.find((r) => r.model === "gnn_ewc_replay" && r.policy === "periodic");
   const o = s.find((r) => r.model === "gnn_ewc_replay" && r.policy === "oracle");
