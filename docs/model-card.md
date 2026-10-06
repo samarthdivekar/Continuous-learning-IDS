@@ -67,8 +67,8 @@ of the same session (optimistic); *temporal* trains on each attack's earlier tra
 
 ## Known failure modes
 
-* **Topology dependence.** When each flow's source host is randomised at test time, macro-F1 falls from 0.950
-  to 0.427 on CIC-IDS2017 (one run); the per-flow FFNN is unaffected.
+* **Topology dependence.** When each flow's source host is randomised at test time, macro-F1 falls from 0.952
+  to 0.431 on CIC-IDS2017 (3 seeds, every seed 0.427–0.436); the per-flow FFNN is unaffected.
 * **Seed instability.** Unseen-attack detection for BruteForce and Botnet swapped between two seeds; on
   CSE-CIC-IDS2018 macro-F1 ranges 0.855–0.925 across seeds, and one run flagged 9,196 benign flows as
   Infiltration where an identical run flagged 3.

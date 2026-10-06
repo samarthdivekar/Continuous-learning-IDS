@@ -61,7 +61,7 @@ The grey line of text under the title says this in plain English; the verdict ta
 
 Examiners reward measured limitations:
 
-* **Randomised source hosts** drop the GNN from 0.950 to **0.427**; the per-flow model is unaffected.
+* **Randomised source hosts** drop the GNN from 0.952 to **0.431** (all three seeds); the per-flow model is unaffected.
   Training with randomisation recovers **0.914** but costs in-distribution accuracy — a trade-off, not a win.
 * **EWC alone fails** (0.300); replay is what prevents forgetting.
 * **Uncertainty-only labelling fails** (0.438); half uncertain + half random reaches **0.937** with

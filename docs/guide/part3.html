@@ -183,7 +183,7 @@ second seed exists the table adds <b>Seeds</b> and <b>Per seed</b> columns (CSE-
 0.1&nbsp;%).</li>
 <li><b>IP leakage test</b>: the same model scored normally, with host identities shuffled (<i>permute</i>: must not change, and
 does not), and with every flow's source randomised (<i>random_src</i>: the attacker stops being one hub; our model falls from
-0.950 to 0.427, the per-flow model is unaffected). This is the project's most important honest limitation.</li>
+0.952 to 0.431 in all three seeds, the per-flow model is unaffected). This is the project's most important honest limitation.</li>
 </ul>
 </section>
 
@@ -326,7 +326,7 @@ python scripts\ui_smoke.py                                   # browser smoke tes
 <tr><td>Drift: clean attack blocks</td><td>Fixed schedule 0.980 (8 retrains) beats ADWIN 0.960 (16.7)</td><td>3</td><td>ADWIN not efficient here</td></tr>
 <tr><td>Drift: two attacks mixed</td><td>ADWIN 0.968 beats schedule 0.926</td><td>3</td><td>ADWIN more robust to mixing</td></tr>
 <tr><td>Never adapting</td><td>0.230</td><td>3</td><td>Adaptation is essential</td></tr>
-<tr><td>IP leakage</td><td>Permute: unchanged. Random sources: 0.950 &rarr; 0.427</td><td>1</td><td>No IP memorising; but depends on attacker topology</td></tr>
+<tr><td>IP leakage</td><td>Permute: unchanged. Random sources: 0.952 &rarr; 0.431</td><td>3</td><td>No IP memorising; but depends on attacker topology</td></tr>
 <tr><td>Incidents</td><td>~100,000 alerts &rarr; 50 incidents, 84&nbsp;% real</td><td>1</td><td>Large workload reduction</td></tr>
 <tr><td>Abstention (conformal)</td><td>184 GNN false alarms &rarr; 0, 9.8&nbsp;% of flows to analyst (&alpha; = 0.05)</td><td>1</td><td>Works on 2017; safe &alpha; differs per dataset</td></tr>
 <tr><td>Calibration</td><td>ECE 0.52&nbsp;% overall, 2.24&nbsp;% on attacks (overconfident)</td><td>1</td><td>Overconfident on attacks</td></tr>
@@ -341,8 +341,8 @@ five seeds, the Wilcoxon test cannot reach p &lt; 0.05 however consistent the se
 <h2>13 &middot; Limitations and future work</h2>
 <h3>Limitations (say these before an examiner does)</h3>
 <ul>
-<li><b>Topology dependence.</b> When attack traffic comes from many random sources the graph model collapses (0.950 &rarr;
-0.427). Training with randomised sources recovers 0.914 but costs in-distribution accuracy (appendix in the README).</li>
+<li><b>Topology dependence.</b> When attack traffic comes from many random sources the graph model collapses (0.952 &rarr;
+0.431, 3 seeds). Training with randomised sources recovers 0.914 but costs in-distribution accuracy (appendix in the README).</li>
 <li><b>Lab data.</b> Both datasets are laboratory captures from 2017 and 2018 with attacks in clean blocks.</li>
 <li><b>Few seeds.</b> Three to five seeds give indicative, not conclusive, statistics. Some product results are one run.</li>
 <li><b>Labels are needed for drift.</b> ADWIN watches the labelled error; a label-free trigger missed most drift.</li>
@@ -412,7 +412,7 @@ adapted. It wins when attacks are mixed, not when they arrive in clean blocks.</
 <tr><td>0.304 &rarr; 0.952</td><td>replay-only with 0 vs 5 stored windows per attack type</td></tr>
 <tr><td>100,000 &rarr; 50</td><td>alerts to incidents (84&nbsp;% real)</td></tr>
 <tr><td>5.5&nbsp;ms</td><td>scoring a 5,000-flow window on the GPU</td></tr>
-<tr><td>0.950 &rarr; 0.427</td><td>the topology limitation (random sources)</td></tr>
+<tr><td>0.952 &rarr; 0.431</td><td>the topology limitation (random sources, 3 seeds)</td></tr>
 <tr><td>69,128</td><td>model parameters; 83 features; 5,000 flows per window</td></tr>
 </table>
 

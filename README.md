@@ -589,16 +589,21 @@ Retention of the first attack is 1.0 for every adaptive policy. FFNN + EWC + rep
   points fall (one seed dropped to 0.855), while ADWIN reacts to the error itself. It still retrains about twice
   as often. Three seeds, so indicative.
 
-### 5. IP leakage (brief §7; single run, seed 42, indicative only)
+### 5. IP leakage (brief §7; seeds 42/43/44, `results/cicids2017/multiclass/ip_remap_seeds/`)
+
+The same trained model scored three ways after the last task: normally, with every host given a new random
+identity (*permuted*), and with every flow given a random source host (*sources randomised*).
 
 | Model | Normal | Hosts permuted | Sources randomised |
 |---|---|---|---|
-| GNN + EWC + replay | 0.950 | 0.950 | **0.427** |
-| FFNN + EWC + replay | 0.947 | 0.947 | 0.947 |
+| GNN + EWC + replay | 0.952 ± 0.006 | 0.952 ± 0.006 | **0.431 ± 0.005** |
+| FFNN + EWC + replay | 0.928 ± 0.020 | 0.928 ± 0.020 | 0.928 ± 0.020 |
+| GNN naive retrain | 0.311 | 0.311 | 0.160 |
 
-Permuting host identities changes nothing (no IP memorisation). Randomising each flow's source, which
-destroys the "attacker = one hub" structure, cuts the GNN's macro-F1 from 0.950 to 0.427 and raises its
-FPR to 1.99 %. See the limitations.
+Permuting host identities changes nothing in any seed (no IP memorisation). Randomising each flow's source,
+which destroys the "attacker = one hub" structure, cuts the GNN's macro-F1 to 0.427–0.436 in all three seeds,
+while the per-flow FFNN is unaffected. The false-positive rate under randomised sources varies by seed
+(1.99 %, 0.14 %, 0.24 %), so the earlier single-run figure of 1.99 % was the high end. See the limitations.
 
 ### 6. CSE-CIC-IDS2018
 
@@ -664,7 +669,7 @@ flow sample, **3 seeds (42, 43, 44)**, hyper-parameters reused from CIC-IDS2017,
   bears this out: the GNN's macro-F1 spans 0.855–0.925 across seeds (± 0.038) and its false-positive rate
   averages 0.35 %, so any single 2018 GNN number should be read as one draw from a wide distribution.
 * **Topology dependence replicates, less severely.** Randomising source hosts drops the GNN from 0.948 to
-  0.754 (2017: 0.950 → 0.427) while the FFNN is unaffected; host permutation changes nothing.
+  0.754 (2017: 0.952 → 0.431 over three seeds) while the FFNN is unaffected; host permutation changes nothing.
 
 ### 7. Product layer: novelty, abstention, incidents, explanations, safe adaptation
 
@@ -809,7 +814,7 @@ CIC-IDS2017 test windows of 5,000 flows. Laptop: GTX 1650 (4 GB), 8-core CPU, 24
 
 ## Known limitations and honest caveats
 
-* **The GNN leans heavily on host topology.** When source hosts are randomised it falls to 0.427
+* **The GNN leans heavily on host topology.** When source hosts are randomised it falls to 0.431 (3 seeds)
   macro-F1 while the per-flow FFNN is unaffected. On these lab datasets each attack comes from very few
   hosts; a real network with many or spoofed attackers could look much more like the randomised case.
   The graph's advantage (and its unseen-attack detection) should be read with this in mind.
