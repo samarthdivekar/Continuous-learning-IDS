@@ -1,0 +1,5 @@
+device,model,parameters
+cuda,gnn_ewc_replay,69128.0
+cuda,gnn_naive,69128.0
+cuda,ffnn_ewc_replay,55432.0
+cuda,xgboost_static,

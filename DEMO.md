@@ -82,5 +82,5 @@ Examiners reward measured limitations:
 | "Why not just XGBoost?" | It cannot learn new attack types: 0.231 macro-F1 and it detects 1.3 % of attacks it never saw. |
 | "Does the graph really help?" | In distribution, modestly: +0.036 (interleaved, 3 seeds) and +0.044 (temporal, 5 seeds), indicative only. On some attacks never seen in training, clearly: unseen DoS 98.6 % vs 0.1 % in both seeds; unseen BruteForce did not replicate (99.7 % then 0.0 %). |
 | "What about false alarms?" | 0.07 % at flow level; abstention removes them entirely at the right α, and incident grouping leaves 50 items with 84 % precision. |
-| "Can it run live?" | The stream demo is the live path. A serving benchmark (`experiments/benchmark_serving.py`) is written but could not be run before submission, so there is no measured throughput to quote. |
+| "Can it run live?" | Scoring a 5,000-flow window takes 5.5 ms on the laptop GPU and 10.5 ms on the CPU (p50), about 630,000 and 460,000 flows per second (README §8). That excludes flow export and graph building from raw traffic. |
 | "What is new here?" | The combination: continual learning + drift-triggered retraining + an operator-facing layer, evaluated on error-corrected data with negative results reported. |

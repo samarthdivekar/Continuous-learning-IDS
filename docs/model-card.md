@@ -56,9 +56,10 @@ of the same session (optimistic); *temporal* trains on each attack's earlier tra
 * **Attacks never seen in training** (CSE-CIC-IDS2018, binary, leave-one-attack-out): unseen DoS is detected
   at 98.6 % in both seeds run (per-flow FFNN: 0.1 %); unseen BruteForce at 99.7 % in one seed and 0.0 % in
   the other; DDoS 99.4 % in one seed only.
-* **Not measured:** serving throughput and latency, calibration, sensitivity to window size and replay budget.
-  The scripts exist (`experiments/benchmark_serving.py`, `run_calibration.py`, the sweeps in the README) but
-  could not be run before submission.
+* **Serving speed** (laptop, GTX 1650): a 5,000-flow window is scored in 5.5 ms on the GPU and 10.5 ms on the
+  CPU (p50), about 630,000 and 460,000 flows per second, excluding flow export and graph building.
+* **Not measured:** calibration, sensitivity to window size and replay budget. The scripts exist
+  (`run_calibration.py`, the sweeps in the README) but could not be run before submission.
 
 ## Known failure modes
 
