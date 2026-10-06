@@ -213,11 +213,13 @@ Open **http://localhost:8080**; stop with `scripts/run_stack.ps1 -Stop`. First l
 database once with `python -m src.db.seed --dataset cicids2017 --label-mode multiclass` (the stack script
 does this unless `-SkipSeed`). A single-process variant is `python -m uvicorn src.api.app:app --port 8000`.
 
-The console has eight tabs in two groups, *Operate* (what a security team uses) and *Evaluate* (the evidence
+![The console: sidebar navigation with service status, and a top bar holding the dataset, label mode and Compare-models switch](docs/screens/redesign-overview.png)
+
+The console has eight pages in two groups in the sidebar, *Operate* (what a security team uses) and *Evaluate* (the evidence
 behind it). Every panel is fed by result files or live API data, and a missing experiment shows "not run yet",
 never a number.
 
-| Tab | What it shows |
+| Page | What it shows |
 |---|---|
 | Overview | the result in plain words, headline KPIs, the "adapts / remembers" verdict table, attack timeline, architecture |
 | Incident queue | one window **or the last N windows** (a shift's queue); alerts grouped into incidents; per-incident explanation (feature attribution, network context, plain-English summary); proposed containment rule; approve / reject with a decision log (dry run); filters, a printable report and a CEF download |
@@ -231,9 +233,11 @@ never a number.
 Interface details that matter in a demo:
 
 * **One model by default.** Charts show the deployed model and its two reference points; the **Compare models**
-  switch in the header brings in every baseline and ablation.
-* **▶ Tour** walks through the console in five steps; **? Help** opens a glossary, and `1`–`8` switch tabs.
-* **A banner** appears when the ML service is down, naming the tabs that still work.
+  switch in the top bar brings in every baseline and ablation.
+* **Sidebar:** the pages, the state of the API, model service, database and stream, and buttons for the
+  five-step **tour**, **help** (glossary), presentation mode and theme. `1`–`8` switch pages and
+  `Ctrl`+`K` opens the command palette. Below 1200 px the sidebar becomes an icon rail; on a phone, a drawer.
+* **A banner** appears when the ML service is down, naming the pages that still work.
 * **⤓ buttons** export any panel as CSV (and the chart as PNG), for slides and reports.
 
 The live stream warm-starts from the task-1 checkpoints written by `run_continual` (first seed) in
