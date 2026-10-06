@@ -58,8 +58,10 @@ of the same session (optimistic); *temporal* trains on each attack's earlier tra
   the other; DDoS 99.4 % in one seed only.
 * **Serving speed** (laptop, GTX 1650): a 5,000-flow window is scored in 5.5 ms on the GPU and 10.5 ms on the
   CPU (p50), about 630,000 and 460,000 flows per second, excluding flow export and graph building.
-* **Not measured:** calibration, sensitivity to window size and replay budget. The scripts exist
-  (`run_calibration.py`, the sweeps in the README) but could not be run before submission.
+* **Calibration** (CIC-IDS2017, one run): expected calibration error 0.52 % over all test flows but 2.24 % on
+  attack flows, where the model is overconfident (99.4 % mean confidence, 97.7 % accuracy).
+* **Not measured:** sensitivity to window size and replay budget (the sweeps are in the README's reproduce
+  table).
 
 ## Known failure modes
 

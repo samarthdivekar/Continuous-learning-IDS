@@ -679,6 +679,23 @@ The model abstains, handing the flow to an analyst, when its conformal predictio
 
 Which α works depends on the dataset. On CIC-IDS2017 the stricter settings remove all 184 GNN false alarms (α = 0.01 and 0.05), and at α = 0.10 107 remain, as expected, because a smaller α gives larger sets. On CSE-CIC-IDS2018 the direction reverses. The 9,219 false alarms are benign flows called Infiltration with high but not extreme confidence. True Infiltration flows in validation are so confident that, at α = 0.10, the Infiltration threshold requires p ≥ 0.997, so the false alarms fall into an empty set and are handed to an analyst. At α ≤ 0.05 the threshold (p ≥ 0.48–0.07) admits them. There is no single safe α. It has to be chosen on validation data for each deployment. The FFNN's false alarms are spread thinly and shrink gradually.
 
+**Are its probabilities honest?** (calibration, CIC-IDS2017, `results/cicids2017/multiclass/calibration/`,
+`python -m experiments.run_calibration`; same seed-42 checkpoints and test windows as above)
+
+| Model | Flows | ECE | MCE | Brier | Mean confidence | Accuracy |
+|---|---|---|---|---|---|---|
+| GNN + EWC + replay (ours) | all | 0.52 % | 36.3 % | 0.012 | 99.80 % | 99.38 % |
+| GNN + EWC + replay (ours) | attack | 2.24 % | 44.9 % | 0.046 | 99.44 % | 97.66 % |
+| FFNN + EWC + replay | all | 0.37 % | 23.6 % | 0.012 | 99.18 % | 99.10 % |
+| FFNN + EWC + replay | attack | 1.55 % | 24.1 % | 0.046 | 96.89 % | 96.46 % |
+
+ECE = expected calibration error over 15 equal-width confidence bins; MCE = the worst bin. Both models are
+well calibrated overall, but that figure mostly describes benign traffic (75 % of these test flows). On attack
+flows our model is overconfident: it reports 99.4 % confidence and is right 97.7 % of the time, a larger gap
+than the per-flow FFNN's. This matches the conformal result above, where the GNN's false alarms are confident
+enough to survive every threshold. The reliability diagram is `reliability.png` in the same folder. Single run,
+indicative only.
+
 **Will analysts drown in alerts?** (alert → incident grouping, CIC-IDS2017 test windows)
 Flagged flows of the same predicted category are joined into connected attacker/victim components. The false-alarm budget raises the confidence threshold until the validation false-positive rate fits the budget.
 
@@ -785,8 +802,7 @@ CIC-IDS2017 test windows of 5,000 flows. Laptop: GTX 1650 (4 GB), 8-core CPU, 24
 * **Experiments planned but not run.** A Windows Smart App Control policy, enforced after a restart, began
   blocking PyTorch's libraries part-way through this work, so these did not run: the replay-budget sweep, the
   window-size sensitivity study, the mixed-attack drift stream (`drift.stream_order: mixed_pairs` is
-  implemented and tested), calibration (`experiments/run_calibration.py`, implemented and tested), extra
-  seeds for drift, IP-remap and
+  implemented and tested), calibration on CSE-CIC-IDS2018, extra seeds for drift, IP-remap and
   the remaining leave-one-attack-out categories, and the 5-seed re-run of the interleaved table. Each is one
   command in the reproduce table; the results they would produce are not claimed anywhere.
 * **Small test classes.** WebAttack has 24 test flows and Botnet 73 in CIC-IDS2017; per-category numbers
