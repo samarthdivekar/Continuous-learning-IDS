@@ -47,7 +47,7 @@ of the same session (optimistic); *temporal* trains on each attack's earlier tra
 |---|---|---|---|
 | CIC-IDS2017, temporal split | 5 | **0.915 ± 0.031** (95 % CI 0.888–0.935) | 0.870 ± 0.009 |
 | CIC-IDS2017, interleaved split | 3 | 0.964 ± 0.020 | 0.928 ± 0.020 |
-| CSE-CIC-IDS2018, interleaved split | 3 | 0.881 ± 0.038 | 0.836 ± 0.029 |
+| CSE-CIC-IDS2018, interleaved split | 3 | 0.911 ± 0.042 | 0.836 ± 0.029 |
 
 * **Retention** of the first attack type after all later tasks: 0.998–1.000 on CIC-IDS2017 (naive retraining: 0).
 * **False-positive rate:** 0.04 % (temporal) and 0.07 % (interleaved) of benign flows on CIC-IDS2017.
@@ -70,7 +70,7 @@ of the same session (optimistic); *temporal* trains on each attack's earlier tra
 * **Topology dependence.** When each flow's source host is randomised at test time, macro-F1 falls from 0.952
   to 0.431 on CIC-IDS2017 (3 seeds, every seed 0.427–0.436); the per-flow FFNN is unaffected.
 * **Seed instability.** Unseen-attack detection for BruteForce and Botnet swapped between two seeds; on
-  CSE-CIC-IDS2018 macro-F1 ranges 0.855–0.925 across seeds, and one run flagged 9,196 benign flows as
+  CSE-CIC-IDS2018 the identical seed-42 configuration scored 0.855, 0.948 and 0.945 in three trainings, and one run flagged 9,196 benign flows as
   Infiltration where an identical run flagged 3.
 * **Attacks it does not catch unseen:** Infiltration, WebAttack and mostly Botnet are missed by every model
   when held out.

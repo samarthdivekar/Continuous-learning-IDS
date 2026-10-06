@@ -1,5 +1,5 @@
 {
-  "timestamp_utc": "2026-10-06T18:32:01.863008+00:00",
+  "timestamp_utc": "2026-10-06T18:34:08.799069+00:00",
   "seed": 42,
   "python": "3.12.10",
   "platform": "Windows-11-10.0.26200-SP0",
@@ -14,7 +14,7 @@
     "pandas": "3.0.5",
     "numpy": "2.5.3"
   },
-  "command": "C:\\Users\\samar\\Desktop\\PBL\\continual-learning-gnn-ids\\experiments\\run_conformal.py --dataset csecicids2018 --label-mode multiclass",
+  "command": "C:\\Users\\samar\\Desktop\\PBL\\continual-learning-gnn-ids\\experiments\\run_calibration.py --dataset csecicids2018 --label-mode multiclass",
   "config": {
     "seed": 42,
     "paths": {
@@ -205,11 +205,7 @@
     "gnn_ewc_replay",
     "ffnn_ewc_replay"
   ],
-  "alphas": [
-    0.01,
-    0.05,
-    0.1
-  ],
-  "calibration": "val windows of all tasks",
+  "bins": 15,
+  "checkpoints": "after the last task, first seed of run_continual",
   "test": "test windows of all tasks"
 }

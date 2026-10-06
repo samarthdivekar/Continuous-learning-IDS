@@ -1,5 +1,5 @@
 {
-  "timestamp_utc": "2026-10-06T18:32:01.863008+00:00",
+  "timestamp_utc": "2026-10-06T17:24:06.852703+00:00",
   "seed": 42,
   "python": "3.12.10",
   "platform": "Windows-11-10.0.26200-SP0",
@@ -14,7 +14,7 @@
     "pandas": "3.0.5",
     "numpy": "2.5.3"
   },
-  "command": "C:\\Users\\samar\\Desktop\\PBL\\continual-learning-gnn-ids\\experiments\\run_conformal.py --dataset csecicids2018 --label-mode multiclass",
+  "command": "C:\\Users\\samar\\Desktop\\PBL\\continual-learning-gnn-ids\\experiments\\run_continual.py --dataset csecicids2018 --label-mode multiclass --seeds 42 --models xgboost_static gnn_naive gnn_ewc_replay ffnn_ewc_replay",
   "config": {
     "seed": 42,
     "paths": {
@@ -202,14 +202,24 @@
     }
   },
   "models": [
+    "xgboost_static",
+    "gnn_naive",
     "gnn_ewc_replay",
     "ffnn_ewc_replay"
   ],
-  "alphas": [
-    0.01,
-    0.05,
-    0.1
+  "eval_split": "test",
+  "task_categories": [
+    "BruteForce",
+    "DoS",
+    "DDoS",
+    "WebAttack",
+    "Infiltration",
+    "Botnet"
   ],
-  "calibration": "val windows of all tasks",
-  "test": "test windows of all tasks"
+  "data_meta": {
+    "n_flows": 9479211,
+    "n_windows": 1898,
+    "n_features": 83,
+    "cache_key": "f74f417b1d5c"
+  }
 }

@@ -235,8 +235,8 @@ Selected: `{"ffnn_ewc_replay": {"lambda": 10.0, "gamma": 0.9}, "gnn_ewc": {"lamb
 | Model | EWC λ / γ | Accuracy (seen) | Macro-F1 (seen) | Retention (task-1 recall) | FPR | BWT (category recall) |
 |---|---|---|---|---|---|---|
 | XGBoost static | – | 0.947 ± 0.000 | 0.282 ± 0.000 | 1.000 ± 0.000 | 0.00% ± 0.00 | 0.000 |
-| GNN naive retrain | – | 0.943 ± 0.000 | 0.298 ± 0.015 | 0.000 ± 0.000 | 0.49% ± 0.02 | -0.912 |
-| **GNN + EWC + replay (ours)** | 10 / 0.9 | 0.997 ± 0.003 | 0.881 ± 0.038 | 1.000 ± 0.000 | 0.35% ± 0.29 | -0.022 |
+| GNN naive retrain | – | 0.945 ± 0.002 | 0.298 ± 0.015 | 0.000 ± 0.000 | 0.33% ± 0.28 | -0.910 |
+| **GNN + EWC + replay (ours)** | 10 / 0.9 | 0.998 ± 0.003 | 0.911 ± 0.042 | 1.000 ± 0.000 | 0.18% ± 0.29 | -0.021 |
 | FFNN + EWC + replay (ablation) | 10 / 0.9 | 0.999 ± 0.001 | 0.836 ± 0.029 | 1.000 ± 0.000 | 0.12% ± 0.10 | -0.008 |
 | FFNN naive retrain | – | 0.948 | 0.282 | 0.000 | 0.00% | -0.970 |
 | GNN + EWC only | 100 / 0.9 | 0.948 | 0.286 | 0.000 | 0.00% | -0.831 |
@@ -249,8 +249,8 @@ Task order: BruteForce → DoS → DDoS → WebAttack → Infiltration → Botne
 | Model | after 1 (BruteForce) | after 2 (DoS) | after 3 (DDoS) | after 4 (WebAttack) | after 5 (Infiltration) | after 6 (Botnet) |
 |---|---|---|---|---|---|---|
 | XGBoost static | 1.000 | 0.650 | 0.390 | 0.392 | 0.328 | 0.282 |
-| GNN naive retrain | 1.000 | 0.658 | 0.511 | 0.289 | 0.203 | 0.298 |
-| **GNN + EWC + replay (ours)** | 1.000 | 1.000 | 0.969 | 0.849 | 0.842 | 0.881 |
+| GNN naive retrain | 1.000 | 0.658 | 0.489 | 0.240 | 0.203 | 0.298 |
+| **GNN + EWC + replay (ours)** | 1.000 | 1.000 | 0.932 | 0.845 | 0.885 | 0.911 |
 | FFNN + EWC + replay (ablation) | 1.000 | 1.000 | 0.933 | 0.891 | 0.812 | 0.836 |
 
 **Retention over time**
@@ -267,8 +267,8 @@ Task order: BruteForce → DoS → DDoS → WebAttack → Infiltration → Botne
 | Model | after 1 (BruteForce) | after 2 (DoS) | after 3 (DDoS) | after 4 (WebAttack) | after 5 (Infiltration) | after 6 (Botnet) |
 |---|---|---|---|---|---|---|
 | XGBoost static | 0.00% | 0.00% | 0.00% | 0.00% | 0.00% | 0.00% |
-| GNN naive retrain | 0.00% | 0.00% | 0.01% | 0.00% | 0.57% | 0.49% |
-| **GNN + EWC + replay (ours)** | 0.00% | 0.00% | 0.01% | 0.01% | 0.39% | 0.35% |
+| GNN naive retrain | 0.00% | 0.00% | 0.01% | 0.00% | 0.57% | 0.33% |
+| **GNN + EWC + replay (ours)** | 0.00% | 0.00% | 0.01% | 0.01% | 0.20% | 0.18% |
 | FFNN + EWC + replay (ablation) | 0.00% | 0.00% | 0.00% | 0.00% | 0.12% | 0.12% |
 
 ### csecicids2018 — binary — task sequence withdrawn: one seed, so it supports no claim (see README §6)

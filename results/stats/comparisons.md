@@ -8,5 +8,5 @@
 | 2017 · interleaved | does EWC add anything to replay? | false-positive rate | 3 | 0.066 % | 0.116 % (gnn_replay) | -0.050 pp | [-0.087 pp, +0.004 pp] | 0.500 / 0.250 | no detectable difference |
 | 2017 · temporal | does EWC add anything to replay? | macro-F1 | 5 | 0.915 | 0.848 (gnn_replay) | +0.067 | [+0.003, +0.145] | 0.188 / 0.094 | ours better (indicative, n=5) |
 | 2017 · temporal | does EWC add anything to replay? | false-positive rate | 5 | 0.042 % | 0.075 % (gnn_replay) | -0.033 pp | [-0.069 pp, +0.000 pp] | 0.312 / 0.156 | no detectable difference |
-| 2018 · interleaved | does the graph help? | macro-F1 | 3 | 0.881 | 0.836 (ffnn_ewc_replay) | +0.045 | [+0.004, +0.123] | 0.250 / 0.125 | ours better (indicative, n=3) |
-| 2018 · interleaved | does the graph help? | false-positive rate | 3 | 0.346 % | 0.124 % (ffnn_ewc_replay) | +0.222 pp | [-0.234 pp, +0.455 pp] | 0.500 / 0.875 | no detectable difference |
+| 2018 · interleaved | does the graph help? | macro-F1 | 3 | 0.911 | 0.836 (ffnn_ewc_replay) | +0.075 | [+0.009, +0.123] | 0.250 / 0.125 | ours better (indicative, n=3) |
+| 2018 · interleaved | does the graph help? | false-positive rate | 3 | 0.176 % | 0.124 % (ffnn_ewc_replay) | +0.052 pp | [-0.234 pp, +0.455 pp] | 1.000 / 0.625 | no detectable difference |

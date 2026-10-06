@@ -367,19 +367,20 @@ seeds these are indicative, not significant.</p>
 <table>
 <thead><tr><th>Model</th><th>Macro-F1</th><th>Per seed</th></tr></thead>
 <tbody>
-<tr><td><b>GNN + EWC + replay (ours)</b></td><td><b>0.881 &plusmn; 0.038</b></td><td>0.855, 0.863, 0.925</td></tr>
+<tr><td><b>GNN + EWC + replay (ours)</b></td><td><b>0.911 &plusmn; 0.042</b></td><td>0.945, 0.863, 0.925</td></tr>
 <tr><td>FFNN + EWC + replay</td><td>0.836 &plusmn; 0.029</td><td>0.850, 0.855, 0.802</td></tr>
 <tr><td>GNN naive retraining</td><td>0.298 &plusmn; 0.015</td><td>forgets completely</td></tr>
 <tr><td>XGBoost static</td><td>0.282</td><td>&mdash;</td></tr>
 </tbody></table>
-<p class="muted">Our model leads in all three seeds, but by 0.004 and 0.009 in two of them; the average gap is
-carried by the third. Stated as suggestive, not conclusive.</p>
+<p class="muted">Our model leads in all three seeds (+0.095, +0.008, +0.123), but its own seeds range 0.863&ndash;0.945:
+the identical seed-42 configuration has scored 0.855, 0.948 and 0.945 in three trainings, because the boundary between
+benign traffic and Infiltration is fragile. Indicative, not conclusive.</p>
 
 <h3>8.4 The product layer</h3>
 <table>
 <thead><tr><th>Question</th><th>Measured answer</th></tr></thead>
 <tbody>
-<tr><td>Will analysts drown in alerts?</td><td>101,913 flow alerts &rarr; 50 incidents, 84 % of them real (2018: 105 &rarr; 90 incidents at 94 % with a budget)</td></tr>
+<tr><td>Will analysts drown in alerts?</td><td>101,913 flow alerts &rarr; 50 incidents, 84 % of them real (2018: about 103,000 alerts &rarr; 96 incidents, 91 % real)</td></tr>
 <tr><td>Does it know when not to decide?</td><td>Abstention removes all 184 false alarms on 2017 at &alpha; = 0.05, handing 9.8 % of flows to a human</td></tr>
 <tr><td>Does it spot attacks it was never taught?</td><td>Graph model 0.950 AUROC (2018, prototype score) against 0.780 for the per-flow model</td></tr>
 <tr><td>Can it adapt on few labels?</td><td>1,700 labels reach 0.937 against 0.949 with everything labelled &mdash; but only with mixed sampling; uncertainty-only collapses to 0.438</td></tr>
