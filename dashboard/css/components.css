@@ -392,3 +392,5 @@ pre.rule {
 .banner-msg { flex: 1; min-width: 0; }
 .model-cell { display: inline-flex; align-items: center; white-space: nowrap; }
 .mono.small { font-size: var(--t-xs); }
+select { max-width: 100%; text-overflow: ellipsis; }
+table.data td { overflow-wrap: anywhere; }

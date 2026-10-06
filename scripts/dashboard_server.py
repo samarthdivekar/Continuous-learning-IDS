@@ -37,8 +37,11 @@ class Handler(SimpleHTTPRequestHandler):
             self.send_header(header, value)
         super().end_headers()
 
-    def log_message(self, fmt, *args):  # quieter console
-        if "/api/" in (args[0] if args else ""):
+    def log_message(self, fmt, *args):  # quieter console: API calls and errors only
+        # args[0] is the request line for access logs but an HTTPStatus for send_error(); treating it as
+        # a string crashed the handler, so every 404 reached the browser as an empty reply
+        first = str(args[0]) if args else ""
+        if "/api/" in first or fmt.startswith("code "):
             super().log_message(fmt, *args)
 
     def _proxy(self, method: str) -> None:

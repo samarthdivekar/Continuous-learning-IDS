@@ -129,6 +129,14 @@ Run the tests:
 python -m pytest
 ```
 
+Smoke-test the console in a real browser (stack running; uses the installed Edge through Playwright). It loads
+every page and sub-page at desktop and phone width in both themes and fails on any uncaught error, any
+console error other than an expected HTTP status, a page stuck loading, or horizontal overflow:
+
+```bash
+python scripts/ui_smoke.py
+```
+
 ## Reproducing results
 
 One command regenerates every number and figure from the raw zips:
