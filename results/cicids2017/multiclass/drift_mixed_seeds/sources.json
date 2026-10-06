@@ -1,0 +1,10 @@
+{
+  "kind": "drift",
+  "folders": [
+    "drift_mixed_seed42",
+    "drift_mixed_seed43",
+    "drift_mixed_seed44"
+  ],
+  "labels": null,
+  "seeds": null
+}

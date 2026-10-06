@@ -77,8 +77,9 @@ of the same session (optimistic); *temporal* trains on each attack's earlier tra
 * **Small classes.** WebAttack has 24 test flows and Botnet 73 on the interleaved CIC-IDS2017 split; their
   per-class numbers move by several points per flow.
 * **Drift detection needs labels.** ADWIN watches the labelled error rate; a label-free confidence trigger
-  missed most drift. ADWIN over-triggered on CIC-IDS2017 (16 retrains vs 8 periodic) and was more efficient
-  than a periodic schedule on CSE-CIC-IDS2018; each is one run.
+  missed most drift. On CIC-IDS2017 (3 seeds) ADWIN retrains about twice as often as a fixed schedule; it ends
+  lower when attacks arrive in clean blocks and higher when two attacks are mixed. On CSE-CIC-IDS2018 it
+  beat the schedule on cost and quality in one run.
 * **Uncertainty-only active learning fails.** Labelling only the least certain flows never labels a new attack
   the model confidently mistakes for an old one; mixing in random labels fixes it (one run).
 

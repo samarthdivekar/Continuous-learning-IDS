@@ -43,8 +43,10 @@ The grey line of text under the title says this in plain English; the verdict ta
 
 * Press **Start**. Watch the error rate rise when a new attack appears, ADWIN flag it, and the model
   adapt mid-stream (the feed prints `error 4.7 % → 65.6 % adapted`).
-* Headline comparison: ADWIN **16 retrains → 0.949**, a fixed schedule **8 retrains → 0.967**, never
-  adapting → **0.232**. Be honest: on 2017 ADWIN over-triggers; on 2018 it wins clearly (24 vs 48).
+* Headline comparison (2017, 3 seeds): never adapting ends at **0.230**; adapting at about **0.96**. With clean
+  task blocks a fixed schedule is better than ADWIN (0.980 vs 0.960, half the retrains). With two attacks mixed
+  per period ADWIN is better (0.968 vs 0.926) but still retrains twice as often. On 2018 (one run) it wins
+  clearly (24 vs 48 retrains).
 
 ## 4 · Why a graph (Graph explorer, 1 min)
 

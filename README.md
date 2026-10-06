@@ -562,19 +562,32 @@ ours 0.9993 macro-F1, FFNN + EWC + replay 0.9991, and **GNN + EWC only reaches 0
 CSE-CIC-IDS2018). GNN naive keeps 0.76 retention; FFNN naive collapses
 to 0.003. The static XGBoost detects only **1.3 %** of attack flows from categories it never saw.
 
-### 4. Drift-triggered adaptation (stream of tasks 2–7; single run, seed 42, indicative only)
+### 4. Drift-triggered adaptation (stream of tasks 2–7, seeds 42/43/44)
 
-| Policy (our model) | Retrains | Final macro-F1 | Retention |
-|---|---|---|---|
-| ADWIN (drift-triggered) | 16 (46 flags) | 0.949 | 1.000 |
-| Periodic, every 25 windows | 8 | 0.967 | 1.000 |
-| Oracle (true task boundaries) | 6 | 0.952 | 1.000 |
-| Never adapt | 0 | **0.232** | 1.000 |
+The training windows of tasks 2–7 are replayed as one stream; the model is never told where a task starts.
+Two orders (`drift.stream_order`): **clean blocks**, one attack at a time in capture order
+(`results/cicids2017/multiclass/drift_seeds/`), and **mixed**, where consecutive tasks are paired and their
+windows interleaved so two attacks arrive together in each period (`drift_mixed_seeds/`). Mixing is per window:
+each 5,000-flow window still holds one task's traffic.
 
-Adapting is essential (0.95 vs 0.23), and ADWIN finds every task boundary without being told. But the
-brief's efficiency goal is **not** met on this stream: ADWIN retrained 16 times where a fixed schedule
-needed 8 and ended marginally lower. Attack bursts inside a task keep raising the error until the
-model has adapted to them.
+| Policy (our model) | Clean blocks: retrains | Clean blocks: macro-F1 | Mixed: retrains | Mixed: macro-F1 |
+|---|---|---|---|---|
+| ADWIN (drift-triggered) | 16.7 | 0.960 ± 0.013 | 15.0 | **0.968 ± 0.019** |
+| Periodic, every 25 windows | 8 | **0.980 ± 0.013** | 8 | 0.926 ± 0.063 |
+| Oracle (true task or period boundaries) | 6 | 0.955 ± 0.014 | 3 | 0.949 ± 0.015 |
+| Never adapt | 0 | 0.230 ± 0.004 | 0 | 0.230 ± 0.004 |
+
+Retention of the first attack is 1.0 for every adaptive policy. FFNN + EWC + replay under ADWIN ends at 0.917
+(clean) and 0.923 (mixed); GNN naive retraining at 0.300 and 0.299.
+
+* **Adapting is essential** (about 0.96 against 0.23 without it), and ADWIN finds the changes without being told.
+* **On clean blocks a fixed schedule is better.** It beats ADWIN in all three seeds (+0.018, +0.019, +0.023)
+  with half the retrains. The brief's efficiency goal is **not** met on this stream: attack bursts inside a
+  task keep raising the error until the model has adapted to them.
+* **On the mixed stream ADWIN is the safer choice, not the cheaper one.** It beats the fixed schedule in all
+  three seeds (+0.092, +0.022, +0.009), mostly because the schedule's quality depends on where its fixed retrain
+  points fall (one seed dropped to 0.855), while ADWIN reacts to the error itself. It still retrains about twice
+  as often. Three seeds, so indicative.
 
 ### 5. IP leakage (brief §7; single run, seed 42, indicative only)
 
@@ -634,8 +647,8 @@ flow sample, **3 seeds (42, 43, 44)**, hyper-parameters reused from CIC-IDS2017,
   CIC-IDS2017.
 * **ADWIN paid off on this stream, in a single run.** 24 drift-triggered retrains beat a periodic schedule
   (48 retrains, 0.825) on both cost and quality (0.943), and the model without adaptation collapses to 0.155.
-  On CIC-IDS2017 the same detector over-triggered (16 vs 8 periodic). Both are one seed, so the efficiency
-  claim is indicative on one dataset and does not hold on the other.
+  On CIC-IDS2017 it retrained about twice as often as the schedule over three seeds (§4), so the efficiency
+  claim is one run on this dataset and does not hold on the other.
 * **GNN vs FFNN on 2018, over three seeds: no settled difference.** Multiclass macro-F1 is **0.881 ± 0.038**
   for the GNN against **0.836 ± 0.029** for the per-flow FFNN. The GNN is ahead in every seed, but by only
   0.004 and 0.009 in two of them; the bootstrap interval of the paired difference is [+0.004, +0.123] and is
@@ -750,7 +763,7 @@ Flagged flows of the same predicted category are joined into connected attacker/
 
 On CSE-CIC-IDS2018 the budget helps both models. The GNN goes from 105 incidents at 81 % precision to 89 at 96 %, and the FFNN from 834 incidents at 12 % to 102 at 92 %. Without a budget, the FFNN's scattered false alarms would give an analyst 738 false incidents to dismiss.
 
-**Can it adapt safely on a small label budget?** (CIC-IDS2017, drift stream as in §4)
+**Can it adapt safely on a small label budget?** (CIC-IDS2017, clean-block drift stream as in §4, seed 42)
 
 | Variant | Updates | Rolled back | Labels used | Final macro-F1 | FPR |
 |---|---|---|---|---|---|
@@ -812,21 +825,21 @@ CIC-IDS2017 test windows of 5,000 flows. Laptop: GTX 1650 (4 GB), 8-core CPU, 24
   macro-F1 because one flags 9,196 benign flows as Infiltration and the other 3 (§6). CUDA scatter
   non-determinism is enough to tip it. Three seeds confirm the spread rather than remove it: macro-F1
   ranges 0.855–0.925 (± 0.038), the widest of any model here, so a single 2018 GNN number means little.
-* **ADWIN's efficiency is dataset-dependent, and each dataset is one run.** On CIC-IDS2017 it over-triggers
-  (16 retrains vs 8 periodic, 6 oracle, with slightly lower quality); on CSE-CIC-IDS2018 it beats the
-  periodic schedule on both cost and quality (24 vs 48 retrains, 0.943 vs 0.825). The refractory period and
-  adaptation window were fixed a priori, not tuned; tuning them without a separate validation stream would
-  overfit the test stream.
+* **ADWIN is not cheaper on CIC-IDS2017.** Over three seeds it retrains about twice as often as a fixed
+  schedule; with clean task blocks the schedule also ends higher, with mixed attacks ADWIN ends higher (§4).
+  On CSE-CIC-IDS2018 it beat the schedule on both cost and quality (24 vs 48 retrains, 0.943 vs 0.825), in one
+  run. The refractory period and adaptation window were fixed a priori, not tuned; tuning them without a
+  separate validation stream would overfit the test stream.
 * **EWC alone is not reliable; EWC with replay may be.** EWC alone fails in class-incremental (multiclass)
   on both datasets. On top of replay it made no detectable difference on the interleaved split but, on the
   temporal split, prevented two replay-only collapses (§2). The replay-budget sweep (§2) shows replay alone is
   flat from five stored windows per category on the interleaved split; it was not repeated on the temporal one.
-* **Experiments planned but not run.** A Windows Smart App Control policy, enforced after a restart, began
-  blocking PyTorch's libraries part-way through this work (it has since been turned off and runs are
-  continuing). Not yet run at the time of writing: the window-size sensitivity study, the mixed-attack drift stream (`drift.stream_order: mixed_pairs` is
-  implemented and tested), calibration on CSE-CIC-IDS2018, extra seeds for drift, IP-remap and
-  the remaining leave-one-attack-out categories, and the 5-seed re-run of the interleaved table. Each is one
-  command in the reproduce table; the results they would produce are not claimed anywhere.
+* **Experiments still running or not run.** A Windows Smart App Control policy, enforced after a restart,
+  blocked PyTorch for part of this work; it has since been turned off and runs are continuing. Not yet in
+  this README: the window-size sensitivity study, calibration on CSE-CIC-IDS2018, the third unseen-attack seed
+  and extra seeds for CSE-CIC-IDS2018 drift and IP-remap, extra CIC-IDS2017 IP-remap and unseen-attack seeds,
+  and the 5-seed re-run of the interleaved table. Each is one command in the reproduce table; nothing they
+  would produce is claimed anywhere.
 * **Small test classes.** WebAttack has 24 test flows and Botnet 73 in CIC-IDS2017; per-category numbers
   for them are noisy (one flow = 1–4 %).
 * **Validation selections are within noise.** The chosen λ = 10, γ = 0.9 beats neighbouring settings by
