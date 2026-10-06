@@ -328,14 +328,14 @@ add("""
 <thead><tr><th>Held-out attack</th><th>GNN, seed 42</th><th>GNN, seed 43</th><th>FFNN (per-flow)</th><th>XGBoost</th></tr></thead>
 <tbody>
 <tr><td>DoS</td><td><b>98.6 %</b></td><td><b>98.6 %</b></td><td>0.1 %</td><td>90.1 %</td></tr>
-<tr><td>BruteForce</td><td>99.7 %</td><td><b>0.0 %</b></td><td>0 %</td><td>0 %</td></tr>
-<tr><td>DDoS</td><td>99.4 %</td><td>not run</td><td>0 %</td><td>0 %</td></tr>
-<tr><td>Botnet</td><td>8.5 %</td><td>not run</td><td>0 %</td><td>0 %</td></tr>
-<tr><td>Infiltration</td><td>0 %</td><td>not run</td><td>0 %</td><td>0 %</td></tr>
+<tr><td>DDoS</td><td><b>99.4 %</b></td><td><b>82.6 %</b></td><td>0 %</td><td>0 %</td></tr>
+<tr><td>BruteForce</td><td>99.7 %</td><td><b>0.1 %</b></td><td>0 %</td><td>0 %</td></tr>
+<tr><td>Botnet</td><td>8.5 %</td><td><b>84.9 %</b></td><td>0 %</td><td>0 %</td></tr>
+<tr><td>Infiltration</td><td>0 %</td><td>0 %</td><td>0 %</td><td>0 %</td></tr>
 </tbody></table>
-<p class="muted">The graph detects unseen DoS in both seeds where the per-flow model sees almost nothing. Unseen
-BruteForce did not replicate (99.7 % in one seed, 0.0 % in the other), so this is a real effect for some attack
-types and not a dependable one for all. The second seed stopped after three held-out categories.</p>
+<p class="muted">In 6 of 12 held-out runs the graph model catches over 80 % of an attack it never saw; the per-flow
+model catches at most 0.07 % in all 12. DoS and DDoS replicate across seeds; BruteForce and Botnet swap, so the
+effect is real but which attacks it covers depends on the training run.</p>
 
 <h3>8.2 CIC-IDS2017 &mdash; seven attack types learned in sequence</h3>
 <p>Two protocols. <b>Interleaved</b> (3 seeds) tests on windows interleaved with training windows of the same
@@ -391,7 +391,7 @@ carried by the third. Stated as suggestive, not conclusive.</p>
 <li><b>EWC alone fails</b> (0.300 interleaved, 0.377 temporal, zero retention). Replay is what prevents forgetting.
 On top of replay, EWC made no detectable difference on the interleaved split but prevented two replay-only collapses on
 the temporal split (+0.067, CI +0.003 to +0.145, indicative).</li>
-<li><b>Unseen BruteForce detection did not replicate</b> &mdash; 99.7 % in one seed, 0.0 % in the next.</li>
+<li><b>Unseen-attack detection is seed-dependent</b> &mdash; BruteForce 99.7 % then 0.1 %, Botnet 8.5 % then 84.9 %.</li>
 <li><b>A label-free drift trigger misses most changes</b> &mdash; 2 retrains instead of 16, ending at 0.338.</li>
 <li><b>Uncertainty-only labelling fails</b> &mdash; a new attack the model confidently mislabels is never queried.</li>
 <li><b>Topology augmentation is a trade-off</b> &mdash; robustness to randomised sources rises from 0.427 to 0.914,

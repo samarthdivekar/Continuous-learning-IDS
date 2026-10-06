@@ -404,20 +404,24 @@ trained jointly here (no continual learning), so the comparison isolates what th
 | Held out | XGBoost | FFNN (per-flow) | GNN (graph), seed 42 | GNN, seed 43 |
 |---|---|---|---|---|
 | DoS | 90.1 % | 0.1 % | **98.6 %** | **98.6 %** |
-| BruteForce | 0.0 % | 0.0 % | 99.7 % | **0.0 %** |
-| DDoS | 0.0 % | 0.0 % | 99.4 % | not run |
-| Botnet | 0.0 % | 0.0 % | 8.5 % | not run |
-| Infiltration | 0.0 % | 0.0 % | 0.0 % | not run |
-| WebAttack | 0.0 % | 0.0 % | 0.0 % | not run |
+| DDoS | 0.0 % | 0.0 % | **99.4 %** | **82.6 %** |
+| BruteForce | 0.0 % | 0.0 % | 99.7 % | **0.1 %** |
+| Botnet | 0.0 % | 0.0 % | 8.5 % | **84.9 %** |
+| Infiltration | 0.0 % | 0.0 % | 0.0 % | 0.0 % |
+| WebAttack | 0.0 % | 0.0 % | 0.0 % | 0.0 % |
 
-* **Unseen DoS replicates.** The graph model flags 98.6 % of DoS flows it never saw in training, in both
-  seeds, where the per-flow FFNN flags 0.06–0.07 %. XGBoost also catches most of it here (90.1 % and 84.8 %).
-* **Unseen BruteForce does not.** 99.7 % in seed 42, **0.0 %** in seed 43. On one run this looked like the
-  strongest evidence in the project; it is a property of one training run, not of the method.
-* **The rest is one seed.** The seed-43 run was stopped by a machine restart after three held-out
-  categories, before the GNN reached DDoS; DDoS (99.4 %) and the other rows are seed 42 only, indicative.
-  No model detects unseen Infiltration or WebAttack (7 held-out flows in the 15 % sample), and the GNN
-  catches 8.5 % of unseen Botnet.
+(XGBoost and FFNN columns are seed 42; in seed 43 they are within a few points: XGBoost DoS 84.8 %, every other
+cell 0.0–0.07 %.)
+
+* **The per-flow model sees nothing unseen, in either seed.** Across all 12 held-out runs (six categories, two
+  seeds) the FFNN flags at most 0.07 % of the unseen attack's flows. The graph model flags more than 80 % in
+  6 of the 12.
+* **Unseen DoS and DDoS replicate.** DoS 98.6 % in both seeds; DDoS 99.4 % and 82.6 %.
+* **BruteForce and Botnet do not; they swap.** BruteForce goes from 99.7 % to 0.1 %, Botnet from 8.5 % to
+  84.9 %. On one run BruteForce looked like the strongest evidence in the project; which of these the model
+  catches depends on the training run, not only on the attack.
+* **Infiltration and WebAttack are missed by every model in both seeds** (WebAttack has 7 held-out flows in the
+  15 % sample).
 
 **CIC-IDS2017** (`results/cicids2017/binary/loao/`, single run, seed 42, indicative only)
 
@@ -429,11 +433,12 @@ trained jointly here (no continual learning), so the comparison isolates what th
 | PortScan / DDoS | ≥ 98.8 % | ≥ 98.8 % | 100 % |
 | BruteForce / Botnet | 0 % | ≤ 0.8 % | 0 % |
 
-**Reading.** Host-level structure (fan-out, fan-in, who talks to whom) lets the graph model flag some attack
-types a per-flow model cannot see at all; unseen DoS is the case that holds across seeds on 2018 and points
-the same way on 2017. It is not a dependable property for every attack type: BruteForce flipped between two
-seeds, and Infiltration, WebAttack and Botnet are mostly missed by every model. It also rests on attackers
-being few hosts (§5).
+**Reading.** Host-level structure (fan-out, fan-in, who talks to whom) lets the graph model flag attack types
+a per-flow model cannot see at all: in half the held-out runs on 2018 it caught most of an attack it was never
+trained on, where the per-flow model caught essentially none. Unseen DoS and DDoS hold across seeds (and DoS
+points the same way on 2017). It is not a dependable property for a given attack type: BruteForce and Botnet
+swap between seeds, and Infiltration and WebAttack are missed by everything. It also rests on attackers being
+few hosts (§5).
 
 ### 2. Learning seven attacks in sequence (multiclass, in distribution)
 
@@ -635,8 +640,8 @@ flow sample, **3 seeds (42, 43, 44)**, hyper-parameters reused from CIC-IDS2017,
   for the GNN against **0.836 ± 0.029** for the per-flow FFNN. The GNN is ahead in every seed, but by only
   0.004 and 0.009 in two of them; the bootstrap interval of the paired difference is [+0.004, +0.123] and is
   carried by the third seed (§2). The FFNN has the lower false-positive rate.
-* **Unseen attacks:** see §1. Unseen DoS replicates across two seeds (98.6 % vs 0.1 % for the FFNN);
-  unseen BruteForce does not (99.7 % in one seed, 0.0 % in the other).
+* **Unseen attacks:** see §1. DoS and DDoS replicate across two seeds (FFNN ≤ 0.07 %); BruteForce and Botnet
+  swap between seeds.
 * **The GNN is unstable on Infiltration.** The IP-remap experiment re-trains the identical configuration
   (same seed, same data). Its "normal" column scores **0.948** where the task-sequence run scored **0.855**.
   The whole gap is one class: the task-sequence run flagged **9,196** benign flows as Infiltration
@@ -801,8 +806,8 @@ CIC-IDS2017 test windows of 5,000 flows. Laptop: GTX 1650 (4 GB), 8-core CPU, 24
 * **The graph advantage in distribution is modest.** +0.036 (interleaved, 3 seeds) and +0.044 (temporal,
   5 seeds) macro-F1 on CIC-IDS2017, both indicative with the seeds available; a tie in 2017 binary; on
   2018 multiclass +0.045 carried by one seed. The FFNN has the lower false-positive rate on the interleaved
-  split. The GNN's clearest advantage is detecting some *unseen* attack types (§1), and even that is
-  seed-dependent for BruteForce.
+  split. The GNN's clearest advantage is detecting some *unseen* attack types (§1), and which ones is
+  seed-dependent apart from DoS and DDoS.
 * **The GNN is unstable on 2018 Infiltration.** Two runs of the identical configuration differ by 0.09
   macro-F1 because one flags 9,196 benign flows as Infiltration and the other 3 (§6). CUDA scatter
   non-determinism is enough to tip it. Three seeds confirm the spread rather than remove it: macro-F1

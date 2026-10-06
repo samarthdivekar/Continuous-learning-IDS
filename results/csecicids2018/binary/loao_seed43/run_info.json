@@ -1,5 +1,5 @@
 {
-  "timestamp_utc": "2026-10-05T19:46:44.789741+00:00",
+  "timestamp_utc": "2026-10-06T13:34:51.429065+00:00",
   "seed": 43,
   "python": "3.12.10",
   "platform": "Windows-11-10.0.26200-SP0",
@@ -141,7 +141,8 @@
       "adapt_epochs": null,
       "label_budget": 0,
       "label_strategy": "margin",
-      "periodic_every": 25
+      "periodic_every": 25,
+      "stream_order": "chronological"
     },
     "ip_remap": {
       "pool_size": 65536

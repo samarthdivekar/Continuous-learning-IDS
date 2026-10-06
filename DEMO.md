@@ -51,9 +51,9 @@ The grey line of text under the title says this in plain English; the verdict ta
 > "A port scan fans out from one host; a flood fans in to one victim. A per-flow model cannot see that."
 
 * Pick an attack window and show the shape. The **model-error overlay** marks the mistakes.
-* The evidence: on 2018, unseen DoS is detected **98.6 %** by the graph model in both seeds run, versus
-  **0.1 %** by the per-flow model. Say the other half too: unseen BruteForce was 99.7 % in one seed and
-  0.0 % in the other, so the property is real for some attacks and not dependable for all.
+* The evidence: on 2018, across 12 held-out runs (six attacks, two seeds) the graph model catches over 80 %
+  of an unseen attack in 6, the per-flow model at most 0.07 % in all 12. DoS (98.6 % both seeds) and DDoS
+  (99.4 %, 82.6 %) replicate. Say the other half too: BruteForce and Botnet swap between seeds.
 
 ## 5 · The honest part (Models → Unseen attacks, Adaptation & trust, 1.5 min)
 
@@ -80,7 +80,7 @@ Examiners reward measured limitations:
 |---|---|
 | "Is it better than a commercial NDR?" | Not comparable — this is an evaluated research prototype with dry-run response only. The README says so. |
 | "Why not just XGBoost?" | It cannot learn new attack types: 0.231 macro-F1 and it detects 1.3 % of attacks it never saw. |
-| "Does the graph really help?" | In distribution, modestly: +0.036 (interleaved, 3 seeds) and +0.044 (temporal, 5 seeds), indicative only. On some attacks never seen in training, clearly: unseen DoS 98.6 % vs 0.1 % in both seeds; unseen BruteForce did not replicate (99.7 % then 0.0 %). |
+| "Does the graph really help?" | In distribution, modestly: +0.036 (interleaved, 3 seeds) and +0.044 (temporal, 5 seeds), indicative only. On attacks never seen in training, clearly but unevenly: over 80 % in 6 of 12 held-out runs vs ≤ 0.07 % for the per-flow model; DoS and DDoS replicate, BruteForce and Botnet swap between seeds. |
 | "What about false alarms?" | 0.07 % at flow level; abstention removes them entirely at the right α, and incident grouping leaves 50 items with 84 % precision. |
 | "Can it run live?" | Scoring a 5,000-flow window takes 5.5 ms on the laptop GPU and 10.5 ms on the CPU (p50), about 630,000 and 460,000 flows per second (README §8). That excludes flow export and graph building from raw traffic. |
 | "What is new here?" | The combination: continual learning + drift-triggered retraining + an operator-facing layer, evaluated on error-corrected data with negative results reported. |

@@ -53,9 +53,10 @@ of the same session (optimistic); *temporal* trains on each attack's earlier tra
 * **False-positive rate:** 0.04 % (temporal) and 0.07 % (interleaved) of benign flows on CIC-IDS2017.
 * **Graph vs per-flow, paired over seeds:** +0.044 (temporal, CI +0.019 to +0.058) and +0.036 (interleaved,
   CI +0.011 to +0.069). Indicative only: with three or five seeds no test can reach conventional significance.
-* **Attacks never seen in training** (CSE-CIC-IDS2018, binary, leave-one-attack-out): unseen DoS is detected
-  at 98.6 % in both seeds run (per-flow FFNN: 0.1 %); unseen BruteForce at 99.7 % in one seed and 0.0 % in
-  the other; DDoS 99.4 % in one seed only.
+* **Attacks never seen in training** (CSE-CIC-IDS2018, binary, leave-one-attack-out, two seeds): over 80 % of
+  the held-out attack's flows detected in 6 of 12 runs, against at most 0.07 % for the per-flow FFNN. DoS
+  (98.6 %, 98.6 %) and DDoS (99.4 %, 82.6 %) replicate; BruteForce (99.7 %, 0.1 %) and Botnet (8.5 %, 84.9 %)
+  do not; Infiltration and WebAttack 0 %.
 * **Serving speed** (laptop, GTX 1650): a 5,000-flow window is scored in 5.5 ms on the GPU and 10.5 ms on the
   CPU (p50), about 630,000 and 460,000 flows per second, excluding flow export and graph building.
 * **Calibration** (CIC-IDS2017, one run): expected calibration error 0.52 % over all test flows but 2.24 % on
@@ -68,7 +69,7 @@ of the same session (optimistic); *temporal* trains on each attack's earlier tra
 
 * **Topology dependence.** When each flow's source host is randomised at test time, macro-F1 falls from 0.950
   to 0.427 on CIC-IDS2017 (one run); the per-flow FFNN is unaffected.
-* **Seed instability.** Unseen-BruteForce detection flipped from 99.7 % to 0.0 % between two seeds; on
+* **Seed instability.** Unseen-attack detection for BruteForce and Botnet swapped between two seeds; on
   CSE-CIC-IDS2018 macro-F1 ranges 0.855–0.925 across seeds, and one run flagged 9,196 benign flows as
   Infiltration where an identical run flagged 3.
 * **Attacks it does not catch unseen:** Infiltration, WebAttack and mostly Botnet are missed by every model
