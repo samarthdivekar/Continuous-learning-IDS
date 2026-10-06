@@ -1,0 +1,387 @@
+<section class="cover">
+  <div class="cover-mark">GNN-IDS</div>
+  <h1>The complete project guide</h1>
+  <p class="cover-sub">Continual-Learning Graph Neural Network Intrusion Detection System</p>
+  <p class="cover-meta">Final-year B.Tech project &middot; repository <span class="mono">Continuous-learning-IDS</span><br>
+  Everything about the project, explained from the beginning in plain language: the problem, the research behind it,
+  the model, the data, every page and button of the console, how it was built, and what the results really say.</p>
+  <p class="cover-meta">Prepared 6 October 2026. Every number in this guide is copied from a result file in the
+  repository; nothing is estimated. Where a number comes from a single run, the guide says so.</p>
+</section>
+
+<section class="toc page-break">
+<h2>Contents</h2>
+<ol>
+<li>The project in one page</li>
+<li>Scope: what it is, what it is not, and who it is for</li>
+<li>The real-world problem, with examples</li>
+<li>The ideas you need, explained simply</li>
+<li>Prior research: 40 papers, what each did, and what each leaves open</li>
+<li>The gap: what was missing, and what this project does about it</li>
+<li>The machine-learning model: why a graph network, and why not Random Forest</li>
+<li>The data: why CIC-IDS2017 and CSE-CIC-IDS2018, why two, and why not newer ones</li>
+<li>How the product works, end to end</li>
+<li>Every page and every feature of the console, with screenshots</li>
+<li>How it was built: stack, structure, tests, and the API key</li>
+<li>What the results say (and do not say)</li>
+<li>Limitations and future work</li>
+<li>Things you might have missed: viva questions, demo plan, glossary, commands</li>
+</ol>
+</section>
+
+<!-- ======================================================================================= 1 -->
+<section class="page-break">
+<h2>1 &middot; The project in one page</h2>
+
+<div class="callout big"><b>In one sentence:</b> a network intrusion detection system that looks at traffic as a
+<b>graph of computers talking to each other</b>, keeps <b>learning new kinds of attack without forgetting the old
+ones</b>, notices by itself when traffic has <b>changed</b>, and turns thousands of alerts into a handful of
+<b>explained incidents</b> that a human approves or rejects.</div>
+
+<h3>The problem in plain words</h3>
+<p>Companies watch their network traffic for attacks. Most machine-learning detectors are trained once on a fixed
+dataset and then frozen. Three things go wrong in practice:</p>
+<ol>
+<li><b>New attacks appear.</b> A detector trained in January has never seen the attack that arrives in March.</li>
+<li><b>Retraining makes it forget.</b> If you train the model again on only the new attack, it forgets the old ones.
+This is called <i>catastrophic forgetting</i>, and it is dramatic: in this project a normally retrained graph model
+went from catching 100&nbsp;% of the first attack type to 0&nbsp;%.</li>
+<li><b>Analysts drown.</b> A per-flow detector raises one alert per network conversation. A single scan can produce
+5,000 alerts in a few seconds. Studies of real security teams describe most of their alerts as false positives
+(Alahmadi et al., USENIX Security 2022).</li>
+</ol>
+
+<h3>What we built</h3>
+<table class="kv">
+<tr><td>Detector</td><td>An <b>E-GraphSAGE graph neural network</b> that classifies every network flow using both the
+flow's own numbers and what the two computers involved are doing with everyone else.</td></tr>
+<tr><td>Learning over time</td><td><b>Continual learning</b>: new attack types are learned one after another. Two tools
+stop forgetting: <b>replay</b> (keep a few old examples and rehearse them) and <b>EWC</b> (protect the parts of the
+model that mattered for old attacks).</td></tr>
+<tr><td>Noticing change</td><td>An <b>ADWIN drift detector</b> watches the model's error rate and triggers retraining
+only when traffic really changes.</td></tr>
+<tr><td>Usable output</td><td>Alerts are grouped into <b>incidents</b>, each with an <b>explanation</b>, an
+<b>"I'm not sure" abstention</b>, a <b>novelty flag</b> for unfamiliar traffic, and a <b>proposed firewall rule that
+is never executed</b> (dry run only).</td></tr>
+<tr><td>Console</td><td>An eight-page web console (Overview, Incident queue, Live stream, Graph explorer, Classify, Models,
+Adaptation &amp; trust, Reproducibility) served by a FastAPI backend.</td></tr>
+<tr><td>Proof</td><td>Every number comes from scripts in <span class="mono">experiments/</span>, run on two public
+datasets, with multiple random seeds, a realistic time-ordered test split, statistics, 92 automated tests and a
+browser smoke test.</td></tr>
+</table>
+
+<h3>The headline results, honestly</h3>
+<table>
+<thead><tr><th>Question</th><th>Answer</th><th>How sure</th></tr></thead>
+<tbody>
+<tr><td>Does it learn new attacks without forgetting?</td><td>Yes. 0.915 macro-F1 on the time-ordered test split
+(0.964 on the easier interleaved split), first attack still caught 99.8&ndash;100&nbsp;%. Normal retraining forgets
+it completely (0&nbsp;%).</td><td>5 seeds and 3 seeds</td></tr>
+<tr><td>Does the graph help on attacks it has seen?</td><td>A little: +0.036 to +0.044 macro-F1 over an identical
+per-flow model.</td><td>Indicative (bootstrap interval excludes zero, too few seeds for a significance test)</td></tr>
+<tr><td>Does the graph help on attacks it has <b>never</b> seen?</td><td>Clearly but unevenly: on CSE-CIC-IDS2018 it
+caught more than 80&nbsp;% of a never-seen attack in 6 of 12 tests; the per-flow model caught at most 0.07&nbsp;% in all
+12. Which attacks it catches changes between training runs, except DoS and DDoS.</td><td>2 seeds</td></tr>
+<tr><td>Is replay what stops forgetting?</td><td>Yes. Replay alone goes from 0.304 (nothing stored) to 0.952 with
+five stored windows per attack type. EWC alone fails (0.300).</td><td>3 seeds</td></tr>
+<tr><td>Does ADWIN retrain at the right time?</td><td>It finds the changes, but it is not cheaper than a fixed schedule.
+It is better than a schedule when two attacks arrive mixed together (0.968 vs 0.926).</td><td>3 seeds</td></tr>
+<tr><td>Is it fast enough?</td><td>A 5,000-flow window is scored in 5.5&nbsp;ms on a laptop GPU (about 628,000 flows per
+second).</td><td>Measured</td></tr>
+<tr><td>Can analysts cope?</td><td>About 100,000 flagged flows became about 50 incidents, 84&nbsp;% of them real
+attacks.</td><td>Single run</td></tr>
+</tbody></table>
+</section>
+
+<!-- ======================================================================================= 2 -->
+<section class="page-break">
+<h2>2 &middot; Scope: what it is, what it is not, and who it is for</h2>
+
+<h3>What it is</h3>
+<p>A <b>research prototype of a triage layer</b>: software that sits beside an organisation's existing intrusion
+detection system, reads the network flows, and helps a small security team decide what to look at first. It is
+built so that every claim can be checked: the experiments, the console and the documentation all read the same
+result files.</p>
+
+<h3>What is in scope</h3>
+<ul>
+<li>Classifying network flows (benign, or one of seven attack categories) from 83 flow features.</li>
+<li>Learning attack categories one after another without forgetting (continual learning).</li>
+<li>Detecting when traffic changes and deciding when to retrain (drift detection).</li>
+<li>Detecting attack types the model was never trained on (unseen attacks, novelty).</li>
+<li>Reducing analyst workload: incidents, explanations, abstention, proposed (never executed) responses.</li>
+<li>An honest evaluation: two datasets, multiple seeds, a time-ordered split, statistics, failure cases.</li>
+<li>A working console and API that a person can use and demonstrate.</li>
+</ul>
+
+<h3>What is deliberately out of scope</h3>
+<ul>
+<li><b>Blocking traffic automatically.</b> Nothing ever executes a firewall rule; every action is a dry run.</li>
+<li><b>Replacing a SOC platform.</b> There is no case management, no correlation across log sources, no TLS, no user
+roles. The README and the positioning note say so plainly.</li>
+<li><b>Reading packet contents.</b> Only flow statistics (sizes, timings, flags) are used, never payloads.</li>
+<li><b>Capturing traffic.</b> Flows arrive as CSV in the CICFlowMeter format; a production system would ingest Zeek or
+Suricata output directly.</li>
+<li><b>Production validation.</b> All results come from two public laboratory datasets.</li>
+</ul>
+
+<h3>Target audience</h3>
+<table>
+<thead><tr><th>Who</th><th>What they get from it</th></tr></thead>
+<tbody>
+<tr><td><b>Primary user: a small security team</b> (2&ndash;5 analysts) that already runs a signature IDS such as Suricata,
+Snort or Zeek and has more alerts than it can read.</td><td>Incidents instead of raw alerts, a reason for each one, an
+"unsure" bucket, a flag for unfamiliar traffic, and a model that keeps up with new attacks.</td></tr>
+<tr><td><b>Examiners and reviewers</b></td><td>A system whose every number can be regenerated with one command, with
+the negative results reported next to the positive ones.</td></tr>
+<tr><td><b>Students and researchers</b> working on graph-based or continual intrusion detection</td><td>A complete,
+tested pipeline (data &rarr; graphs &rarr; continual training &rarr; drift &rarr; evaluation &rarr; API &rarr; UI) to
+build on.</td></tr>
+</tbody></table>
+<p class="note">Positioning in one line (from <span class="mono">docs/positioning.md</span>): <i>a continual-learning
+triage layer on an existing IDS's alert stream, not a SOC platform.</i></p>
+</section>
+
+<!-- ======================================================================================= 3 -->
+<section class="page-break">
+<h2>3 &middot; The real-world problem, with examples</h2>
+
+<h3>Example 1: the port scan that looks innocent one connection at a time</h3>
+<p>An attacker's computer (172.16.0.1) tries to connect to 996 different ports on one server in seven seconds. Each
+single connection is tiny and looks like a normal failed request. A detector that judges <b>one flow at a time</b>
+sees 4,986 boring flows. A detector that looks at the <b>graph</b> sees one computer reaching out to almost a thousand
+ports on the same victim: an unmistakable scan. This exact case appears in the Incident queue screenshot in section 10.</p>
+
+<h3>Example 2: the detector that forgets</h3>
+<p>Monday the model learns BruteForce (password guessing). Wednesday it is retrained on DoS (denial of service). On
+Thursday BruteForce comes back, and the retrained model no longer recognises it. In this project's measurements a
+normally retrained graph model catches <b>0&nbsp;%</b> of the first attack after learning the later ones, while the
+continual model still catches <b>99.8&ndash;100&nbsp;%</b>.</p>
+
+<h3>Example 3: the attack nobody trained on</h3>
+<p>A new botnet appears. No labelled examples exist yet. A per-flow model has never seen anything like it and calls it
+benign. A graph model can still notice that one host is talking to many others in an unusual pattern. On
+CSE-CIC-IDS2018 the per-flow model detected at most 0.07&nbsp;% of any never-seen attack; the graph model detected more
+than 80&nbsp;% in half of the tests.</p>
+
+<h3>Example 4: 100,000 alerts</h3>
+<p>On the CIC-IDS2017 test traffic, the model flagged about 100,000 flows. Grouping flows that belong to the same
+attacker and victim turned that into about 50 incidents, 84&nbsp;% of them real attacks. An analyst can read 50
+incidents in a shift; nobody can read 100,000 alerts.</p>
+
+<h3>Example 5: traffic changes</h3>
+<p>Software updates, new users and new attacks change what "normal" looks like. Retraining every day wastes effort;
+never retraining lets accuracy rot. In this project a model that never adapts falls to 0.230 macro-F1 on the stream,
+while adapting keeps it around 0.96.</p>
+</section>
+
+<!-- ======================================================================================= 4 -->
+<section class="page-break">
+<h2>4 &middot; The ideas you need, explained simply</h2>
+
+<h3>Network flow</h3>
+<p>One conversation between two computers, summarised as numbers: how long it lasted, how many packets went each way,
+how many bytes, which TCP flags were set, the time between packets, and so on. CICFlowMeter turns raw traffic into
+these rows. This project uses <b>83 numeric features</b> per flow. IP addresses are <b>never</b> used as features; they
+only decide who is connected to whom in the graph.</p>
+
+<h3>Intrusion detection system (IDS)</h3>
+<p>Software that watches traffic for attacks. <b>Signature</b> IDSs (Snort, Suricata) match known patterns: precise,
+but blind to anything new. <b>Machine-learning</b> IDSs learn patterns from labelled examples: they can generalise, but
+they are usually trained once and frozen.</p>
+
+<h3>Graph</h3>
+<p>Dots and lines. Here every <b>computer (IP address) is a dot (node)</b> and every <b>flow is a line (edge)</b> between
+two dots. Each graph holds <b>5,000 consecutive flows</b>, called a <i>window</i>.</p>
+<div class="diagram">
+<svg viewBox="0 0 640 170" width="100%">
+  <g font-family="Inter, sans-serif" font-size="13">
+  <circle cx="90" cy="85" r="16" fill="#ef5f5f"/><text x="60" y="130">attacker</text>
+  <g stroke="#8591a3" stroke-width="1.4">
+    <line x1="106" y1="85" x2="250" y2="30"/><line x1="106" y1="85" x2="250" y2="65"/><line x1="106" y1="85" x2="250" y2="100"/><line x1="106" y1="85" x2="250" y2="135"/>
+  </g>
+  <circle cx="258" cy="30" r="8" fill="#9aa8b8"/><circle cx="258" cy="65" r="8" fill="#9aa8b8"/><circle cx="258" cy="100" r="8" fill="#9aa8b8"/><circle cx="258" cy="135" r="8" fill="#9aa8b8"/>
+  <text x="70" y="158">scan: one host fans OUT</text>
+  <g stroke="#8591a3" stroke-width="1.4">
+    <line x1="400" y1="30" x2="540" y2="85"/><line x1="400" y1="65" x2="540" y2="85"/><line x1="400" y1="100" x2="540" y2="85"/><line x1="400" y1="135" x2="540" y2="85"/>
+  </g>
+  <circle cx="392" cy="30" r="8" fill="#ef5f5f"/><circle cx="392" cy="65" r="8" fill="#ef5f5f"/><circle cx="392" cy="100" r="8" fill="#ef5f5f"/><circle cx="392" cy="135" r="8" fill="#ef5f5f"/>
+  <circle cx="548" cy="85" r="16" fill="#9aa8b8"/><text x="530" y="130">victim</text>
+  <text x="380" y="158">flood: many hosts fan IN</text>
+  </g>
+</svg>
+<p class="caption">Attacks have shapes. A per-flow model sees only one line at a time; a graph model sees the shape.</p>
+</div>
+
+<h3>Graph neural network (GNN), E-GraphSAGE</h3>
+<p>A neural network that works on graphs. For each flow it looks at the flow's own numbers, then <b>gathers summaries
+of the neighbouring flows</b> (other flows of the same two computers), and combines both to decide. GraphSAGE
+(Hamilton et al., 2017) introduced this "sample and aggregate" idea; <b>E-GraphSAGE</b> (Lo et al., 2022) adapted it so
+that the <b>edges (flows)</b> carry the features and get classified. Our model has 69,128 learnable numbers
+(parameters) and takes milliseconds per window.</p>
+
+<h3>Continual learning and catastrophic forgetting</h3>
+<p>Learning tasks one after another, like a student taking one subject per term. A normal neural network that studies
+the new subject overwrites what it knew about the old one: <b>catastrophic forgetting</b>. Two cures are used here:</p>
+<ul>
+<li><b>Replay</b> (Rolnick et al., 2019): keep a small box of old flashcards and mix a few into every study session.
+Here the box holds up to 10 old traffic windows per attack type, and two are rehearsed at each training step.</li>
+<li><b>EWC, Elastic Weight Consolidation</b> (Kirkpatrick et al., 2017): measure which knobs inside the model mattered
+most for the old subject, and make those knobs stiff, so learning the new subject moves them as little as possible.</li>
+</ul>
+
+<h3>Concept drift and ADWIN</h3>
+<p>Drift means the traffic the model sees has changed since it was trained. <b>ADWIN</b> (Bifet &amp; Gavald&agrave;,
+2007) keeps a window of recent error values and constantly asks: "is the older half of this window significantly
+different from the newer half?" If yes, it raises a drift flag and the model retrains on the most recent traffic. It is
+a smoke alarm for accuracy.</p>
+
+<h3>Metrics</h3>
+<ul>
+<li><b>Macro-F1</b>: detection quality averaged over every category, so a rare attack counts as much as a common one.
+1.0 is perfect.</li>
+<li><b>Retention</b>: how much of the first attack type is still caught after learning all the others. 1.0 = nothing
+forgotten.</li>
+<li><b>False-positive rate (FPR)</b>: share of normal traffic wrongly flagged. 0.07&nbsp;% means 7 false alarms per
+10,000 normal flows.</li>
+<li><b>BWT (backward transfer)</b>: how much older tasks got worse after later training; near 0 is good, negative is
+forgetting.</li>
+</ul>
+
+<h3>Conformal prediction (abstaining)</h3>
+<p>A way to let the model say "I'm not sure". For each class it learns, on validation data, how low the model's
+confidence can be for genuine members of that class. If a new flow fits more than one class, or none, the model
+<b>abstains</b> and hands it to an analyst (Angelopoulos &amp; Bates, 2021).</p>
+
+<h3>Calibration</h3>
+<p>Whether "90&nbsp;% confident" really means "right 90&nbsp;% of the time" (Guo et al., 2017). Measured with expected
+calibration error (ECE).</p>
+
+<h3>Open-set / novelty detection</h3>
+<p>Scoring how unfamiliar a flow looks, so that never-seen attacks can be flagged as "new" rather than forced into a
+known class. Three scores are compared: maximum softmax probability (Hendrycks &amp; Gimpel), energy (Liu et al., 2020)
+and distance to class prototypes.</p>
+</section>
+
+<!-- ======================================================================================= 5 -->
+<section class="page-break">
+<h2>5 &middot; Prior research: 40 papers</h2>
+<p>Every paper below was checked against its publisher or arXiv record (title, authors, year). <b>35 of the 40</b> are
+open access and were downloaded into the repository folder <span class="mono">research paper/</span>; the other five are
+behind a paywall or a bot check and are listed with their link. "What it leaves open" is relative to <i>this
+project's</i> goal, not a criticism of the paper. File names start with the number in the first column.</p>
+
+<h3>5.1 Datasets and how to evaluate fairly</h3>
+<table class="papers">
+<thead><tr><th>#</th><th>Paper</th><th>What it did</th><th>What it leaves open for us</th></tr></thead>
+<tbody>
+<tr><td>01</td><td>Sharafaldin, Lashkari, Ghorbani. <i>Toward Generating a New Intrusion Detection Dataset and Intrusion Traffic Characterization.</i> ICISSP 2018.</td><td>Created CIC-IDS2017: five days of realistic office traffic with scheduled attacks, converted to flows with CICFlowMeter.</td><td>The released labels and flows contain errors; static use only.</td></tr>
+<tr><td>02</td><td>Engelen, Rimmer, Joosen. <i>Troubleshooting an Intrusion Detection Dataset: the CICIDS2017 Case Study.</i> IEEE S&amp;P Workshops 2021.</td><td>Found flow-construction, feature and labelling problems; reconstructed or relabelled more than 20&nbsp;% of the traffic.</td><td>A corrected dataset, but no continual or graph evaluation. <b>We use this corrected release.</b></td></tr>
+<tr><td>03</td><td>Liu, Engelen, Lynar, Essam, Joosen. <i>Error Prevalence in NIDS Datasets: A Case Study on CIC-IDS-2017 and CSE-CIC-IDS-2018.</i> IEEE CNS 2022. <span class="link">(paywalled; record: archive.cps-vo.org/node/97449)</span></td><td>Extended the error analysis to CSE-CIC-IDS2018 and published a corrected version.</td><td>Same: data quality, not detection. <b>We use this corrected release.</b></td></tr>
+<tr><td>04</td><td>Lanvin et al. <i>Errors in the CICIDS2017 Dataset and the Significant Differences in Detection Performances It Makes.</i> CRiSIS 2022. <span class="link">(hal.science/hal-03775466, bot check)</span></td><td>Showed that label errors change reported detection results substantially.</td><td>Confirms why corrected data matter; no new detector.</td></tr>
+<tr><td>05</td><td>Flood, Engelen, Aspinall, Desmet. <i>Bad Design Smells in Benchmark NIDS Datasets.</i> IEEE EuroS&amp;P 2024 (Distinguished Paper). <span class="link">(IEEE Xplore 10629000)</span></td><td>Analysed seven benchmark datasets and named six recurring design flaws, such as low diversity and murky labels.</td><td>Warns that lab benchmarks may not generalise: a limitation we state for our own results.</td></tr>
+<tr><td>06</td><td>Arp et al. <i>Dos and Don'ts of Machine Learning in Computer Security.</i> USENIX Security 2022.</td><td>Catalogued ten common pitfalls, including sampling bias, data snooping and unrealistic splits.</td><td>A checklist, not a system. We follow it (validation-only tuning, temporal split, seeds).</td></tr>
+<tr><td>07</td><td>Pendlebury, Pierazzi, Jordaney, Kinder, Cavallaro. <i>TESSERACT: Eliminating Experimental Bias in Malware Classification across Space and Time.</i> USENIX Security 2019.</td><td>Showed that random splits inflate results; argued that tests must be later in time than training.</td><td>About malware. We apply the same idea to network flows (temporal split).</td></tr>
+<tr><td>08</td><td>Apruzzese, Laskov, Schneider. <i>SoK: Pragmatic Assessment of Machine Learning for Network Intrusion Detection.</i> IEEE EuroS&amp;P 2023.</td><td>Re-evaluated ML detectors across many settings, attacks and hardware, with a practitioner study.</td><td>Static detectors; no continual learning, no graphs.</td></tr>
+<tr><td>09</td><td>Sarhan, Layeghy, Portmann. <i>Towards a Standard Feature Set for NIDS Datasets.</i> Mobile Networks and Applications 2022.</td><td>Proposed a common NetFlow feature set so datasets can be compared.</td><td>Feature standardisation; detection over time not studied.</td></tr>
+<tr><td>10</td><td>Dragoi et al. <i>AnoShift: A Distribution Shift Benchmark for Unsupervised Anomaly Detection.</i> NeurIPS 2022 Datasets &amp; Benchmarks.</td><td>Ten years of traffic (Kyoto-2006+) split into near and far future; measured how detectors decay.</td><td>Unsupervised, no attack categories learned in sequence, no graph.</td></tr>
+</tbody></table>
+
+<h3>5.2 Graph neural networks for intrusion detection</h3>
+<table class="papers">
+<thead><tr><th>#</th><th>Paper</th><th>What it did</th><th>What it leaves open for us</th></tr></thead>
+<tbody>
+<tr><td>11</td><td>Hamilton, Ying, Leskovec. <i>Inductive Representation Learning on Large Graphs (GraphSAGE).</i> NeurIPS 2017.</td><td>The sample-and-aggregate GNN that works on graphs it has never seen.</td><td>General method, not security. It is the base of our model.</td></tr>
+<tr><td>12</td><td>Lo, Layeghy, Sarhan, Gallagher, Portmann. <i>E-GraphSAGE: A GNN-based Intrusion Detection System for IoT.</i> IEEE/IFIP NOMS 2022.</td><td>Adapted GraphSAGE to classify edges (flows) with edge features; strong results on NetFlow datasets.</td><td>Trained once; no new attacks over time, no forgetting, no drift, no analyst layer. <b>Our model's architecture.</b></td></tr>
+<tr><td>13</td><td>Pujol-Perich, Su&aacute;rez-Varela, Cabellos-Aparicio, Barlet-Ros. <i>Unveiling the Potential of GNNs for Robust Intrusion Detection.</i> 2021/22.</td><td>GNN on CIC-IDS2017 that stays accurate when attackers alter packet sizes and timings.</td><td>Static training; robustness to feature tampering, not to new attack types.</td></tr>
+<tr><td>14</td><td>Caville, Lo, Layeghy, Portmann. <i>Anomal-E: A Self-Supervised NIDS based on GNNs.</i> Knowledge-Based Systems 2022.</td><td>Learns edge embeddings without labels, then detects anomalies.</td><td>No supervised continual learning; no incidents or explanations.</td></tr>
+<tr><td>15</td><td>Bilot, El Madhoun, Al Agha, Zouaoui. <i>Graph Neural Networks for Intrusion Detection: A Survey.</i> IEEE Access 2023. <span class="link">(hal.science/hal-04099607, bot check)</span></td><td>Survey of GNN-based IDS work.</td><td>Survey; identifies open problems rather than solving them.</td></tr>
+<tr><td>16</td><td>Li, Zhang, Yuan, Zhou. <i>Network Intrusion Detection with Edge-Directed Graph Multi-Head Attention Networks.</i> arXiv 2023.</td><td>Attention-based GNN that uses edge direction.</td><td>Static benchmark accuracy.</td></tr>
+<tr><td>17</td><td>Wang, Zheng, Gui, Hua, Hassan. <i>Are We There Yet? Unraveling the State-of-the-Art Graph Network Intrusion Detection Systems.</i> arXiv 2025.</td><td>Systematically re-evaluates published graph-based NIDS.</td><td>An evaluation study of existing graph detectors; continual learning and drift are outside its scope.</td></tr>
+<tr><td>18</td><td>El Mahdaouy, Ait Yahia, Oualil, Berrada. <i>Deep Learning for Contextualized NetFlow-Based Network Intrusion Detection: Methods, Data, Evaluation and Deployment.</i> arXiv 2026.</td><td>Recent survey of detectors that use context beyond a single flow.</td><td>Survey; continual adaptation and analyst workload remain open.</td></tr>
+</tbody></table>
+</section>
+
+<section class="page-break">
+<h3>5.3 Continual learning (general and on graphs)</h3>
+<table class="papers">
+<thead><tr><th>#</th><th>Paper</th><th>What it did</th><th>What it leaves open for us</th></tr></thead>
+<tbody>
+<tr><td>19</td><td>Kirkpatrick et al. <i>Overcoming Catastrophic Forgetting in Neural Networks.</i> PNAS 2017.</td><td>Introduced EWC: penalise changes to weights that were important for earlier tasks.</td><td>Not security; and EWC alone is known to struggle when new classes are added. We confirm that (0.300).</td></tr>
+<tr><td>20</td><td>Rolnick, Ahuja, Schwarz, Lillicrap, Wayne. <i>Experience Replay for Continual Learning.</i> NeurIPS 2019.</td><td>Showed that replaying a small buffer of old data is a strong defence against forgetting.</td><td>Not graphs, not security. We replay whole traffic windows.</td></tr>
+<tr><td>21</td><td>van de Ven, Tolias. <i>Three Scenarios for Continual Learning.</i> arXiv 2019.</td><td>Defined task-, domain- and class-incremental learning and showed class-incremental is hardest.</td><td>A framework. Our multiclass setting is class-incremental; our binary setting is domain-incremental.</td></tr>
+<tr><td>22</td><td>Wang, Zhang, Su, Zhu. <i>A Comprehensive Survey of Continual Learning: Theory, Method and Application.</i> IEEE TPAMI 2024.</td><td>Broad survey of continual-learning methods and applications.</td><td>Survey; security applications only touched on.</td></tr>
+<tr><td>23</td><td>Zhou, Cao. <i>Overcoming Catastrophic Forgetting in GNNs with Experience Replay (ER-GNN).</i> AAAI 2021.</td><td>Replay for graph neural networks: choose which nodes to keep.</td><td>Node classification on citation-style graphs, not network flows.</td></tr>
+<tr><td>24</td><td>Liu, Yang, Wang. <i>Overcoming Catastrophic Forgetting in Graph Neural Networks (TWP).</i> AAAI 2021.</td><td>Protects weights that matter for the graph's topology, an EWC-like idea for GNNs.</td><td>Same: generic graphs, not intrusion detection.</td></tr>
+</tbody></table>
+
+<h3>5.4 Continual learning for intrusion detection</h3>
+<table class="papers">
+<thead><tr><th>#</th><th>Paper</th><th>What it did</th><th>What it leaves open for us</th></tr></thead>
+<tbody>
+<tr><td>25</td><td>Amalapuram, Tadwai, Vinta, Channappayya, Tamma. <i>Continual Learning for Anomaly based Network Intrusion Detection.</i> COMSNETS 2022. <span class="link">(paywalled; newslab.iith.ac.in)</span></td><td>Applied EWC and GEM to CICIDS and KDD; studied class imbalance and task order.</td><td>Per-flow models; no graph structure, no drift trigger, no analyst layer.</td></tr>
+<tr><td>26</td><td>Amalapuram, Channappayya, Tamma. <i>Augmented Memory Replay-based Continual Learning Approaches for Network Intrusion Detection.</i> NeurIPS 2023.</td><td>Class-balanced replay and a cheaper way to pick replay samples, on many NIDS datasets including CIC-IDS2017/2018.</td><td>Focuses on the replay mechanism; graph context and analyst workload are complementary questions.</td></tr>
+<tr><td>27</td><td>Zhang et al. <i>Continual Learning with Strategic Selection and Forgetting for Network Intrusion Detection.</i> IEEE INFOCOM 2025.</td><td>Chooses which new samples to keep and deliberately forgets outdated ones.</td><td>Focuses on which samples to keep; we study graph context, retraining timing and analyst output.</td></tr>
+<tr><td>28</td><td>Banerjee, Bergqvist, Toor, Rohner, Johnsson. <i>Quantifying Catastrophic Forgetting in IoT Intrusion Detection Systems.</i> arXiv 2026.</td><td>Measured forgetting across continual-learning methods; found replay best overall.</td><td>IoT setting. Its replay finding agrees with ours in a different domain.</td></tr>
+</tbody></table>
+
+<h3>5.5 Concept drift: noticing change and adapting</h3>
+<table class="papers">
+<thead><tr><th>#</th><th>Paper</th><th>What it did</th><th>What it leaves open for us</th></tr></thead>
+<tbody>
+<tr><td>29</td><td>Bifet, Gavald&agrave;. <i>Learning from Time-Changing Data with Adaptive Windowing (ADWIN).</i> SIAM SDM 2007.</td><td>The adaptive-window change detector with statistical guarantees.</td><td>Generic method. It is our drift trigger.</td></tr>
+<tr><td>30</td><td>Andresini, Pendlebury, Pierazzi, Loglisci, Appice, Cavallaro. <i>INSOMNIA: Towards Concept-Drift Robustness in Network Intrusion Detection.</i> ACM AISec 2021.</td><td>Semi-supervised NIDS that updates continuously, with active learning and label estimation.</td><td>A drift-robust per-flow detector; we add a direct comparison of a drift trigger against a fixed schedule for a graph model.</td></tr>
+<tr><td>31</td><td>Barbero, Pendlebury, Pierazzi, Cavallaro. <i>Transcending Transcend: Revisiting Malware Classification in the Presence of Concept Drift.</i> IEEE S&amp;P 2022.</td><td>Uses conformal evaluation to reject predictions that drift has made untrustworthy.</td><td>Malware, not network graphs.</td></tr>
+<tr><td>32</td><td>Yang et al. <i>CADE: Detecting and Explaining Concept Drift Samples for Security Applications.</i> USENIX Security 2021.</td><td>Detects drifting samples with contrastive learning and explains them.</td><td>Detection of drift, not continual retraining of a graph detector.</td></tr>
+<tr><td>33</td><td>Chen, Ding, Wagner. <i>Continuous Learning for Android Malware Detection.</i> USENIX Security 2023.</td><td>Active learning plus contrastive learning to keep a malware classifier current over seven years.</td><td>Malware; analyst labelling budget is studied, which inspired our label-budget experiment.</td></tr>
+</tbody></table>
+
+<h3>5.6 Trust: calibration, uncertainty, novelty, analysts</h3>
+<table class="papers">
+<thead><tr><th>#</th><th>Paper</th><th>What it did</th><th>What it leaves open for us</th></tr></thead>
+<tbody>
+<tr><td>34</td><td>Guo, Pleiss, Sun, Weinberger. <i>On Calibration of Modern Neural Networks.</i> ICML 2017.</td><td>Showed modern networks are overconfident; introduced ECE measurements.</td><td>Generic; we measure our model's calibration (ECE 2.2&nbsp;% on attacks).</td></tr>
+<tr><td>35</td><td>Angelopoulos, Bates. <i>A Gentle Introduction to Conformal Prediction and Distribution-Free Uncertainty Quantification.</i> 2021.</td><td>Tutorial on prediction sets with coverage guarantees.</td><td>Generic method; we apply its class-conditional form for abstention.</td></tr>
+<tr><td>36</td><td>Liu, Wang, Owens, Li. <i>Energy-based Out-of-distribution Detection.</i> NeurIPS 2020.</td><td>The energy score for spotting inputs unlike the training data.</td><td>Images; we use it as one of three novelty scores for traffic.</td></tr>
+<tr><td>37</td><td>Alahmadi, Axon, Martinovic. <i>99% False Positives: A Qualitative Study of SOC Analysts' Perspectives on Security Alarms.</i> USENIX Security 2022.</td><td>Interviewed SOC practitioners; alarms must be reliable, explainable, analytical, contextual and transferable.</td><td>A user study, not a system. It motivates our incidents, explanations and abstention.</td></tr>
+<tr><td>38</td><td>Barrett, Li, Dorai, Rajaganapathy. <i>FIRCE: A Framework for Intrusion Response and Conformal Evaluation.</i> arXiv 2026.</td><td>Adds conformal uncertainty and drift detection to supervised IDS classifiers.</td><td>Adds uncertainty to existing IDS classifiers; not combined with a continual graph model.</td></tr>
+</tbody></table>
+
+<h3>5.7 Tools the project is built on</h3>
+<table class="papers">
+<thead><tr><th>#</th><th>Paper</th><th>What it did</th><th>Role here</th></tr></thead>
+<tbody>
+<tr><td>39</td><td>Fey, Lenssen. <i>Fast Graph Representation Learning with PyTorch Geometric.</i> ICLR Workshop 2019.</td><td>The PyTorch library for GNNs.</td><td>Graph data structures and message passing.</td></tr>
+<tr><td>40</td><td>Chen, Guestrin. <i>XGBoost: A Scalable Tree Boosting System.</i> KDD 2016.</td><td>Gradient-boosted decision trees.</td><td>The tree-ensemble baseline (the Random-Forest family).</td></tr>
+</tbody></table>
+</section>
+
+<!-- ======================================================================================= 6 -->
+<section class="page-break">
+<h2>6 &middot; The gap: what was missing, and what this project does about it</h2>
+<p>Each line of work above solves one piece. In the papers reviewed here we did not find one system that does all
+of the pieces together <i>and</i> evaluates them with a time-ordered split, several seeds and statistics. That
+combination, and the honesty of the evaluation, is what this project contributes. It is a combination of known
+techniques, not a new algorithm, and should be presented that way.</p>
+
+<table>
+<thead><tr><th>What is missing</th><th>Who it affects</th><th>What this project does</th><th>Evidence</th></tr></thead>
+<tbody>
+<tr><td><b>GNN detectors are trained once.</b> No new attacks over time, no forgetting measured.</td><td>12, 13, 14, 16</td><td>Graph model learns 7 attack types in sequence with replay and EWC; retention, BWT and per-category recall reported after every task.</td><td>2 datasets; 3&ndash;5 seeds</td></tr>
+<tr><td><b>Continual NIDS uses per-flow models.</b> Host relationships are ignored.</td><td>25, 26, 27, 28</td><td>The same continual-learning recipe applied to a graph model <i>and</i> to an identical per-flow model, so the graph's effect is isolated.</td><td>Paired statistics, both splits</td></tr>
+<tr><td><b>Unseen attacks are rarely tested for continual detectors.</b></td><td>25&ndash;28</td><td>Leave-one-attack-out: graph vs per-flow vs XGBoost on attacks never trained on.</td><td>2 seeds (2018), 1 seed (2017)</td></tr>
+<tr><td><b>When to retrain is rarely compared with simple alternatives.</b></td><td>30, 31, 33</td><td>ADWIN vs fixed schedule vs perfect-knowledge oracle vs never, on clean and mixed attack streams.</td><td>3 seeds each</td></tr>
+<tr><td><b>Optimistic splits and single runs.</b></td><td>6, 7, 17</td><td>Time-ordered split per attack, 5 seeds, bootstrap confidence intervals, Wilcoxon tests; error-corrected datasets.</td><td>results/stats</td></tr>
+<tr><td><b>Detectors stop at flow-level accuracy.</b> Analyst workload is ignored.</td><td>37</td><td>Incidents, explanations, conformal abstention, calibration, novelty scores, dry-run response with approve/reject.</td><td>Single runs, labelled</td></tr>
+<tr><td><b>Results are hard to reproduce.</b></td><td>6, 17</td><td>Every number written by a script; one command regenerates them; 92 tests; console reads the same files.</td><td>README, CI</td></tr>
+</tbody></table>
+
+<h3>What we do <i>not</i> claim</h3>
+<ul>
+<li>That the graph model is always better: on attacks it has seen, the gain is small (+0.04) and the per-flow model has
+a lower false-positive rate on one split.</li>
+<li>That unseen-attack detection is reliable for every attack: BruteForce and Botnet swapped between two seeds.</li>
+<li>That ADWIN saves retraining: on CIC-IDS2017 it retrains about twice as often as a fixed schedule.</li>
+<li>That lab results transfer to a real network: both datasets are laboratory captures.</li>
+</ul>
+</section>

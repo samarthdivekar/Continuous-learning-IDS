@@ -1,0 +1,228 @@
+<!-- ======================================================================================= 7 -->
+<section class="page-break">
+<h2>7 &middot; The machine-learning model: why a graph network, and why not Random Forest</h2>
+
+<h3>7.1 The model we use, in plain words</h3>
+<p>The deployed model is called <span class="mono">gnn_ewc_replay</span>: an <b>E-GraphSAGE graph neural network</b>
+trained with <b>EWC</b> and <b>replay</b>. Here is what happens to one flow, step by step:</p>
+<ol>
+<li><b>Build the graph.</b> The 5,000 flows of a window become a graph. Each computer is a node; each flow is an edge
+carrying its 83 numbers (scaled so that big and small numbers are comparable). Each node also gets simple structural
+numbers: how many flows it sends and receives.</li>
+<li><b>Look around (two hops).</b> For each computer the model gathers a summary of the flows going out of it and the
+flows coming into it, separately (direction matters: a scanner sends, a victim receives). It does this twice, so a
+computer's summary also reflects its neighbours' neighbours.</li>
+<li><b>Decide per flow.</b> For each flow, the summaries of its two endpoints are joined with the flow's own numbers
+(the "edge skip", so the flow itself is never drowned out), and a small classifier outputs a probability for benign and
+for each attack type.</li>
+</ol>
+<table class="kv">
+<tr><td>Hidden size / layers</td><td>64 / 2 (two hops of neighbourhood)</td></tr>
+<tr><td>Parameters</td><td>69,128 (the per-flow FFNN ablation has 55,432)</td></tr>
+<tr><td>Training per task</td><td>10 epochs, Adam, learning rate 0.001, class weights for rare attacks (chosen on the
+validation split, never on test)</td></tr>
+<tr><td>EWC</td><td>&lambda; = 10, &gamma; = 0.9 (chosen by a validation sweep over &lambda; and &gamma;)</td></tr>
+<tr><td>Replay</td><td>up to 10 stored windows per attack category, 2 replayed at every training step</td></tr>
+</table>
+
+<h3>7.2 The models it is compared against</h3>
+<p>The project keeps every baseline and ablation, because they are the evidence for the design choices:</p>
+<table>
+<thead><tr><th>Model</th><th>What it is</th><th>The question it answers</th></tr></thead>
+<tbody>
+<tr><td>XGBoost static</td><td>Boosted decision trees, trained once on the first task, never updated</td><td>What does a classic tree model do when it never learns new attacks?</td></tr>
+<tr><td>GNN naive retrain</td><td>Our graph model retrained on each new task with no protection</td><td>How bad is forgetting?</td></tr>
+<tr><td>FFNN + EWC + replay</td><td>A plain neural network judging each flow alone, with the <i>same</i> continual-learning recipe</td><td>Does the graph help? (only the graph differs)</td></tr>
+<tr><td>GNN + replay only</td><td>Our model without EWC</td><td>Does EWC add anything?</td></tr>
+<tr><td>GNN + EWC only</td><td>Our model without replay</td><td>Does replay matter?</td></tr>
+<tr><td>GNN / FFNN joint</td><td>Retrained on all data seen so far, every time</td><td>The upper bound a continual model aims for</td></tr>
+</tbody></table>
+
+<h3>7.3 Why not Random Forest (or any per-flow tree model)?</h3>
+<p class="note">You mentioned an early Random Forest version that was dropped. It is not in this repository's history,
+which starts on 17 September 2026, so this guide explains the decision using the tree-ensemble baseline the repository
+does contain: XGBoost. Random Forest and XGBoost are close relatives: both are many decision trees voting, and both
+judge each flow on its own.</p>
+
+<p>Random Forest is a good classifier and a sensible first attempt. It was replaced because the product needs four
+things a per-flow tree model cannot provide:</p>
+<table>
+<thead><tr><th>Need</th><th>Random Forest / XGBoost</th><th>Graph neural network with continual learning</th></tr></thead>
+<tbody>
+<tr><td><b>See relationships</b> between computers (scans fan out, floods fan in)</td><td>Judges one row at a time; "this host talked to 996 ports" is invisible unless you hand-craft extra features.</td><td>Reads the neighbourhood directly from the graph.</td></tr>
+<tr><td><b>Catch attacks never trained on</b></td><td>Our XGBoost baseline caught 0&nbsp;% of five of the six never-seen 2018 attacks (90.1&nbsp;% on DoS only); the per-flow neural network caught at most 0.07&nbsp;% on all of them.</td><td>More than 80&nbsp;% in 6 of 12 held-out tests.</td></tr>
+<tr><td><b>Learn new attacks over time</b> without starting from scratch</td><td>Trees are rebuilt from scratch; to keep old knowledge you must keep and retrain on <i>all</i> old data. A tree model trained once (our XGBoost static) ends at 0.231 macro-F1 because it never learns the later attacks.</td><td>Updates on the new task, rehearsing only a small replay buffer, and keeps 99.8&ndash;100&nbsp;% retention.</td></tr>
+<tr><td><b>Say "I'm not sure" and "this is new"</b></td><td>Tree vote fractions are poorly calibrated probabilities; no learned embedding for distance-based novelty.</td><td>Softmax probabilities support conformal abstention, and the hidden layer gives embeddings for novelty and drift scores.</td></tr>
+</tbody></table>
+<p><b>Where Random Forest would be the right choice:</b> a fixed set of known attacks, no need to learn over time, and a
+need for very fast CPU-only training with feature importances out of the box. That is not this product's situation.</p>
+
+<h3>7.4 How the model choice benefits the product</h3>
+<ul>
+<li><b>Incidents come naturally.</b> Because the model already thinks in hosts and connections, grouping flagged flows
+into attacker/victim incidents uses the same graph.</li>
+<li><b>Better explanations.</b> The explanation can say "80&nbsp;% of the evidence came from neighbouring flows", which
+tells an analyst the graph context mattered (see the incident detail screenshot).</li>
+<li><b>Fewer missed new attacks.</b> Structural patterns transfer to attacks the model never saw, at least for some of
+them.</li>
+<li><b>Cheap to keep current.</b> Each update trains on the new traffic plus a small buffer, in seconds per task on a
+laptop GPU, instead of retraining on everything.</li>
+</ul>
+
+<h3>7.5 What the numbers say about the model (CIC-IDS2017, final task)</h3>
+<table>
+<thead><tr><th>Model</th><th>Interleaved split (3 seeds)</th><th>Temporal split (5 seeds)</th><th>Remembers first attack</th></tr></thead>
+<tbody>
+<tr><td><b>GNN + EWC + replay (ours)</b></td><td><b>0.964 &plusmn; 0.020</b></td><td><b>0.915 &plusmn; 0.031</b></td><td>100&nbsp;% / 99.8&nbsp;%</td></tr>
+<tr><td>FFNN + EWC + replay (no graph)</td><td>0.928 &plusmn; 0.020</td><td>0.870 &plusmn; 0.009</td><td>100&nbsp;% / 99.7&nbsp;%</td></tr>
+<tr><td>GNN + replay only</td><td>0.948 &plusmn; 0.016</td><td>0.848 &plusmn; 0.089</td><td>100&nbsp;% / 99.4&nbsp;%</td></tr>
+<tr><td>GNN + EWC only</td><td>0.300</td><td>0.377</td><td>0&nbsp;%</td></tr>
+<tr><td>GNN naive retrain</td><td>0.289</td><td>0.263</td><td>0&nbsp;%</td></tr>
+<tr><td>XGBoost static (tree model)</td><td>0.231</td><td>0.236</td><td>100&nbsp;% / 99.0&nbsp;% (it never learns anything new)</td></tr>
+<tr><td>GNN joint retrain (upper bound)</td><td>0.951</td><td>0.935</td><td>100&nbsp;% / 99.7&nbsp;%</td></tr>
+</tbody></table>
+</section>
+
+<!-- ======================================================================================= 8 -->
+<section class="page-break">
+<h2>8 &middot; The data: why CIC-IDS2017 and CSE-CIC-IDS2018</h2>
+
+<h3>8.1 The two datasets</h3>
+<table>
+<thead><tr><th></th><th>CIC-IDS2017</th><th>CSE-CIC-IDS2018</th></tr></thead>
+<tbody>
+<tr><td>Made by</td><td>Canadian Institute for Cybersecurity (Sharafaldin et al., 2018)</td><td>Communications Security Establishment and CIC</td></tr>
+<tr><td>Network</td><td>A lab office network, five working days</td><td>A larger network hosted on AWS, about ten days</td></tr>
+<tr><td>Release used</td><td>Error-corrected by Engelen et al. (2021)</td><td>Error-corrected by Liu et al. (2022)</td></tr>
+<tr><td>Attack tasks, in capture order</td><td>BruteForce &rarr; DoS &rarr; WebAttack &rarr; Infiltration &rarr; Botnet &rarr; PortScan &rarr; DDoS (7)</td><td>BruteForce &rarr; DoS &rarr; DDoS &rarr; WebAttack &rarr; Infiltration &rarr; Botnet (6)</td></tr>
+<tr><td>Flows used</td><td>All</td><td>A 15&nbsp;% sample, taken without looking at labels (the full set is too large for a 24 GB laptop)</td></tr>
+<tr><td>Features</td><td colspan="2">The same CICFlowMeter flow features (83 used), so one model design fits both</td></tr>
+</tbody></table>
+
+<h3>8.2 Why these two, and not more recent ones?</h3>
+<p>Newer intrusion datasets exist (for example CIC-DDoS2019, BoT-IoT, TON_IoT and CIC-IoT2023). These two were chosen
+because the project needs a very specific combination, and they are the best-documented datasets that have it:</p>
+<ol>
+<li><b>Many different attack types arriving one after another, with timestamps.</b> Continual learning needs a natural
+<i>sequence</i> of new attacks. Both datasets recorded different attacks on different days, so the capture schedule
+gives a realistic order of tasks. Datasets built around one attack family (such as a DDoS-only set) cannot provide
+that.</li>
+<li><b>Source and destination addresses kept.</b> A graph needs to know who talked to whom. Some re-released datasets
+anonymise or drop addresses, which makes graph building impossible.</li>
+<li><b>Corrected versions exist.</b> Researchers found and fixed thousands of labelling and flow errors in exactly these
+two datasets (papers 02 and 03). A detector evaluated on wrong labels gives wrong numbers (paper 04). Very few newer
+datasets have had this level of independent checking.</li>
+<li><b>Comparability.</b> They are the most-used enterprise intrusion benchmarks, including by the graph and
+continual-learning papers this project builds on (12, 13, 26), so the results can be placed next to published work.</li>
+<li><b>Enterprise rather than IoT traffic.</b> The target user is an organisation's security team. Many newer datasets
+focus on IoT devices, a different traffic profile.</li>
+</ol>
+<p><b>The honest downside:</b> 2017 and 2018 traffic is old, and it is laboratory traffic with attacks in clean
+blocks. The project tests one consequence of that directly (the mixed-attack stream, section 12) and lists validation on
+newer and real traffic as future work.</p>
+
+<h3>8.3 Why two datasets and not one?</h3>
+<p>Because one dataset can fool you. A result that holds on one network might be an accident of that network's
+particular hosts, timings or labelling. The second dataset is a <b>different network</b> (bigger, cloud-hosted, a
+different attack order) measured with the <b>same features</b>, so the same model can be tested on both. That is
+replication, and it changed conclusions:</p>
+<ul>
+<li>EWC alone looked fine in 2017 binary mode but <b>failed on 2018</b>, which is part of why the project concludes that
+replay, not EWC, is what prevents forgetting.</li>
+<li>The drift detector over-triggered on 2017 but <b>beat a fixed schedule on 2018</b> (one run): its value depends on
+the network.</li>
+<li>The graph's advantage on attacks it has seen is clear on 2017 but carried by one seed on 2018.</li>
+<li>The strongest graph result, detection of never-seen attacks, is <b>strongest on 2018</b>.</li>
+</ul>
+
+<h3>8.4 How the data become tasks and test sets</h3>
+<p>Flows are sorted by time and cut into windows of 5,000. Each window belongs to the attack task during which it was
+captured. Each task's windows are split into training, validation and test. Two ways of splitting are reported:</p>
+<div class="diagram">
+<svg viewBox="0 0 640 140" width="100%">
+  <g font-family="Inter, sans-serif" font-size="12">
+  <text x="0" y="16" fill="#555">Interleaved (by position in groups of 10)</text>
+  <g>
+    <rect x="0" y="24" width="60" height="22" fill="#5361e8"/><rect x="62" y="24" width="60" height="22" fill="#5361e8"/>
+    <rect x="124" y="24" width="60" height="22" fill="#ef5f5f"/><rect x="186" y="24" width="60" height="22" fill="#5361e8"/>
+    <rect x="248" y="24" width="60" height="22" fill="#5361e8"/><rect x="310" y="24" width="60" height="22" fill="#fab219"/>
+    <rect x="372" y="24" width="60" height="22" fill="#5361e8"/><rect x="434" y="24" width="60" height="22" fill="#5361e8"/>
+    <rect x="496" y="24" width="60" height="22" fill="#ef5f5f"/><rect x="558" y="24" width="60" height="22" fill="#5361e8"/>
+  </g>
+  <text x="0" y="78" fill="#555">Temporal (first 70 % train, gap, 10 % validation, gap, last 20 % test)</text>
+  <rect x="0" y="86" width="420" height="22" fill="#5361e8"/><rect x="424" y="86" width="16" height="22" fill="#ccc"/>
+  <rect x="444" y="86" width="56" height="22" fill="#fab219"/><rect x="504" y="86" width="16" height="22" fill="#ccc"/>
+  <rect x="524" y="86" width="96" height="22" fill="#ef5f5f"/>
+  <rect x="0" y="122" width="12" height="12" fill="#5361e8"/><text x="18" y="132">train</text>
+  <rect x="70" y="122" width="12" height="12" fill="#fab219"/><text x="88" y="132">validation</text>
+  <rect x="170" y="122" width="12" height="12" fill="#ef5f5f"/><text x="188" y="132">test</text>
+  <rect x="230" y="122" width="12" height="12" fill="#ccc"/><text x="248" y="132">gap (dropped)</text>
+  </g>
+</svg>
+<p class="caption">Interleaved tests sit minutes away from training windows of the same attack session, which is
+optimistic. Temporal tests are always later in time, which is realistic.</p>
+</div>
+<p>A plain time split leaves some attacks with nothing to test on (WebAttack and Botnet would get 0 test attack flows,
+DoS only 11), because those attacks sit at one end of their task. So the project uses a <b>per-attack temporal
+split</b>: the windows carrying the new attack and the other windows are each split 70/10/20 in time. Every attack is
+then tested on its own latest traffic. This cost our model 0.049 macro-F1 (0.964 &rarr; 0.915), which is the honest
+price of a realistic test.</p>
+</section>
+
+<!-- ======================================================================================= 9 -->
+<section class="page-break">
+<h2>9 &middot; How the product works, end to end</h2>
+
+<h3>9.1 The five layers</h3>
+<div class="diagram">
+<svg viewBox="0 0 660 230" width="100%">
+  <g font-family="Inter, sans-serif" font-size="12.5">
+  <rect x="5" y="20" width="120" height="58" rx="8" fill="#eef1f7" stroke="#8591a3"/><text x="16" y="44" font-weight="700">1 Ingestion</text><text x="16" y="62">CSV flows &#8594; clean</text>
+  <rect x="140" y="20" width="120" height="58" rx="8" fill="#eef1f7" stroke="#8591a3"/><text x="151" y="44" font-weight="700">2 Graphs</text><text x="151" y="62">5,000-flow windows</text>
+  <rect x="275" y="20" width="130" height="58" rx="8" fill="#e6e9ff" stroke="#5361e8"/><text x="286" y="44" font-weight="700">3 Model service</text><text x="286" y="62">GPU &#183; port 8001</text>
+  <rect x="420" y="20" width="110" height="58" rx="8" fill="#eef1f7" stroke="#8591a3"/><text x="431" y="44" font-weight="700">4 Public API</text><text x="431" y="62">FastAPI &#183; 8000</text>
+  <rect x="545" y="20" width="110" height="58" rx="8" fill="#eef1f7" stroke="#8591a3"/><text x="556" y="44" font-weight="700">5 Console</text><text x="556" y="62">browser &#183; 8080</text>
+  <g stroke="#5361e8" stroke-width="2" fill="none"><path d="M125 49 H140"/><path d="M260 49 H275"/><path d="M405 49 H420"/><path d="M530 49 H545"/></g>
+  <rect x="140" y="120" width="120" height="50" rx="8" fill="#fff" stroke="#8591a3"/><text x="151" y="142" font-weight="700">Cache</text><text x="151" y="160">graphs, checkpoints</text>
+  <rect x="275" y="120" width="130" height="50" rx="8" fill="#fff" stroke="#8591a3"/><text x="286" y="142" font-weight="700">results/ files</text><text x="286" y="160">every number shown</text>
+  <rect x="420" y="120" width="110" height="50" rx="8" fill="#fff" stroke="#8591a3"/><text x="431" y="142" font-weight="700">Database</text><text x="431" y="160">SQLite (or Postgres)</text>
+  <g stroke="#8591a3" stroke-dasharray="4 3" fill="none"><path d="M200 78 V120"/><path d="M340 78 V120"/><path d="M475 78 V120"/></g>
+  <text x="5" y="210" fill="#555">Started together by scripts/run_stack.ps1. The browser only talks to port 8080, which serves the pages and forwards /api.</text>
+  </g>
+</svg>
+</div>
+
+<h3>9.2 Following one window through the system</h3>
+<ol>
+<li><b>Ingestion</b> reads the corrected CSV files, renames columns to a standard form, fixes infinite or missing values,
+relabels "attempted" attacks (no malicious payload) as benign as the dataset authors advise, and assigns each flow to its
+attack task by time.</li>
+<li><b>Preprocessing</b> applies a log transform and scaling learned on training data only, clips extreme values, and
+cuts the stream into windows of 5,000 flows.</li>
+<li><b>Graph building</b> turns each window into a graph (hosts &rarr; nodes, flows &rarr; edges) and caches it on
+disk, so later steps never repeat this work.</li>
+<li><b>Training</b> (offline, <span class="mono">experiments/run_continual.py</span>) learns the tasks in order and saves a
+checkpoint of every model after every task.</li>
+<li><b>Serving</b>: the model service loads the final checkpoints. When the console asks about window 363, it scores all
+5,000 flows in about 5.5&nbsp;ms on the GPU and caches the answer.</li>
+<li><b>Incidents</b>: flows predicted as attacks are linked when they share hosts, giving one group per attacker/victim
+cluster and category. Each group gets a severity (size &times; confidence), a key host, an explanation and a proposed
+action.</li>
+<li><b>Human decision</b>: the analyst approves or rejects. The decision is stored in the database with their name and a
+note. Nothing is executed.</li>
+</ol>
+
+<h3>9.3 The live loop (Live stream page)</h3>
+<p>The same steps run continuously during a replay. For each new window, each of four models predicts first. Then the
+true labels are revealed (the "delayed labels" an analyst would provide), the error goes to ADWIN, and if ADWIN confirms a
+rise in error the model adapts on the last 20 windows using its continual-learning strategy. Everything is written to the
+database and shown live.</p>
+
+<h3>9.4 Why it is split into separate services</h3>
+<ul>
+<li>The heavy model work (GPU, PyTorch) runs in its own process, so the public API stays responsive.</li>
+<li>If the model service is down, the pages that read saved results still work, and a banner names the pages that
+need the model service.</li>
+<li>The browser never talks to the model service directly. It only talks to port 8080, which is easier to secure.</li>
+</ul>
+</section>

@@ -16,3 +16,8 @@ results/dev/
 # documentation generator intermediates
 scripts/docgen/*.json
 scripts/docgen/project_documentation.html
+
+# downloaded research papers: for reading only, not redistributed
+research paper/*.pdf
+# guide build intermediate
+docs/guide/guide.html

@@ -1,0 +1,456 @@
+<!-- ======================================================================================= 10 -->
+<section class="page-break">
+<h2>10 &middot; Every page and every feature of the console</h2>
+<p>The console is a website that runs in the browser at <span class="mono">http://localhost:8080</span>. It has eight
+pages in two groups: <b>Operate</b> (what a security team uses day to day) and <b>Evaluate</b> (the evidence that the
+model works). Every number on screen is read from a result file or from the live model; nothing is typed in by hand.
+Screenshots were taken from the running system with the model service up, in the dark theme at 1440&times;900.</p>
+
+<h3>10.1 The frame around every page</h3>
+<figure><img src="img/03_sidebar.png" class="narrow"><figcaption>The sidebar: brand, the eight pages, service
+status, and four utility buttons.</figcaption></figure>
+<table class="kv">
+<tr><td>Navigation</td><td>One item per page with an icon. The current page is highlighted with an accent bar. Hovering an
+item shows its keyboard number (1&ndash;8). A red <b>LIVE</b> badge appears on Live stream while a replay runs.</td></tr>
+<tr><td>Service status</td><td>Four rows checked every 4 seconds: <b>API</b> (port 8000), <b>Model service</b> (port 8001,
+the GPU), <b>Database</b>, and <b>Stream</b> (idle, finished, or progress such as 120/200). Green dot = online, red =
+offline. Hovering Model service shows the device (cuda + GPU name) and the models loaded.</td></tr>
+<tr><td>&#9654; Tour</td><td>A five-step guided walk: Overview &rarr; Incident queue &rarr; Live stream &rarr; Graph explorer
+&rarr; Models, one sentence each.</td></tr>
+<tr><td>? Help</td><td>Opens a drawer with "where to start", keyboard shortcuts and a glossary. It opens by itself on a first
+visit.</td></tr>
+<tr><td>Presentation mode</td><td>Larger text and thicker chart lines for a projector; fine print is hidden.</td></tr>
+<tr><td>Theme</td><td>Switches dark and light. Charts redraw in the new colours.</td></tr>
+</table>
+
+<figure><img src="img/04_topbar.png"><figcaption>The top bar: where you are, and the three settings shared by every
+page.</figcaption></figure>
+<table class="kv">
+<tr><td>Breadcrumb</td><td>The group and page name, e.g. "Operate &rsaquo; Overview".</td></tr>
+<tr><td>Dataset</td><td>CIC-IDS2017 or CSE-CIC-IDS2018. Every open page re-reads its data.</td></tr>
+<tr><td>Labels</td><td><b>Multiclass</b> names each attack type; <b>Binary</b> is only attack vs benign. Binary is disabled
+for CSE-CIC-IDS2018, because that experiment had only one seed and was withdrawn (hover explains why).</td></tr>
+<tr><td>Compare models</td><td>Off: charts show our model and two reference points (naive retraining, XGBoost). On: every
+baseline and ablation appears.</td></tr>
+<tr><td>Jump to&hellip; (Ctrl K)</td><td>The command palette: type to jump to a page, switch dataset or labels, start or stop the
+stream, switch theme, or type a number to open that incident.</td></tr>
+</table>
+
+<div class="two">
+<figure><img src="img/81_command_palette.png"><figcaption>Command palette: typing "incident" offers the Incident queue.</figcaption></figure>
+<figure><img src="img/80_help_drawer.png"><figcaption>Help drawer with the glossary.</figcaption></figure>
+</div>
+<div class="two">
+<figure><img src="img/82_tour.png"><figcaption>The guided tour card (bottom right).</figcaption></figure>
+<figure><img src="img/83_presentation_mode.png"><figcaption>Presentation mode: bigger type for a projector.</figcaption></figure>
+</div>
+<p><b>Keyboard:</b> 1&ndash;8 switch pages, ? opens help, Esc closes panels, Ctrl+K opens the palette. In the Incident
+queue: j / k move, Enter opens, a approves, r rejects, c copies the rule.</p>
+<p><b>Other details:</b> a yellow <b>banner</b> appears under the top bar when the model service is down, naming the pages that
+still work; <b>&#10515; export buttons</b> on panels download the data as CSV (and charts as PNG); preferences (theme,
+dataset, labels, compare, chosen sub-page) are remembered by the browser; if the server requires an API key the console
+asks once and sends it in a header, never in the address.</p>
+</section>
+
+<section class="page-break">
+<h3>10.2 Overview: "does it work?" in one screen</h3>
+<figure><img src="img/02_overview_full.png"><figcaption>Overview, CIC-IDS2017 multiclass.</figcaption></figure>
+<ul>
+<li><b>In plain words</b>: a sentence generated from the result files, e.g. "the model learned 7 attack types one after
+another&hellip; after the last one it still catches 100&nbsp;% of the first attack type, while a normally retrained model
+catches 0&nbsp;%. It wrongly flags about 66 of every 100,000 normal flows."</li>
+<li><b>Four KPI tiles</b>: our macro-F1 (0.964 &plusmn; 0.020 over 3 seeds, versus 0.928 for the per-flow FFNN), retention of the
+first attack (100&nbsp;%, versus 0&nbsp;% for naive retraining), false-positive rate (0.07&nbsp;%), drift-triggered retrains (16,
+where the oracle needed 6).</li>
+<li><b>The core claim, measured</b>: per model, does it <i>adapt</i> (recall on each new category) and does it
+<i>remember</i> (recall on the first category at the end)? A tick appears at 80&nbsp;% or more; the rule is written on the
+panel.</li>
+<li><b>Attack timeline</b>: attack and benign test flows per task, in capture order.</li>
+<li><b>System architecture</b> diagram and a <b>Dataset</b> panel (flows, window graphs, features, tasks).</li>
+</ul>
+<p class="example"><b>Example use:</b> an examiner asks "does it forget?". Open Overview, point at the Retention tile (100&nbsp;%)
+and the red 0&nbsp;% for naive retraining underneath it.</p>
+</section>
+
+<section class="page-break">
+<h3>10.3 Incident queue: what an analyst works through</h3>
+<figure><img src="img/12_soc_incident_detail.png"><figcaption>Window #363 (PortScan) loaded with our model; incident #1 open.</figcaption></figure>
+<p><b>Why it exists:</b> analysts cannot read thousands of flow alerts. This page groups them into incidents, explains each
+one, proposes a response and records the human decision.</p>
+<table class="kv">
+<tr><td>What to review</td><td><b>One window</b> (pick a traffic window) or <b>Recent</b> (scan the last 10/20/50 windows and
+rank incidents across them, like a shift's queue).</td></tr>
+<tr><td>Detector</td><td>Which model scores the traffic: ours, the per-flow FFNN, or naive retraining.</td></tr>
+<tr><td>Minimum confidence</td><td>Alerts below this confidence are dropped before grouping.</td></tr>
+<tr><td>Load incidents</td><td>Scores the window and builds the queue.</td></tr>
+<tr><td>KPI row</td><td>Flows in the window (5,000), flagged flows (4,986 = 99.7&nbsp;%), incidents (1: "about 4,986 alerts
+folded into each"), and the share of incidents that are real (checked against ground truth, demo only).</td></tr>
+<tr><td>Queue</td><td>Incidents ranked by severity (size &times; confidence), with category colour, key host, flow count,
+confidence and a severity bar. Filters by category and severity; export as CSV or as CEF lines for a SIEM.</td></tr>
+<tr><td>Why was this flagged?</td><td>A plain-English explanation built by rules (no language model): "The source probed 996
+different destination ports (4,986 flows), a port-scan pattern&hellip; 80&nbsp;% of the attribution came from 6+ neighbouring
+flows, i.e. the graph context mattered."</td></tr>
+<tr><td>What pushed the decision</td><td>A bar chart of feature attribution (gradient &times; input): red bars pushed towards
+the verdict, blue against.</td></tr>
+<tr><td>Network context</td><td>Facts: hosts the source talks to, flows from source, distinct ports targeted, how many hosts the
+destination hears from, share of evidence from neighbouring flows.</td></tr>
+<tr><td>Proposed containment (DRY RUN)</td><td>Block the attacking host, rate-limit to a victim, or isolate a host, chosen from
+the incident's shape, with the exact rule for <b>Linux (iptables)</b> or <b>Windows Firewall</b>, a <b>Copy rule</b> button and
+a printable one-page <b>report</b>.</td></tr>
+<tr><td>Decision</td><td>Name, optional note, <b>Approve</b> or <b>Reject</b>. It is stored with a timestamp. Nothing is ever
+executed.</td></tr>
+<tr><td>Decision log</td><td>Every proposal and decision, filterable by All / Pending / Approved / Rejected.</td></tr>
+</table>
+<p class="example"><b>Example:</b> window #363 contains 5,000 flows; 4,986 are flagged; they collapse into <b>one</b> incident:
+host 172.16.0.1 scanning 996 ports of one server. The proposed rule is <span class="mono">iptables -I INPUT -s 172.16.0.1 -j
+DROP</span>. The analyst types their name and presses Approve; the log records it as approved (dry run).</p>
+</section>
+
+<section class="page-break">
+<h3>10.4 Live stream: watch it detect drift and adapt</h3>
+<figure><img src="img/71_live_running.png" class="crop-top"><figcaption>A recorded 200-window replay of tasks 2&ndash;7 through
+four models. (The status line at the top read "failed" when this was captured because of an unrelated GPU fault during
+the screenshot session; the charts are the completed run.)</figcaption></figure>
+<table class="kv">
+<tr><td>Speed / Start / Retrain now / Stop</td><td>Delay between windows; start the replay; force an adaptation (operator
+override); stop.</td></tr>
+<tr><td>Accuracy, Retention, False-positive rate</td><td>Live charts for all four models; dashed vertical lines are our model's
+adaptations.</td></tr>
+<tr><td>Window error rate</td><td>Error per window; &#9660; marks an ADWIN drift flag; the shaded area is the true attack share of
+the window.</td></tr>
+<tr><td>Current window</td><td>Our model's verdicts on the latest window: benign, known attack, and novel/drifted (confidence
+below 0.6).</td></tr>
+<tr><td>Adaptation cycles</td><td>Drift flags and retrains per model (e.g. ours 49 flags, 17 retrains in this run; XGBoost never
+adapts).</td></tr>
+<tr><td>Drift event feed</td><td>One line per event: window, model, error before &rarr; after, and whether it retrained or the error
+decreased.</td></tr>
+</table>
+<p class="example"><b>Example:</b> around window 181 a new attack arrives and the error jumps; ADWIN flags it and the models
+retrain. The feed shows lines such as "w181 FFNN + EWC + replay &mdash; error 0.24&nbsp;% &rarr; 32.8&nbsp;% &middot; retrained",
+and the error falls back over the next windows.</p>
+</section>
+
+<section class="page-break">
+<h3>10.5 Graph explorer: an attack has a shape</h3>
+<figure><img src="img/20_explorer_graph.png"><figcaption>Window #359 (PortScan): 5,000 flows between 11 hosts; two hosts carry
+4,967 attack flows between them.</figcaption></figure>
+<table class="kv">
+<tr><td>Ground truth / Model errors</td><td>Colour lines by their true category, or by whether the chosen model got them wrong
+(false alarms and missed attacks become visible).</td></tr>
+<tr><td>Model selector</td><td>Which model's mistakes to overlay.</td></tr>
+<tr><td>Hosts slider / Fit</td><td>Maximum hosts drawn (keeps busy windows readable) and re-centre the view.</td></tr>
+<tr><td>Window stats</td><td>Attack flows, hosts, and the busiest attack hosts with flows out / in.</td></tr>
+<tr><td>Selected flow</td><td>Click any line to ask the model why it judged that flow the way it did.</td></tr>
+<tr><td>Windows list</td><td>Filter by task, split (train/validation/test) and "attacks only"; each row shows the window number,
+task, category and attack-flow count with a bar.</td></tr>
+</table>
+<p>Interaction: scroll to zoom, drag to pan, hover a host for its degree. Hosts with attack flows are drawn in red.</p>
+<figure><img src="img/21_explorer_model_errors.png" class="half"><figcaption>The same window coloured by model errors.</figcaption></figure>
+</section>
+
+<section class="page-break">
+<h3>10.6 Classify: run the models on demand</h3>
+<figure><img src="img/30_classify_window.png"><figcaption>Held-out window #82 (BruteForce): every model's verdict
+compared with the truth.</figcaption></figure>
+<ul>
+<li><b>A held-out window</b>: choose a test window and press Classify window. Each loaded model labels all 5,000 flows; the chart
+compares counts per category with the ground truth, and the table shows how many flows each flagged. In this example our
+model flags exactly the 258 attack flows.</li>
+<li><b>Your own flows</b>: drop or choose a CSV with <span class="mono">src_ip</span>, <span class="mono">dst_ip</span> and all 83
+trained features. The panel previews rows and columns before sending. A file missing any feature is <b>rejected</b> with the
+missing names listed, because a verdict computed on made-up zeros would look authoritative and mean nothing. Limits: 5 MB,
+5,000 flows per request. For 50 flows or fewer a per-flow verdict table with confidences appears.</li>
+</ul>
+</section>
+
+<section class="page-break">
+<h3>10.7 Models: the evidence about quality</h3>
+<figure><img src="img/40_models_accuracy.png"><figcaption>Accuracy &amp; forgetting: macro-F1 after each task, with a band of
+&plusmn;1 standard deviation across seeds.</figcaption></figure>
+<ul>
+<li><b>Metric over tasks</b> (choose the metric): our model stays near the top; naive retraining and XGBoost fall as attacks
+are added.</li>
+<li><b>Per-category recall matrix</b>: rows are "after task i", columns are attack types; forgetting shows as a column going
+dark.</li>
+<li><b>Forgetting (BWT)</b> bar chart, and a <b>confusion matrix</b> for any model after any task.</li>
+<li><b>Compare models</b> on adds every ablation (FFNN, replay-only, EWC-only, joint upper bounds).</li>
+</ul>
+<figure><img src="img/41_models_compare_on.png" class="half"><figcaption>With Compare models switched on.</figcaption></figure>
+<figure><img src="img/42_models_unseen.png"><figcaption>Unseen attacks &amp; IP leakage.</figcaption></figure>
+<ul>
+<li><b>Unseen attacks</b>: each model trained without one category, then tested on it. Bars show the share detected. When a
+second seed exists the table adds <b>Seeds</b> and <b>Per seed</b> columns (CSE-CIC-IDS2018 BruteForce reads 99.7&nbsp;% &middot;
+0.1&nbsp;%).</li>
+<li><b>IP leakage test</b>: the same model scored normally, with host identities shuffled (<i>permute</i>: must not change, and
+does not), and with every flow's source randomised (<i>random_src</i>: the attacker stops being one hub; our model falls from
+0.950 to 0.427, the per-flow model is unaffected). This is the project's most important honest limitation.</li>
+</ul>
+</section>
+
+<section class="page-break">
+<h3>10.8 Adaptation &amp; trust</h3>
+<figure><img src="img/50_adapt_drift.png"><figcaption>Drift &amp; retraining.</figcaption></figure>
+<ul>
+<li><b>Retrains vs final macro-F1</b>: bars are retrain cycles, the line is final quality, for ADWIN, a fixed schedule, the
+oracle and never adapting.</li>
+<li><b>Policy scoreboard</b>: flags, retrains, macro-F1 and retention per model and policy, labelled with how many seeds are
+summarised.</li>
+<li><b>Error timeline</b>: per-window error with drift flags and adaptations, for the selected run.</li>
+</ul>
+<figure><img src="img/51_adapt_trust.png"><figcaption>Trust: novelty, abstention, alert load.</figcaption></figure>
+<ol>
+<li><b>Does it notice an attack it was never taught?</b> AUROC per unseen category for three novelty scores (choose energy,
+max softmax or prototype distance), plus clustering of novel flows into candidate new categories.</li>
+<li><b>Does it know when not to decide?</b> Conformal abstention: false alarms before and after, share handed to an analyst.</li>
+<li><b>Will analysts drown in alerts?</b> Flow alerts vs incidents at different false-alarm budgets.</li>
+<li><b>Can it adapt safely without labelling everything?</b> All labels vs 100 labels per update (half least certain, half
+random) vs the safety gate that rolls back a bad update. Labelled single run, indicative only.</li>
+</ol>
+</section>
+
+<section class="page-break">
+<h3>10.9 Reproducibility: check, don't trust</h3>
+<figure><img src="img/60_repro.png"><figcaption>Reproducibility page.</figcaption></figure>
+<ul>
+<li><b>Reproduce everything</b>: the single command (<span class="mono">python -m experiments.reproduce_all --dataset
+cicids2017</span>) with a Copy button.</li>
+<li><b>EWC &lambda; sweep</b>: validation macro-F1 for each penalty strength (log axis), the chosen value marked.</li>
+<li><b>Training-budget tuning</b>: the settings tried on the validation split and the one selected.</li>
+<li><b>Run metadata</b>: timestamp, seed, GPU, Python and package versions of the run that produced the numbers.</li>
+<li><b>EWC stability</b>: a check that the penalty never became large enough to destabilise training.</li>
+</ul>
+
+<h3>10.10 Light theme, the second dataset, and the phone</h3>
+<div class="two">
+<figure><img src="img/84_light_theme.png"><figcaption>Light theme.</figcaption></figure>
+<figure><img src="img/85_dataset_2018.png"><figcaption>CSE-CIC-IDS2018 selected (Binary disabled).</figcaption></figure>
+</div>
+<div class="two phone">
+<figure><img src="img/90_phone_overview.png"><figcaption>Phone: page name next to the menu button.</figcaption></figure>
+<figure><img src="img/91_phone_drawer.png"><figcaption>Phone: the sidebar as a drawer.</figcaption></figure>
+</div>
+</section>
+
+<!-- ======================================================================================= 11 -->
+<section class="page-break">
+<h2>11 &middot; How it was built</h2>
+
+<h3>11.1 Technology stack</h3>
+<table>
+<thead><tr><th>Layer</th><th>Technology (version)</th><th>Why</th></tr></thead>
+<tbody>
+<tr><td>Language</td><td>Python 3.12.10</td><td>The ML ecosystem.</td></tr>
+<tr><td>Deep learning</td><td>PyTorch 2.14.0 (CUDA 12.6)</td><td>GPU training and inference.</td></tr>
+<tr><td>Graphs</td><td>PyTorch Geometric 2.8.0</td><td>Graph data and message passing (paper 39). Neighbour sampling written by hand, so no fragile compiled add-ons are needed on Windows.</td></tr>
+<tr><td>Tree baseline</td><td>XGBoost 3.4.1</td><td>The tree-ensemble comparison (paper 40).</td></tr>
+<tr><td>Drift detection</td><td>river 0.26.1 (ADWIN)</td><td>Streaming change detection (paper 29).</td></tr>
+<tr><td>Data</td><td>pandas 3.0.5, NumPy 2.5.3, PyArrow 25.0.1, scikit-learn 1.9.1, SciPy 1.18.1</td><td>Loading, scaling, metrics, statistics.</td></tr>
+<tr><td>Plots for reports</td><td>matplotlib 3.11.2</td><td>Figures in results/.</td></tr>
+<tr><td>API</td><td>FastAPI 0.141.1 + uvicorn 0.53.0, httpx 0.28.1</td><td>Two services (public API, model service), 47 routes.</td></tr>
+<tr><td>Database</td><td>SQLAlchemy 2.0.54; SQLite by default, PostgreSQL/TimescaleDB optional</td><td>Flows, predictions, metrics, drift events, analyst decisions.</td></tr>
+<tr><td>Console</td><td>Plain JavaScript ES modules (no framework, no build step), Chart.js 4.4.4, d3 7.9.0, self-hosted Inter and JetBrains Mono fonts</td><td>Nothing to compile; works offline; strict Content-Security-Policy.</td></tr>
+<tr><td>Testing</td><td>pytest 9.1.1 (92 tests), Playwright 1.63.0 (browser smoke test), GitHub Actions</td><td>Every commit checked.</td></tr>
+<tr><td>Hardware</td><td>Windows 11 laptop, NVIDIA GTX 1650 (4 GB), 8-core CPU, 24 GB RAM</td><td>Everything, including training, runs on one laptop.</td></tr>
+</tbody></table>
+
+<h3>11.2 Repository structure</h3>
+<table class="kv">
+<tr><td class="mono">src/ingestion, preprocessing</td><td>reading the CSVs, cleaning, scaling, task assignment</td></tr>
+<tr><td class="mono">src/graph</td><td>windows &rarr; graphs, splits, neighbour sampling, IP remapping test</td></tr>
+<tr><td class="mono">src/models</td><td>E-GraphSAGE, FFNN, EWC, replay buffers</td></tr>
+<tr><td class="mono">src/training, evaluation</td><td>learners, task sequence, stream runner, metrics, conformal, calibration, open set</td></tr>
+<tr><td class="mono">src/drift</td><td>ADWIN monitor</td></tr>
+<tr><td class="mono">src/product, explain</td><td>incident grouping, response proposals, explanations</td></tr>
+<tr><td class="mono">src/api, db</td><td>FastAPI services, database models</td></tr>
+<tr><td class="mono">experiments/</td><td>one script per experiment; each writes CSV/JSON/PNG to results/</td></tr>
+<tr><td class="mono">dashboard/</td><td>the console (about 2,650 lines of JavaScript)</td></tr>
+<tr><td class="mono">tests/</td><td>92 pytest tests with small synthetic data</td></tr>
+<tr><td class="mono">docs/</td><td>model card, positioning note, technical PDF, this guide, screenshots</td></tr>
+<tr><td class="mono">research paper/</td><td>the 35 downloaded papers (kept out of git)</td></tr>
+</table>
+<p>About 7,550 lines of Python in <span class="mono">src/</span> and <span class="mono">experiments/</span>; 75 commits from 17
+September to 6 October 2026.</p>
+
+<h3>11.3 How it was built, step by step</h3>
+<ol>
+<li>Data pipeline on the corrected datasets, with tests on synthetic data.</li>
+<li>The graph model, the per-flow model and the tree baseline, then EWC and replay, then the task-sequence experiment.</li>
+<li>ADWIN drift detection and the streaming experiment.</li>
+<li>Hyper-parameters tuned on the validation split only (epochs, class balancing, EWC &lambda; and &gamma;).</li>
+<li>The API, database and console; then the product layer (incidents, explanations, abstention, novelty, dry-run
+response).</li>
+<li>A results-integrity review that found and fixed several defects (for example a label-dependent sampling step that
+would have leaked labels into the graphs); affected experiments were re-run.</li>
+<li>A senior review called the project "over-built and under-proven". The response: a temporal split, five seeds,
+paired statistics, a serving benchmark, calibration, a replay-budget sweep, a mixed-attack stream, extra seeds,
+removal of weak features (free-form CSV paste, a one-seed table, the Docker setup), the console redesign and a browser
+smoke test.</li>
+</ol>
+
+<h3>11.4 Is there an API key?</h3>
+<ul>
+<li><b>No external API keys are used anywhere.</b> No cloud service, no OpenAI/Claude or other language model, no paid API.
+Explanations are generated by rules in Python; everything runs locally.</li>
+<li><b>The project's own API can require a key.</b> Set the environment variable <span class="mono">GNNIDS_API_KEY</span> before
+starting the stack. Then every endpoint except <span class="mono">/health</span> requires the header
+<span class="mono">X-API-Key</span>. The console asks for the key once, stores it in the browser and sends it only in that
+header (never in a web address). By default no key is set, which is fine on a single laptop and is listed as a limitation
+for any real deployment.</li>
+<li><b>Other protections:</b> strict Content-Security-Policy on the console, checkpoints loaded in PyTorch's safe
+weights-only mode where possible, and response actions that are never executed.</li>
+</ul>
+
+<h3>11.5 How to run it</h3>
+<pre>python -m venv .venv  &amp;&amp;  .venv\Scripts\activate
+pip install torch==2.14.0 --index-url https://download.pytorch.org/whl/cu126
+pip install -r requirements.txt
+python -m experiments.reproduce_all --dataset cicids2017     # all experiments
+powershell -ExecutionPolicy Bypass -File scripts\run_stack.ps1  # start the console
+# open http://localhost:8080 ; stop with scripts\run_stack.ps1 -Stop
+python -m pytest                                             # 92 tests
+python scripts\ui_smoke.py                                   # browser smoke test</pre>
+</section>
+
+<!-- ======================================================================================= 12 -->
+<section class="page-break">
+<h2>12 &middot; What the results say (and do not say)</h2>
+<table>
+<thead><tr><th>Experiment</th><th>Result</th><th>Seeds</th><th>Verdict</th></tr></thead>
+<tbody>
+<tr><td>Learning 7 attacks in sequence, temporal split</td><td>Ours 0.915 [0.888, 0.935]; FFNN 0.870; naive 0.263</td><td>5</td><td>Works</td></tr>
+<tr><td>Same, interleaved split</td><td>Ours 0.964; FFNN 0.928; naive 0.289</td><td>3</td><td>Works (optimistic split)</td></tr>
+<tr><td>Does the graph help (seen attacks)?</td><td>+0.044 [+0.019, +0.058] temporal; +0.036 interleaved</td><td>5 / 3</td><td>Yes, modestly; indicative</td></tr>
+<tr><td>Unseen attacks (CSE-CIC-IDS2018)</td><td>Graph &gt;80&nbsp;% in 6 of 12 tests; per-flow &le;0.07&nbsp;% in all 12</td><td>2</td><td>Real, but which attacks varies by seed</td></tr>
+<tr><td>Replay budget</td><td>0.304 / 0.702 / 0.952 / 0.948 / 0.957 at 0 / 1 / 5 / 10 / 20 windows</td><td>3</td><td>Replay is what stops forgetting</td></tr>
+<tr><td>EWC on top of replay</td><td>No detectable gain interleaved; +0.067 temporal (two seeds)</td><td>3 / 5</td><td>Helps only on the harder split, indicatively</td></tr>
+<tr><td>Drift: clean attack blocks</td><td>Fixed schedule 0.980 (8 retrains) beats ADWIN 0.960 (16.7)</td><td>3</td><td>ADWIN not efficient here</td></tr>
+<tr><td>Drift: two attacks mixed</td><td>ADWIN 0.968 beats schedule 0.926</td><td>3</td><td>ADWIN more robust to mixing</td></tr>
+<tr><td>Never adapting</td><td>0.230</td><td>3</td><td>Adaptation is essential</td></tr>
+<tr><td>IP leakage</td><td>Permute: unchanged. Random sources: 0.950 &rarr; 0.427</td><td>1</td><td>No IP memorising; but depends on attacker topology</td></tr>
+<tr><td>Incidents</td><td>~100,000 alerts &rarr; 50 incidents, 84&nbsp;% real</td><td>1</td><td>Large workload reduction</td></tr>
+<tr><td>Abstention (conformal)</td><td>184 GNN false alarms &rarr; 0, 9.8&nbsp;% of flows to analyst (&alpha; = 0.05)</td><td>1</td><td>Works on 2017; safe &alpha; differs per dataset</td></tr>
+<tr><td>Calibration</td><td>ECE 0.52&nbsp;% overall, 2.24&nbsp;% on attacks (overconfident)</td><td>1</td><td>Overconfident on attacks</td></tr>
+<tr><td>Speed</td><td>5.5&nbsp;ms per 5,000-flow window on GPU; 10.5&nbsp;ms on CPU</td><td>measured</td><td>Far faster than needed</td></tr>
+</tbody></table>
+<p class="note">"Indicative" means the bootstrap 95&nbsp;% interval of the paired difference excludes zero but, with only three or
+five seeds, the Wilcoxon test cannot reach p &lt; 0.05 however consistent the seeds are.</p>
+</section>
+
+<!-- ======================================================================================= 13 -->
+<section class="page-break">
+<h2>13 &middot; Limitations and future work</h2>
+<h3>Limitations (say these before an examiner does)</h3>
+<ul>
+<li><b>Topology dependence.</b> When attack traffic comes from many random sources the graph model collapses (0.950 &rarr;
+0.427). Training with randomised sources recovers 0.914 but costs in-distribution accuracy (appendix in the README).</li>
+<li><b>Lab data.</b> Both datasets are laboratory captures from 2017 and 2018 with attacks in clean blocks.</li>
+<li><b>Few seeds.</b> Three to five seeds give indicative, not conclusive, statistics. Some product results are one run.</li>
+<li><b>Labels are needed for drift.</b> ADWIN watches the labelled error; a label-free trigger missed most drift.</li>
+<li><b>Seed instability.</b> 2018 macro-F1 ranges 0.855&ndash;0.925 across seeds; unseen BruteForce flipped between seeds.</li>
+<li><b>Not a product.</b> No TLS, no roles, no rate limiting; flows stored in clear text; CSV input only.</li>
+<li><b>Windows Smart App Control</b> blocked PyTorch for part of the project; it was turned off and the remaining experiments
+are being run (status in the README).</li>
+</ul>
+<h3>Future work</h3>
+<ul>
+<li>Validate on newer and real traffic; ingest Zeek or Suricata output directly.</li>
+<li>Reduce topology dependence without losing accuracy (better augmentation, host-agnostic features).</li>
+<li>Learn from fewer labels; test label-free drift signals that work.</li>
+<li>Authentication, TLS and roles for a real deployment.</li>
+</ul>
+</section>
+
+<!-- ======================================================================================= 14 -->
+<section class="page-break">
+<h2>14 &middot; Things you might have missed</h2>
+
+<h3>14.1 Likely viva questions, with short answers</h3>
+<table class="qa">
+<tr><td>What is new here?</td><td>The combination, evaluated honestly: a graph detector that learns attacks continually, decides
+when to retrain, detects some never-seen attacks, and reduces analyst workload, with a temporal split, seeds and statistics.
+Not a new algorithm.</td></tr>
+<tr><td>Why a graph instead of Random Forest?</td><td>Attacks have shapes between hosts that per-flow models cannot see; it
+detects never-seen attacks far better (&gt;80&nbsp;% in 6 of 12 tests vs &le;0.07&nbsp;%), and it can learn new attacks without
+retraining on everything (section 7).</td></tr>
+<tr><td>Your test windows are next to your training windows. Isn't that cheating?</td><td>That was the interleaved split. The
+temporal split tests on later traffic for every attack; it costs 0.049 macro-F1 and is reported alongside.</td></tr>
+<tr><td>Is the difference statistically significant?</td><td>With 3&ndash;5 seeds no Wilcoxon test can reach p &lt; 0.05; the
+bootstrap intervals exclude zero, so the gain is indicative. We say exactly that.</td></tr>
+<tr><td>Does EWC help?</td><td>EWC alone fails. On top of replay: no detectable gain on the interleaved split; it prevented two
+collapses on the temporal split. Replay is the key ingredient.</td></tr>
+<tr><td>Why 2017/2018 data?</td><td>Sequence of many attacks over days, IP addresses kept for graphs, independently corrected
+releases, comparability with published work, enterprise traffic (section 8).</td></tr>
+<tr><td>Could it memorise IP addresses?</td><td>No: IPs are never features, and shuffling host identities changes nothing. But it
+does rely on attackers being few hosts.</td></tr>
+<tr><td>Can it run in real time?</td><td>Scoring takes 5.5&nbsp;ms per 5,000 flows on a laptop GPU; flow export and graph building
+from raw traffic are not in that figure.</td></tr>
+<tr><td>What happens if the model is wrong?</td><td>It can abstain, every action is a dry run, and a safety gate can roll back a bad
+update.</td></tr>
+<tr><td>Why does ADWIN retrain more than a schedule?</td><td>Attack bursts inside a task keep raising the error until the model has
+adapted. It wins when attacks are mixed, not when they arrive in clean blocks.</td></tr>
+<tr><td>What would you do with more time?</td><td>Real traffic, less topology dependence, fewer labels, deployment security.</td></tr>
+</table>
+
+<h3>14.2 A ten-minute demo plan</h3>
+<ol>
+<li>Overview (1 min): the plain-words sentence, retention 100&nbsp;% vs 0&nbsp;%.</li>
+<li>Incident queue (2 min): window #363, one incident, why it was flagged, the dry-run rule, approve.</li>
+<li>Graph explorer (1 min): a scan or flood as a shape.</li>
+<li>Live stream (2 min): start, point at a drift flag and the retrain.</li>
+<li>Models (2 min): forgetting chart, then unseen attacks and the IP-leakage limitation.</li>
+<li>Reproducibility (1 min): one command reproduces every number.</li>
+<li>Close (1 min): what it is (a triage layer), what it is not (a SOC platform).</li>
+</ol>
+<p class="note">Do not start the Live stream while long experiments are training on the same 4 GB GPU.</p>
+
+<h3>14.3 Numbers worth memorising</h3>
+<table class="kv">
+<tr><td>0.915 / 0.964</td><td>our macro-F1, temporal (5 seeds) / interleaved (3 seeds)</td></tr>
+<tr><td>100&nbsp;% vs 0&nbsp;%</td><td>retention: ours vs naive retraining</td></tr>
+<tr><td>+0.044</td><td>graph vs per-flow on the temporal split, CI [+0.019, +0.058]</td></tr>
+<tr><td>6 of 12 vs 0 of 12</td><td>never-seen attacks caught above 80&nbsp;%: graph vs per-flow (2018)</td></tr>
+<tr><td>0.304 &rarr; 0.952</td><td>replay-only with 0 vs 5 stored windows per attack type</td></tr>
+<tr><td>100,000 &rarr; 50</td><td>alerts to incidents (84&nbsp;% real)</td></tr>
+<tr><td>5.5&nbsp;ms</td><td>scoring a 5,000-flow window on the GPU</td></tr>
+<tr><td>0.950 &rarr; 0.427</td><td>the topology limitation (random sources)</td></tr>
+<tr><td>69,128</td><td>model parameters; 83 features; 5,000 flows per window</td></tr>
+</table>
+
+<h3>14.4 Glossary</h3>
+<table class="kv">
+<tr><td>Flow</td><td>One network conversation summarised by 83 numbers.</td></tr>
+<tr><td>Window</td><td>5,000 consecutive flows turned into one graph.</td></tr>
+<tr><td>Task</td><td>A period in which a new attack type appears.</td></tr>
+<tr><td>Macro-F1</td><td>Detection quality averaged over all categories (1.0 is perfect).</td></tr>
+<tr><td>Retention</td><td>Recall on the first attack after learning all the others.</td></tr>
+<tr><td>FPR</td><td>Share of normal traffic wrongly flagged.</td></tr>
+<tr><td>BWT</td><td>Backward transfer: how much old tasks got worse; negative is forgetting.</td></tr>
+<tr><td>Catastrophic forgetting</td><td>A network overwriting old knowledge when trained on new data.</td></tr>
+<tr><td>EWC</td><td>Elastic Weight Consolidation: stiffen the weights that mattered before.</td></tr>
+<tr><td>Replay</td><td>Rehearse a few stored old windows while learning new ones.</td></tr>
+<tr><td>ADWIN</td><td>Adaptive windowing drift detector.</td></tr>
+<tr><td>Concept drift</td><td>The data changing after training.</td></tr>
+<tr><td>Conformal prediction</td><td>Prediction sets with coverage guarantees, used to abstain.</td></tr>
+<tr><td>ECE</td><td>Expected calibration error: gap between confidence and accuracy.</td></tr>
+<tr><td>AUROC</td><td>Area under the ROC curve; 0.5 is chance, 1.0 perfect separation.</td></tr>
+<tr><td>Leave-one-attack-out</td><td>Train without one attack type, test on it (unseen-attack test).</td></tr>
+<tr><td>Interleaved / temporal split</td><td>Test windows between training windows / strictly later in time.</td></tr>
+<tr><td>Seed</td><td>The random starting point of a training run; more seeds = more trustworthy averages.</td></tr>
+<tr><td>Dry run</td><td>An action that is proposed and recorded but never executed.</td></tr>
+<tr><td>CEF</td><td>Common Event Format, a log line format that SIEM tools import.</td></tr>
+</table>
+
+<h3>14.5 Points you did not ask about but should know</h3>
+<ul>
+<li><b>Dataset licences:</b> both datasets are public for research; cite papers 01&ndash;03 when you use them. The downloaded papers
+in <span class="mono">research paper/</span> are for your reading and are deliberately not pushed to GitHub.</li>
+<li><b>Ethics:</b> the system never blocks traffic and never reads payloads; IP addresses are used only to build graphs.</li>
+<li><b>Two deployment paths became one:</b> Docker was removed on 6 October 2026; <span class="mono">run_stack.ps1</span> is the only
+supported way to run it.</li>
+<li><b>Where to find more:</b> README (all results), <span class="mono">docs/model-card.md</span>,
+<span class="mono">docs/positioning.md</span>, <span class="mono">DEMO.md</span>, and
+<span class="mono">docs/GNN-IDS_Technical_Documentation.pdf</span> (every API route and control).</li>
+<li><b>Results still arriving:</b> extra seeds for drift, IP-remap and unseen attacks, the window-size study and 2018
+re-runs are running in the background; the README is updated as each finishes.</li>
+</ul>
+</section>
