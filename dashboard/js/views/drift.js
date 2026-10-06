@@ -1,5 +1,5 @@
 // Drift Analysis: ADWIN vs periodic vs oracle vs never — retrain cost vs final quality, plus timelines.
-import { $, color, css, esc, f3, get, int, label, pct, state, table } from "../lib/core.js";
+import { $, color, css, esc, f3, get, int, label, modelCell, pct, state, table } from "../lib/core.js";
 import { barOptions, lineOptions, markerPlugin, modelDataset, mount } from "../lib/charts.js";
 import { makeSortable, showError } from "../lib/ui.js";
 
@@ -46,7 +46,7 @@ async function render() {
         y: { title: { display: true, text: "retrain cycles" }, grid: { color: css("--grid") }, beginAtZero: true },
         y1: { position: "right", min: 0, max: 1, grid: { display: false }, title: { display: true, text: "final macro-F1" } } } } });
   $("#dr-table", root).innerHTML = table([
-    { title: "Model", html: (r) => `<span class="swatch" style="background:${color(r.model)}"></span>${esc(label(r.model))}` },
+    { title: "Model", html: (r) => modelCell(r.model) },
     { title: "Policy", value: (r) => POLICY[r.policy] || r.policy },
     { title: "Flags", num: true, value: (r) => int(r.drift_flags) },
     { title: "Retrains", num: true, value: (r) => int(r.retrains) },

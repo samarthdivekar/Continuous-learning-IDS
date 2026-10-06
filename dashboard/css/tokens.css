@@ -1,46 +1,56 @@
 /* ==========================================================================
    Design tokens — the only place raw values are allowed.
 
-   Dark is the default and is the theme the console is demonstrated in: high
-   information density, recessive chrome, colour reserved for meaning
-   (severity, model identity, service status). Light is a full peer, not an
-   afterthought, and both are checked for WCAG AA contrast.
+   Dark is the default and the theme the console is demonstrated in. Chrome is
+   quiet (cool greys, one indigo accent for "you are here" and primary
+   actions); colour with meaning is reserved for data: severity, service
+   status and model identity. Light is a full peer.
 
    Model colours are fixed identities: a model keeps its colour on every chart
-   of every tab, so a line can be recognised without reading the legend. Those
-   hex values are deliberately unchanged from the original palette.
+   of every page, so a line can be recognised without reading the legend.
+   They are deliberately unchanged from the original palette.
+
+   Contrast (WCAG 2 formula, measured against --panel): --ink 16.3:1, --ink-2 10.0:1,
+   --muted 5.8:1 in dark; 18.7:1, 9.3:1, 5.4:1 in light. White on --accent-strong
+   (primary buttons): 4.95:1 dark, 5.54:1 light.
    ========================================================================== */
 
 :root {
   color-scheme: dark;
 
   /* ---- surfaces, from furthest back to nearest the reader ---- */
-  --page: #080b10;
-  --page-2: #0b1017;
-  --panel: #111820;
-  --panel-2: #0e141b;
-  --panel-hi: #16202b;
+  --page: #07090e;
+  --page-2: #0b0e15;              /* sidebar */
+  --panel: #10141c;
+  --panel-2: #0c1017;             /* inset: inputs, wells */
+  --panel-hi: #171d28;            /* hover, selected */
+  --topbar: rgba(7, 9, 14, 0.92);
 
   /* ---- lines ---- */
-  --border: rgba(255, 255, 255, 0.09);
-  --border-hi: rgba(255, 255, 255, 0.17);
-  --grid: #1c2632;                /* chart gridlines */
-  --axis: #2b3847;                /* chart axes, table rules */
+  --border: rgba(148, 163, 184, 0.11);
+  --border-hi: rgba(148, 163, 184, 0.22);
+  --grid: #1a212c;                /* chart gridlines */
+  --axis: #29323f;                /* chart axes, table rules */
 
-  /* ---- text (AA against --panel) ---- */
-  --ink: #eef3f8;                 /* 16.0:1 on --panel */
-  --ink-2: #bcc7d4;               /* 10.4:1 */
-  --muted: #8b98a7;               /* 6.1:1  — raised from #7d8a99 (5.1:1) for small text */
+  /* ---- text ---- */
+  --ink: #edf1f7;
+  --ink-2: #b6c0ce;
+  --muted: #8591a3;
+
+  /* ---- chrome accent ---- */
+  --accent: #6b7bff;
+  --accent-2: #8f9bff;
+  --accent-strong: #5361e8;       /* filled buttons: white text passes AA */
+  --accent-strong-hi: #4c57d9;
+  --accent-soft: rgba(107, 123, 255, 0.14);
+  --accent-glow: rgba(107, 123, 255, 0.32);
 
   /* ---- meaning ---- */
-  --accent: #3987e5;
-  --accent-2: #5ea3f2;
-  --accent-glow: rgba(57, 135, 229, 0.35);
-  --good: #3ec46d;                /* 7.9:1  — #0ca30c was 5.3:1, thin at small sizes */
+  --good: #3ec46d;
   --warn: #fab219;
   --serious: #ec835a;
-  --critical: #ef5f5f;            /* 5.5:1  — #d03b3b failed AA on dark panels at 3.7:1 */
-  --good-ink: #0ca30c;            /* the denser original, for light theme and fills */
+  --critical: #ef5f5f;
+  --good-ink: #0ca30c;
   --critical-ink: #d03b3b;
 
   /* ---- model identities (unchanged) ---- */
@@ -65,32 +75,37 @@
   --s-8: 32px;
   --s-10: 40px;
 
+  /* ---- layout ---- */
+  --side-w: 248px;
+  --side-rail: 68px;
+  --top-h: 60px;
+
   /* ---- type ---- */
   --font: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
   --mono: "JetBrains Mono", ui-monospace, "Cascadia Code", Consolas, monospace;
   --t-xs: 11.5px;
   --t-sm: 13px;
-  --t-base: 14.5px;
+  --t-base: 14px;
   --t-md: 15px;
-  --t-lg: 17px;
-  --t-xl: 21px;
+  --t-lg: 16.5px;
+  --t-xl: 20px;
   --t-2xl: 26px;
-  --t-3xl: 40px;                  /* KPI value */
+  --t-3xl: 38px;                  /* KPI value */
   --lh-tight: 1.2;
-  --lh: 1.45;
+  --lh: 1.5;
 
   /* ---- shape ---- */
   --r-sm: 6px;
-  --r-md: 10px;
+  --r-md: 9px;
   --r-lg: 14px;
   --r-pill: 999px;
-  --radius: var(--r-lg);          /* kept: existing rules reference it */
+  --radius: var(--r-lg);
 
   /* ---- elevation ---- */
   --e-1: 0 1px 2px rgba(0, 0, 0, 0.35);
-  --e-2: 0 6px 18px rgba(0, 0, 0, 0.30);
-  --e-3: 0 10px 30px rgba(0, 0, 0, 0.35);
-  --shadow: var(--e-3);           /* kept: existing rules reference it */
+  --e-2: 0 1px 0 rgba(255, 255, 255, 0.03) inset, 0 8px 24px rgba(0, 0, 0, 0.28);
+  --e-3: 0 16px 40px rgba(0, 0, 0, 0.45);
+  --shadow: var(--e-3);
 
   /* ---- focus: one ring everywhere, never removed ---- */
   --focus: 0 0 0 2px var(--page), 0 0 0 4px var(--accent-2);
@@ -108,21 +123,25 @@
 
 :root[data-theme="light"] {
   color-scheme: light;
-  --page: #f3f5f8;
-  --page-2: #eef1f5;
+  --page: #f4f6fa;
+  --page-2: #ffffff;
   --panel: #ffffff;
-  --panel-2: #f8fafc;
-  --panel-hi: #eef3f9;
-  --border: rgba(15, 23, 42, 0.12);
-  --border-hi: rgba(15, 23, 42, 0.22);
-  --grid: #e6eaf0;
-  --axis: #c3ccd8;
-  --ink: #0b1220;                 /* 17.4:1 on white */
-  --ink-2: #39485c;               /* 9.4:1  */
-  --muted: #5d6b7d;               /* 5.6:1  — raised from #6b7788 */
-  --accent: #2a78d6;
-  --accent-2: #1f5fab;
-  --accent-glow: rgba(42, 120, 214, 0.18);
+  --panel-2: #f6f8fb;
+  --panel-hi: #eef1f7;
+  --topbar: rgba(244, 246, 250, 0.94);
+  --border: rgba(15, 23, 42, 0.10);
+  --border-hi: rgba(15, 23, 42, 0.20);
+  --grid: #e8ecf2;
+  --axis: #c7cfdb;
+  --ink: #0b1220;
+  --ink-2: #39485c;
+  --muted: #5d6b7d;
+  --accent: #4f5bd5;
+  --accent-2: #3d48b8;
+  --accent-strong: #4f5bd5;
+  --accent-strong-hi: #3d48b8;
+  --accent-soft: rgba(79, 91, 213, 0.10);
+  --accent-glow: rgba(79, 91, 213, 0.18);
   --good: #0f7a35;
   --critical: #c22f2f;
   --good-ink: #0f7a35;
@@ -139,8 +158,8 @@
   --benign-edge: #aab4c0;
   --node: #52514e;
   --e-1: 0 1px 2px rgba(15, 23, 42, 0.06);
-  --e-2: 0 6px 18px rgba(15, 23, 42, 0.08);
-  --e-3: 0 8px 24px rgba(15, 23, 42, 0.10);
+  --e-2: 0 1px 2px rgba(15, 23, 42, 0.05), 0 6px 18px rgba(15, 23, 42, 0.06);
+  --e-3: 0 12px 32px rgba(15, 23, 42, 0.14);
   --focus: 0 0 0 2px #fff, 0 0 0 4px var(--accent-2);
 }
 

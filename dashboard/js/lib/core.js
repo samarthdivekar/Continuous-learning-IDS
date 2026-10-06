@@ -164,7 +164,7 @@ export function attachExport(el, { rows, canvas, name }) {
   tools.appendChild(btn);
 }
 
-export const modelCell = (m) => `<span class="swatch" style="background:${color(m)}"></span>${esc(label(m))}`;
+export const modelCell = (m) => `<span class="model-cell"><span class="swatch" style="background:${color(m)}"></span>${esc(label(m))}</span>`;
 
 // sequential blue scale for heatmaps (value in [0,1])
 export function heatColor(v) {

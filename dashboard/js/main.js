@@ -1,4 +1,4 @@
-// App shell: tab routing (hash-based), global dataset/mode context, health pills, theme.
+// App shell: sidebar routing (hash-based), global dataset/mode context, service status, theme.
 import { $, $$, esc, get, onContextChange, post, prefs, setApiKey, setContext, state, toast } from "./lib/core.js";
 import { applyDefaults } from "./lib/charts.js";
 import * as tour from "./lib/tour.js";
@@ -19,8 +19,18 @@ const loaded = {};
 async function show(name) {
   if (LEGACY[name]) name = LEGACY[name];          // old bookmarks keep working
   if (!VIEWS[name]) name = "overview";
-  $$(".tab").forEach((t) => t.classList.toggle("on", t.dataset.view === name));
+  $$(".tab").forEach((t) => {
+    const on = t.dataset.view === name;
+    t.classList.toggle("on", on);
+    t.setAttribute("aria-selected", String(on));
+    if (on) {                                       // the top bar says where you are
+      $("#crumb-group").textContent = t.dataset.group || "";
+      $("#crumb-title").textContent = t.querySelector(".nav-label")?.textContent || name;
+    }
+  });
   $$(".view").forEach((v) => v.classList.toggle("on", v.id === `view-${name}`));
+  document.body.classList.remove("nav-open");      // a choice on the phone drawer closes it
+  $("#nav-scrim").classList.add("hidden");
   const el = $(`#view-${name}`);
   if (!loaded[name]) {
     el.innerHTML = `<div class="empty pulse">Loading…</div>`;
@@ -41,6 +51,12 @@ function initControls() {
   $$("#ds-seg button").forEach((b) => b.addEventListener("click", () => { syncSeg("ds-seg", b.dataset.v); setContext({ dataset: b.dataset.v }); }));
   $$("#mode-seg button").forEach((b) => b.addEventListener("click", () => { syncSeg("mode-seg", b.dataset.v); setContext({ mode: b.dataset.v }); }));
   $$(".tab").forEach((t) => t.addEventListener("click", () => { location.hash = t.dataset.view; }));
+  const drawer = (open) => {                         // narrow screens: the sidebar is a drawer
+    document.body.classList.toggle("nav-open", open);
+    $("#nav-scrim").classList.toggle("hidden", !open);
+  };
+  $("#menu-btn").addEventListener("click", () => drawer(!document.body.classList.contains("nav-open")));
+  $("#nav-scrim").addEventListener("click", () => drawer(false));
   window.addEventListener("hashchange", () => show(location.hash.slice(1)));
   const cmp = $("#compare-toggle");
   cmp.checked = state.compare;
@@ -88,7 +104,7 @@ function initControls() {
     repro: ["seeds", "lambda", "sweep", "tuning", "metadata", "reproduce", "commit"],
   };
   const tabActions = $$(".tab").map((t) => ({
-    label: `Go to ${t.textContent.replace("LIVE", "").trim()}`, group: "tab",
+    label: `Go to ${t.querySelector(".nav-label").textContent.trim()}`, group: "page",
     keywords: TAB_KEYWORDS[t.dataset.view] || [], run: () => go(t.dataset.view),
   }));
   const streamAction = async (path, label) => {
@@ -136,20 +152,22 @@ function initControls() {
   window.addEventListener("keydown", (e) => {
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") { e.preventDefault(); palette.open(); }
   });
+  $("#search-btn").addEventListener("click", () => palette.open());
   window.addEventListener("keydown", (e) => {
     if (e.ctrlKey || e.metaKey || e.altKey || palette.isOpen()
         || /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement?.tagName)) return;
-    if (e.key === "Escape") help(false);
+    if (e.key === "Escape") { help(false); drawer(false); }
     else if (e.key === "?") help($("#help").classList.contains("hidden"));
     else if (/^[0-9]$/.test(e.key)) { const i = e.key === "0" ? 9 : Number(e.key) - 1; if (order[i]) location.hash = order[i]; }
   });
   if (!prefs.get("helpSeen", "")) help(true);
 }
 
+/** One row of the sidebar's service status: a coloured dot and a one-word state. */
 function pill(id, ok, text) {
-  const el = $(id); const dot = el.querySelector(".dot");
-  dot.className = `dot ${ok === true ? "ok" : ok === false ? "bad" : "warn"}`;
-  if (text) (el.querySelector(".pill-text") || el.querySelector("span") || el).textContent = text;
+  const el = $(id);
+  el.querySelector(".dot").className = `dot ${ok === true ? "ok" : ok === false ? "bad" : "warn"}`;
+  el.querySelector(".status-val").textContent = text || (ok === true ? "online" : ok === false ? "offline" : "unknown");
 }
 
 /** One line at the top of the page when something is wrong, naming what still works. */
@@ -159,7 +177,7 @@ function banner(html, kind = "warn") {
   if (!html) { el.classList.add("hidden"); el.innerHTML = ""; el.dataset.html = ""; return; }
   if (el.dataset.html === html) return;                 // do not re-render on every poll
   el.dataset.html = html; el.dataset.dismissed = ""; el.className = `banner ${kind}`;
-  el.innerHTML = `${html}<button class="icon-btn small" id="banner-x" title="Dismiss">✕</button>`;
+  el.innerHTML = `<div class="banner-msg">${html}</div><button class="icon-btn small" id="banner-x" title="Dismiss">✕</button>`;
   $("#banner-x").addEventListener("click", () => { el.classList.add("hidden"); el.dataset.dismissed = "1"; });
 }
 
@@ -191,7 +209,7 @@ async function health() {
     const d = await get("/demo/status");
     const live = d.alive;
     $("#live-badge").classList.toggle("hidden", !live);
-    const txt = live ? `Stream ${d.position}/${d.total || "…"}` : `Stream ${d.status || "idle"}`;
+    const txt = live ? `${d.position}/${d.total || "…"}` : `${d.status || "idle"}`;
     pill("#pill-stream", live ? true : null, txt);
   } catch { /* ignore */ }
 }

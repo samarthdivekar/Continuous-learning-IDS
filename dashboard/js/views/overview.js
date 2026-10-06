@@ -94,10 +94,14 @@ async function dataPanel(dataset) {
     // this is the one Overview panel that needs the model service: it reads the processed-data
     // metadata through the ML stack. Everything else on this page comes from result files.
     showError(box, e, { what: "the dataset panel (it reads processed-data metadata through the model service)" });
-    root.querySelector("#ov-tasks")?.closest(".card")?.classList.add("hidden");
+    const card = root.querySelector("#ov-tasks")?.closest(".card");
+    card?.classList.add("hidden");
+    card?.parentElement.classList.add("single");      // the verdict table takes the whole row
     return;
   }
-  root.querySelector("#ov-tasks")?.closest(".card")?.classList.remove("hidden");
+  const card = root.querySelector("#ov-tasks")?.closest(".card");
+  card?.classList.remove("hidden");
+  card?.parentElement.classList.remove("single");
   box.innerHTML = `
     <div class="grid g2" style="gap:10px;margin:6px 0 12px">
       <div><div class="muted">Flows</div><div style="font-size:26px;font-weight:700">${int(d.n_flows)}</div></div>

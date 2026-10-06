@@ -19,9 +19,9 @@ async function render() {
       <p class="sub">data preparation → tuning → λ sweep → task sequence (3 seeds) → drift stream → unseen attacks → IP remap → figures → report</p></div>
       <button class="btn" id="rp-copy">Copy command</button></div>
       <pre class="rule mono" id="rp-cmd">python -m experiments.reproduce_all --dataset ${esc(dataset)}</pre></div>
-    <div class="grid g2">
+    <div class="grid g-5-7">
       <div class="card"><h3>EWC λ sweep (validation)</h3><p class="sub">final validation macro-F1 per λ · solid γ = 0.9, dashed γ = 1.0 · log x-axis</p>
-        <div class="chart"><canvas id="rp-sweep"></canvas></div><div id="rp-selected"></div></div>
+        <div class="chart" style="height:420px"><canvas id="rp-sweep"></canvas></div><div id="rp-selected"></div></div>
       <div class="card"><h3>Training-budget tuning (validation)</h3><div id="rp-tuning"></div></div>
     </div>
     <div class="grid g2" style="margin-top:16px">
@@ -75,7 +75,7 @@ async function render() {
   }
   if (t?.tuning) {
     $("#rp-tuning", root).innerHTML = table([
-      { title: "Model", value: (r) => short(r.model) }, { title: "Setting", html: (r) => `<span class="mono">${esc(r.overrides)}</span>` },
+      { title: "Model", value: (r) => short(r.model) }, { title: "Setting", html: (r) => `<span class="mono small">${esc(r.overrides)}</span>` },
       { title: "val macro-F1", num: true, value: (r) => f3(r.val_macro_f1_seen) }, { title: "val FPR", num: true, value: (r) => pct(r.val_fpr_seen, 2) }],
       t.tuning, { highlight: (r) => (t.selected_tuning || "").includes(String(r.overrides).split(" ")[0]) });
   }
