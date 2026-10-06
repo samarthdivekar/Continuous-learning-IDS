@@ -1,0 +1,184 @@
+[
+  {
+    "tag": "task0",
+    "seconds": 34.29012632369995,
+    "steps": 970,
+    "final_loss": 4.6900925099180313e-07,
+    "extra": {
+      "buffer": {
+        "1": {
+          "stored": 1,
+          "seen": 19
+        }
+      }
+    }
+  },
+  {
+    "tag": "task1",
+    "seconds": 52.99410629272461,
+    "steps": 700,
+    "final_loss": 0.00041977944783866405,
+    "extra": {
+      "buffer": {
+        "1": {
+          "stored": 1,
+          "seen": 19
+        },
+        "2": {
+          "stored": 1,
+          "seen": 37
+        }
+      }
+    }
+  },
+  {
+    "tag": "task2",
+    "seconds": 13.641957521438599,
+    "steps": 180,
+    "final_loss": 0.0007530614966526628,
+    "extra": {
+      "buffer": {
+        "1": {
+          "stored": 1,
+          "seen": 19
+        },
+        "2": {
+          "stored": 1,
+          "seen": 37
+        },
+        "3": {
+          "stored": 1,
+          "seen": 9
+        }
+      }
+    }
+  },
+  {
+    "tag": "task3",
+    "seconds": 25.715760469436646,
+    "steps": 340,
+    "final_loss": 0.0007876562303863466,
+    "extra": {
+      "buffer": {
+        "1": {
+          "stored": 1,
+          "seen": 19
+        },
+        "2": {
+          "stored": 1,
+          "seen": 37
+        },
+        "3": {
+          "stored": 1,
+          "seen": 9
+        },
+        "4": {
+          "stored": 1,
+          "seen": 20
+        }
+      }
+    }
+  },
+  {
+    "tag": "task4",
+    "seconds": 15.134107112884521,
+    "steps": 200,
+    "final_loss": 0.0017701179021969438,
+    "extra": {
+      "buffer": {
+        "1": {
+          "stored": 1,
+          "seen": 19
+        },
+        "2": {
+          "stored": 1,
+          "seen": 37
+        },
+        "3": {
+          "stored": 1,
+          "seen": 9
+        },
+        "4": {
+          "stored": 1,
+          "seen": 20
+        },
+        "5": {
+          "stored": 1,
+          "seen": 7
+        }
+      }
+    }
+  },
+  {
+    "tag": "task5",
+    "seconds": 29.77980899810791,
+    "steps": 380,
+    "final_loss": 0.000366382475476712,
+    "extra": {
+      "buffer": {
+        "1": {
+          "stored": 1,
+          "seen": 19
+        },
+        "2": {
+          "stored": 1,
+          "seen": 37
+        },
+        "3": {
+          "stored": 1,
+          "seen": 9
+        },
+        "4": {
+          "stored": 1,
+          "seen": 20
+        },
+        "5": {
+          "stored": 1,
+          "seen": 7
+        },
+        "6": {
+          "stored": 1,
+          "seen": 30
+        }
+      }
+    }
+  },
+  {
+    "tag": "task6",
+    "seconds": 18.64874243736267,
+    "steps": 200,
+    "final_loss": 0.000574268982745707,
+    "extra": {
+      "buffer": {
+        "1": {
+          "stored": 1,
+          "seen": 19
+        },
+        "2": {
+          "stored": 1,
+          "seen": 37
+        },
+        "3": {
+          "stored": 1,
+          "seen": 9
+        },
+        "4": {
+          "stored": 1,
+          "seen": 20
+        },
+        "5": {
+          "stored": 1,
+          "seen": 7
+        },
+        "6": {
+          "stored": 1,
+          "seen": 30
+        },
+        "7": {
+          "stored": 1,
+          "seen": 16
+        }
+      }
+    }
+  }
+]

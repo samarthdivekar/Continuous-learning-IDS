@@ -1,0 +1,22 @@
+{
+  "kind": "sweep",
+  "folders": [
+    "replay_budget_0",
+    "replay_budget_1",
+    "replay_budget_5",
+    "continual",
+    "replay_budget_20"
+  ],
+  "labels": [
+    "0",
+    "1",
+    "5",
+    "10",
+    "20"
+  ],
+  "seeds": [
+    42,
+    43,
+    44
+  ]
+}

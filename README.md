@@ -525,9 +525,26 @@ here; it is reported for completeness, and every verdict is indicative, not conf
   it did, indicatively.** EWC + replay beat replay-only by +0.067, CI [+0.003, +0.145], but the gain comes
   from two seeds in which replay-only collapsed (+0.208, +0.102); in the other three the difference is
   −0.021 to +0.027. This **revises the earlier claim that "replay does the work, EWC does not"**: EWC
-  appears to stabilise replay when train and test are further apart. The replay-budget sweep that would show
-  whether a larger replay buffer does the same was not run (see the limitations).
+  appears to stabilise replay when train and test are further apart. The replay-budget sweep below was run
+  on the interleaved split only.
 * **2018 is not settled.** +0.045 for the graph, but one seed carries it (+0.122; the others +0.004 and +0.009).
+
+#### How much replay is enough? (replay-budget sweep, `results/cicids2017/multiclass/replay_budget_sweep/`)
+
+EWC was given a λ/γ grid; this gives replay the same treatment. Replay-only GNN on the interleaved split, seeds
+42–44, varying how many windows are stored per attack category (the step budget stays at two replayed windows):
+
+| Stored windows per category | 0 | 1 | 5 | 10 (default) | 20 |
+|---|---|---|---|---|---|
+| Macro-F1 | 0.304 ± 0.007 | 0.702 ± 0.058 | 0.952 ± 0.012 | 0.948 ± 0.016 | 0.957 ± 0.039 |
+| Retention (task-1 recall) | 0.000 | 0.667 | 1.000 | 1.000 | 1.000 |
+
+With no stored windows replay-only is naive retraining (0.304, retention 0, as it should be). One window per
+category recovers most of the forgetting; from five upwards the curve is flat and replay alone sits within
+noise of EWC + replay at the default budget (0.964 ± 0.020). EWC alone fails at every λ of its sweep. So on the
+interleaved split the conclusion is now evidenced symmetrically: **replay is what prevents forgetting, a small
+buffer is enough, and EWC adds no detectable gain on top of it.** The temporal split is the exception above,
+where EWC prevented two replay-only collapses; the sweep was not repeated there.
 * **The expected forgetting pattern holds on both splits.** The static model never learns new attacks;
   naive retraining forgets the first attack completely; our model learns every new category and keeps
   retention at 0.998–1.000, close to a model retrained on all data.
@@ -797,11 +814,11 @@ CIC-IDS2017 test windows of 5,000 flows. Laptop: GTX 1650 (4 GB), 8-core CPU, 24
   overfit the test stream.
 * **EWC alone is not reliable; EWC with replay may be.** EWC alone fails in class-incremental (multiclass)
   on both datasets. On top of replay it made no detectable difference on the interleaved split but, on the
-  temporal split, prevented two replay-only collapses (§2). Whether a larger replay buffer would do the same
-  is untested: the replay-budget sweep was not run.
+  temporal split, prevented two replay-only collapses (§2). The replay-budget sweep (§2) shows replay alone is
+  flat from five stored windows per category on the interleaved split; it was not repeated on the temporal one.
 * **Experiments planned but not run.** A Windows Smart App Control policy, enforced after a restart, began
-  blocking PyTorch's libraries part-way through this work, so these did not run: the replay-budget sweep, the
-  window-size sensitivity study, the mixed-attack drift stream (`drift.stream_order: mixed_pairs` is
+  blocking PyTorch's libraries part-way through this work (it has since been turned off and runs are
+  continuing). Not yet run at the time of writing: the window-size sensitivity study, the mixed-attack drift stream (`drift.stream_order: mixed_pairs` is
   implemented and tested), calibration on CSE-CIC-IDS2018, extra seeds for drift, IP-remap and
   the remaining leave-one-attack-out categories, and the 5-seed re-run of the interleaved table. Each is one
   command in the reproduce table; the results they would produce are not claimed anywhere.

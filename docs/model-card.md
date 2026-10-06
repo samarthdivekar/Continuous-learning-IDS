@@ -60,8 +60,9 @@ of the same session (optimistic); *temporal* trains on each attack's earlier tra
   CPU (p50), about 630,000 and 460,000 flows per second, excluding flow export and graph building.
 * **Calibration** (CIC-IDS2017, one run): expected calibration error 0.52 % over all test flows but 2.24 % on
   attack flows, where the model is overconfident (99.4 % mean confidence, 97.7 % accuracy).
-* **Not measured:** sensitivity to window size and replay budget (the sweeps are in the README's reproduce
-  table).
+* **Replay budget** (interleaved split, 3 seeds): replay-only macro-F1 is 0.304 with no stored windows, 0.702
+  with one per category and 0.948–0.957 from five upwards; the default is ten.
+* **Not measured:** sensitivity to window size (the sweep is in the README's reproduce table).
 
 ## Known failure modes
 
