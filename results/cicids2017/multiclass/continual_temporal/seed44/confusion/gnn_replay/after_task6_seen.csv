@@ -1,0 +1,9 @@
+,pred_Benign,pred_BruteForce,pred_DoS,pred_WebAttack,pred_Infiltration,pred_Botnet,pred_PortScan,pred_DDoS
+true_Benign,336884,17,0,0,4,0,2,0
+true_BruteForce,1,1355,2,0,0,0,0,0
+true_DoS,1181,0,14019,0,0,0,0,4657
+true_WebAttack,21,0,0,0,0,0,0,0
+true_Infiltration,34,0,3,0,17442,0,6,11
+true_Botnet,257,0,0,0,0,0,0,0
+true_PortScan,27,0,0,0,1,0,20038,5
+true_DDoS,0,0,0,0,0,0,0,19007

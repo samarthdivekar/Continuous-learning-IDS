@@ -1,0 +1,15 @@
+strategy,task,category,train_windows,val_windows,test_windows,test_flows,test_flows_of_task_attack
+interleaved,0,BruteForce,97,14,28,138702,1280
+interleaved,1,DoS,70,10,20,100000,33606
+interleaved,2,WebAttack,18,2,5,25000,24
+interleaved,3,Infiltration,34,5,9,45000,16434
+interleaved,4,Botnet,20,3,6,27642,73
+interleaved,5,PortScan,38,5,11,55000,29277
+interleaved,6,DDoS,20,3,5,25000,22159
+temporal_attack,0,BruteForce,93,14,28,138702,1358
+temporal_attack,1,DoS,66,10,20,96639,19857
+temporal_attack,2,WebAttack,14,2,5,21631,21
+temporal_attack,3,Infiltration,29,5,10,50445,17496
+temporal_attack,4,Botnet,16,3,6,27642,257
+temporal_attack,5,PortScan,34,5,11,51117,20071
+temporal_attack,6,DDoS,15,3,6,28798,19007

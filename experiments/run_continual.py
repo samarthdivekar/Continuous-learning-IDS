@@ -17,11 +17,9 @@ Running a subset of models (e.g. --models gnn_ewc) MERGES into existing seed
 directories: rows of the re-run models are replaced, other models are kept, and
 the aggregate is recomputed over every model present.
 """
-import json
 import shutil
 
-import pandas as pd
-
+from experiments.aggregate_continual import aggregate
 from experiments.common import (
     apply_selection,
     base_parser,
@@ -39,32 +37,6 @@ log = get_logger("continual")
 
 DEFAULT_MODELS = ["xgboost_static", "gnn_naive", "gnn_ewc_replay", "ffnn_ewc_replay",
                   "ffnn_naive", "gnn_ewc", "gnn_replay", "gnn_joint", "ffnn_joint"]
-
-
-def aggregate(root, seeds: list[int]) -> pd.DataFrame:
-    per_seed = []
-    for s in seeds:
-        f = root / f"seed{s}" / "summary.csv"
-        if f.exists():
-            d = pd.read_csv(f)
-            d["seed"] = s
-            per_seed.append(d)
-    allseeds = pd.concat(per_seed, ignore_index=True)
-    allseeds.to_csv(root / "summary_all_seeds.csv", index=False)
-    keys = ["model", "ip_mode", "after_task", "task_category"]
-    num = allseeds.drop(columns=["seed"]).select_dtypes("number").columns.difference(["after_task"])
-    grouped = allseeds.groupby(keys, sort=False)[list(num)]
-    mean = grouped.mean().reset_index()
-    mean = mean.merge(allseeds.groupby("model")["seed"].nunique().rename("n_seeds").reset_index(), on="model")
-    mean.to_csv(root / "summary.csv", index=False)
-    grouped.std(ddof=1).reset_index().to_csv(root / "summary_std.csv", index=False)
-    for model in allseeds["model"].unique():
-        mats = [pd.read_csv(root / f"seed{s}" / f"recall_matrix_{model}.csv", index_col=0)
-                for s in seeds if (root / f"seed{s}" / f"recall_matrix_{model}.csv").exists()]
-        (sum(mats) / len(mats)).to_csv(root / f"recall_matrix_{model}.csv")
-    with open(root / "seeds.json", "w", encoding="utf-8") as fh:
-        json.dump({"seeds": seeds}, fh)
-    return mean
 
 
 def is_nonstandard(cfg: dict, overrides: list[str]) -> bool:
