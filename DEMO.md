@@ -16,7 +16,9 @@ model service is down, the console says so in a banner and names the tabs that s
 
 > "The model learned seven attack types one after another and still detects the first one perfectly."
 
-* **0.964 ± 0.020** macro-F1 over 3 seeds, **100 %** retention of the first attack type.
+* **0.964 ± 0.020** macro-F1 over 3 seeds on the interleaved split, **0.915 ± 0.031** over 5 seeds on the
+  harder temporal split (train on each attack's earlier traffic, test on its latest), and ~100 % retention
+  of the first attack type on both.
 * A normally retrained model: **0 %** retention — it forgets completely.
 * False alarms: **0.07 %**, about 66 in every 100,000 normal flows.
 
@@ -49,8 +51,9 @@ The grey line of text under the title says this in plain English; the verdict ta
 > "A port scan fans out from one host; a flood fans in to one victim. A per-flow model cannot see that."
 
 * Pick an attack window and show the shape. The **model-error overlay** marks the mistakes.
-* The evidence: on 2018, unseen attacks are detected **98.6–99.7 %** by the graph model versus **~0 %**
-  by the per-flow model.
+* The evidence: on 2018, unseen DoS is detected **98.6 %** by the graph model in both seeds run, versus
+  **0.1 %** by the per-flow model. Say the other half too: unseen BruteForce was 99.7 % in one seed and
+  0.0 % in the other, so the property is real for some attacks and not dependable for all.
 
 ## 5 · The honest part (Models → Unseen attacks, Adaptation & trust, 1.5 min)
 
@@ -77,7 +80,7 @@ Examiners reward measured limitations:
 |---|---|
 | "Is it better than a commercial NDR?" | Not comparable — this is an evaluated research prototype with dry-run response only. The README says so. |
 | "Why not just XGBoost?" | It cannot learn new attack types: 0.231 macro-F1 and it detects 1.3 % of attacks it never saw. |
-| "Does the graph really help?" | In-distribution, barely (0.964 vs 0.928). On attacks never seen in training, decisively (98.6–99.7 % vs ~0 %). |
+| "Does the graph really help?" | In distribution, modestly: +0.036 (interleaved, 3 seeds) and +0.044 (temporal, 5 seeds), indicative only. On some attacks never seen in training, clearly: unseen DoS 98.6 % vs 0.1 % in both seeds; unseen BruteForce did not replicate (99.7 % then 0.0 %). |
 | "What about false alarms?" | 0.07 % at flow level; abstention removes them entirely at the right α, and incident grouping leaves 50 items with 84 % precision. |
-| "Can it run live?" | The stream demo is the live path; throughput was never benchmarked on server hardware, and the README lists that as future work. |
+| "Can it run live?" | The stream demo is the live path. A serving benchmark (`experiments/benchmark_serving.py`) is written but could not be run before submission, so there is no measured throughput to quote. |
 | "What is new here?" | The combination: continual learning + drift-triggered retraining + an operator-facing layer, evaluated on error-corrected data with negative results reported. |

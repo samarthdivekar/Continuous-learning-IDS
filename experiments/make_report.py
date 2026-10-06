@@ -50,8 +50,14 @@ def ewc_settings(ds: str, mode: str) -> dict:
     return {}
 
 
-def continual_section(ds: str, mode: str) -> list[str]:
-    d = RES / ds / mode / "continual"
+# Withdrawn results: kept on disk, not reported (README explains why).
+WITHDRAWN = {("csecicids2018", "binary"): "task sequence withdrawn: one seed, so it supports no claim (see README §6)"}
+
+
+def continual_section(ds: str, mode: str, folder: str = "continual", split: str = "interleaved split") -> list[str]:
+    if (ds, mode) in WITHDRAWN and folder == "continual":
+        return [f"### {ds} — {mode} — {WITHDRAWN[(ds, mode)]}", ""]
+    d = RES / ds / mode / folder
     if not (d / "summary.csv").exists():
         return []
     sel = ewc_settings(ds, mode)
@@ -59,7 +65,7 @@ def continual_section(ds: str, mode: str) -> list[str]:
     std = pd.read_csv(d / "summary_std.csv") if (d / "summary_std.csv").exists() else None
     seeds = json.loads((d / "seeds.json").read_text())["seeds"] if (d / "seeds.json").exists() else ["?"]
     last_t = mean["after_task"].max()
-    out = [f"### {ds} — {mode} — task sequence (test split, mean ± std over seeds {seeds})", ""]
+    out = [f"### {ds} — {mode} — task sequence ({split}, test, mean ± std over seeds {seeds})", ""]
     rows = []
     for model in [m for m in ORDER if m in set(mean["model"])]:
         m = mean[(mean["model"] == model) & (mean["after_task"] == last_t)].iloc[0]
@@ -185,6 +191,7 @@ def main():
         lines += [f"## {ds}", ""]
         for mode in ["multiclass", "binary"]:
             lines += continual_section(ds, mode)
+        lines += continual_section(ds, "multiclass", "continual_temporal", "temporal split, per-attack chronological")
         lines += drift_section(ds, "multiclass")
         for mode in ["binary", "multiclass"]:
             lines += loao_section(ds, mode)

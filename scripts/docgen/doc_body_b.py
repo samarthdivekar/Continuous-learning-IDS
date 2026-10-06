@@ -314,7 +314,23 @@ add("""
 <h2>8 &middot; Measured results</h2>
 <p>Every figure here is in <span class="mono">results/</span> and visible in the console.</p>
 
-<h3>8.1 CIC-IDS2017 &mdash; seven attack types learned in sequence, 3 seeds</h3>
+<h3>8.1 Attacks never seen in training (CSE-CIC-IDS2018, leave-one-attack-out)</h3>
+<table>
+<thead><tr><th>Held-out attack</th><th>GNN, seed 42</th><th>GNN, seed 43</th><th>FFNN (per-flow)</th><th>XGBoost</th></tr></thead>
+<tbody>
+<tr><td>DoS</td><td><b>98.6 %</b></td><td><b>98.6 %</b></td><td>0.1 %</td><td>90.1 %</td></tr>
+<tr><td>BruteForce</td><td>99.7 %</td><td><b>0.0 %</b></td><td>0 %</td><td>0 %</td></tr>
+<tr><td>DDoS</td><td>99.4 %</td><td>not run</td><td>0 %</td><td>0 %</td></tr>
+<tr><td>Botnet</td><td>8.5 %</td><td>not run</td><td>0 %</td><td>0 %</td></tr>
+<tr><td>Infiltration</td><td>0 %</td><td>not run</td><td>0 %</td><td>0 %</td></tr>
+</tbody></table>
+<p class="muted">The graph detects unseen DoS in both seeds where the per-flow model sees almost nothing. Unseen
+BruteForce did not replicate (99.7 % in one seed, 0.0 % in the other), so this is a real effect for some attack
+types and not a dependable one for all. The second seed stopped after three held-out categories.</p>
+
+<h3>8.2 CIC-IDS2017 &mdash; seven attack types learned in sequence</h3>
+<p>Two protocols. <b>Interleaved</b> (3 seeds) tests on windows interleaved with training windows of the same
+session; <b>temporal</b> (5 seeds) trains on each attack's earlier traffic and tests on its latest.</p>
 <table>
 <thead><tr><th>Model</th><th>Macro-F1</th><th>Retention of first attack</th><th>False-positive rate</th></tr></thead>
 <tbody>
@@ -325,8 +341,20 @@ add("""
 <tr><td>GNN naive retraining</td><td>0.289</td><td>0 %</td><td>0.45 %</td></tr>
 <tr><td>XGBoost static</td><td>0.231</td><td>100 % (never learns anything new)</td><td>0.00 %</td></tr>
 </tbody></table>
+<table>
+<thead><tr><th>Temporal split, 5 seeds</th><th>Macro-F1</th><th>Retention of first attack</th><th>False-positive rate</th></tr></thead>
+<tbody>
+<tr><td><b>GNN + EWC + replay (ours)</b></td><td><b>0.915 &plusmn; 0.031</b> (95 % CI 0.888&ndash;0.935)</td><td>99.8 %</td><td>0.04 %</td></tr>
+<tr><td>FFNN + EWC + replay (no graph)</td><td>0.870 &plusmn; 0.009</td><td>99.7 %</td><td>0.04 %</td></tr>
+<tr><td>GNN + replay only</td><td>0.848 &plusmn; 0.089</td><td>99.4 %</td><td>0.08 %</td></tr>
+<tr><td>GNN + EWC only</td><td>0.377 &plusmn; 0.109</td><td>0 %</td><td>0.04 %</td></tr>
+<tr><td>GNN naive retraining</td><td>0.263 &plusmn; 0.055</td><td>0 %</td><td>0.19 %</td></tr>
+</tbody></table>
+<p class="muted">The temporal split cost our model 0.049 macro-F1 and the FFNN 0.058. Paired over seeds, the graph is
+ahead by +0.036 (interleaved, CI +0.011 to +0.069) and +0.044 (temporal, CI +0.019 to +0.058); with three or five
+seeds these are indicative, not significant.</p>
 
-<h3>8.2 CSE-CIC-IDS2018 &mdash; 3 seeds</h3>
+<h3>8.3 CSE-CIC-IDS2018 &mdash; 3 seeds</h3>
 <table>
 <thead><tr><th>Model</th><th>Macro-F1</th><th>Per seed</th></tr></thead>
 <tbody>
@@ -337,19 +365,6 @@ add("""
 </tbody></table>
 <p class="muted">Our model leads in all three seeds, but by 0.004 and 0.009 in two of them; the average gap is
 carried by the third. Stated as suggestive, not conclusive.</p>
-
-<h3>8.3 Attacks never seen in training (2018, leave-one-attack-out)</h3>
-<table>
-<thead><tr><th>Held-out attack</th><th>GNN (graph)</th><th>FFNN (per-flow)</th><th>XGBoost</th></tr></thead>
-<tbody>
-<tr><td>BruteForce</td><td><b>99.7 %</b></td><td>0 %</td><td>0 %</td></tr>
-<tr><td>DDoS</td><td><b>99.4 %</b></td><td>0 %</td><td>0 %</td></tr>
-<tr><td>DoS</td><td><b>98.6 %</b></td><td>0.1 %</td><td>90.1 %</td></tr>
-<tr><td>Botnet</td><td>8.5 %</td><td>0 %</td><td>0 %</td></tr>
-<tr><td>Infiltration</td><td>0 %</td><td>0 %</td><td>0 %</td></tr>
-</tbody></table>
-<p class="muted">This is the clearest argument for the graph: structure generalises to attacks the model was never
-trained on. Infiltration defeats everything, because it looks like ordinary traffic.</p>
 
 <h3>8.4 The product layer</h3>
 <table>
@@ -364,8 +379,10 @@ trained on. Infiltration defeats everything, because it looks like ordinary traf
 
 <h3>8.5 Results reported as negative</h3>
 <ul>
-<li><b>EWC alone fails</b> (0.300, zero retention). Replay is what prevents forgetting; the combination is kept
-because it is what was measured, not because EWC carries it.</li>
+<li><b>EWC alone fails</b> (0.300 interleaved, 0.377 temporal, zero retention). Replay is what prevents forgetting.
+On top of replay, EWC made no detectable difference on the interleaved split but prevented two replay-only collapses on
+the temporal split (+0.067, CI +0.003 to +0.145, indicative).</li>
+<li><b>Unseen BruteForce detection did not replicate</b> &mdash; 99.7 % in one seed, 0.0 % in the next.</li>
 <li><b>A label-free drift trigger misses most changes</b> &mdash; 2 retrains instead of 16, ending at 0.338.</li>
 <li><b>Uncertainty-only labelling fails</b> &mdash; a new attack the model confidently mislabels is never queried.</li>
 <li><b>Topology augmentation is a trade-off</b> &mdash; robustness to randomised sources rises from 0.427 to 0.914,

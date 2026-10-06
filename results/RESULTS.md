@@ -5,7 +5,7 @@ Do not edit by hand — rerun the experiments and this script instead.
 
 ## cicids2017
 
-### cicids2017 — multiclass — task sequence (test split, mean ± std over seeds [42, 43, 44])
+### cicids2017 — multiclass — task sequence (interleaved split, test, mean ± std over seeds [42, 43, 44])
 
 | Model | EWC λ / γ | Accuracy (seen) | Macro-F1 (seen) | Retention (task-1 recall) | FPR | BWT (category recall) |
 |---|---|---|---|---|---|---|
@@ -48,7 +48,7 @@ Task order: BruteForce → DoS → WebAttack → Infiltration → Botnet → Por
 | **GNN + EWC + replay (ours)** | 0.00% | 0.07% | 0.09% | 0.10% | 0.08% | 0.10% | 0.07% |
 | FFNN + EWC + replay (ablation) | 0.00% | 0.01% | 0.04% | 0.10% | 0.04% | 0.05% | 0.04% |
 
-### cicids2017 — binary — task sequence (test split, mean ± std over seeds [42, 43, 44])
+### cicids2017 — binary — task sequence (interleaved split, test, mean ± std over seeds [42, 43, 44])
 
 | Model | EWC λ / γ | Accuracy (seen) | Macro-F1 (seen) | Retention (task-1 recall) | FPR | BWT (category recall) |
 |---|---|---|---|---|---|---|
@@ -90,6 +90,49 @@ Task order: BruteForce → DoS → WebAttack → Infiltration → Botnet → Por
 | GNN naive retrain | 0.00% | 0.07% | 0.04% | 0.54% | 0.04% | 0.42% | 0.34% |
 | **GNN + EWC + replay (ours)** | 0.00% | 0.07% | 0.08% | 0.15% | 0.11% | 0.10% | 0.06% |
 | FFNN + EWC + replay (ablation) | 0.00% | 0.01% | 0.08% | 0.09% | 0.12% | 0.05% | 0.05% |
+
+### cicids2017 — multiclass — task sequence (temporal split, per-attack chronological, test, mean ± std over seeds [42, 43, 44, 45, 46])
+
+| Model | EWC λ / γ | Accuracy (seen) | Macro-F1 (seen) | Retention (task-1 recall) | FPR | BWT (category recall) |
+|---|---|---|---|---|---|---|
+| XGBoost static | – | 0.815 ± 0.000 | 0.236 ± 0.000 | 0.990 ± 0.002 | 0.00% ± 0.00 | 0.000 |
+| GNN naive retrain | – | 0.885 ± 0.026 | 0.263 ± 0.055 | 0.000 ± 0.000 | 0.19% ± 0.06 | -0.797 |
+| **GNN + EWC + replay (ours)** | 10 / 0.9 | 0.996 ± 0.005 | 0.915 ± 0.031 | 0.998 ± 0.002 | 0.04% ± 0.04 | -0.050 |
+| FFNN + EWC + replay (ablation) | 10 / 0.9 | 0.973 ± 0.001 | 0.870 ± 0.009 | 0.997 ± 0.001 | 0.04% ± 0.01 | -0.034 |
+| FFNN naive retrain | – | 0.882 ± 0.008 | 0.297 ± 0.022 | 0.000 ± 0.000 | 0.01% ± 0.00 | -0.755 |
+| GNN + EWC only | 100 / 0.9 | 0.908 ± 0.004 | 0.377 ± 0.109 | 0.000 ± 0.000 | 0.04% ± 0.05 | -0.646 |
+| GNN + replay only | – | 0.988 ± 0.010 | 0.848 ± 0.089 | 0.994 ± 0.002 | 0.08% ± 0.07 | -0.122 |
+| GNN joint retrain (upper bound, not continual) | – | 0.998 ± 0.002 | 0.935 ± 0.008 | 0.997 ± 0.002 | 0.04% ± 0.03 | -0.005 |
+| FFNN joint retrain (upper bound, not continual) | – | 0.976 ± 0.001 | 0.896 ± 0.003 | 0.995 ± 0.005 | 0.02% ± 0.01 | -0.013 |
+
+Task order: BruteForce → DoS → WebAttack → Infiltration → Botnet → PortScan → DDoS. Metrics after the final task; 'seen' = test windows of all tasks.
+
+**Macro-F1 over time**
+
+| Model | after 1 (BruteForce) | after 2 (DoS) | after 3 (WebAttack) | after 4 (Infiltration) | after 5 (Botnet) | after 6 (PortScan) | after 7 (DDoS) |
+|---|---|---|---|---|---|---|---|
+| XGBoost static | 0.997 | 0.650 | 0.489 | 0.385 | 0.322 | 0.273 | 0.236 |
+| GNN naive retrain | 0.996 | 0.661 | 0.484 | 0.433 | 0.284 | 0.286 | 0.263 |
+| **GNN + EWC + replay (ours)** | 0.996 | 0.995 | 0.875 | 0.908 | 0.907 | 0.910 | 0.915 |
+| FFNN + EWC + replay (ablation) | 0.998 | 0.923 | 0.786 | 0.841 | 0.856 | 0.846 | 0.870 |
+
+**Retention over time**
+
+| Model | after 1 (BruteForce) | after 2 (DoS) | after 3 (WebAttack) | after 4 (Infiltration) | after 5 (Botnet) | after 6 (PortScan) | after 7 (DDoS) |
+|---|---|---|---|---|---|---|---|
+| XGBoost static | 0.990 | 0.990 | 0.990 | 0.990 | 0.990 | 0.990 | 0.990 |
+| GNN naive retrain | 1.000 | 0.000 | 0.000 | 0.000 | 0.000 | 0.000 | 0.000 |
+| **GNN + EWC + replay (ours)** | 1.000 | 0.998 | 0.997 | 0.996 | 0.996 | 0.995 | 0.998 |
+| FFNN + EWC + replay (ablation) | 0.994 | 0.996 | 0.997 | 0.997 | 0.997 | 0.997 | 0.997 |
+
+**FPR over time**
+
+| Model | after 1 (BruteForce) | after 2 (DoS) | after 3 (WebAttack) | after 4 (Infiltration) | after 5 (Botnet) | after 6 (PortScan) | after 7 (DDoS) |
+|---|---|---|---|---|---|---|---|
+| XGBoost static | 0.00% | 0.00% | 0.00% | 0.00% | 0.00% | 0.00% | 0.00% |
+| GNN naive retrain | 0.01% | 0.10% | 0.00% | 0.08% | 0.02% | 0.08% | 0.19% |
+| **GNN + EWC + replay (ours)** | 0.01% | 0.13% | 0.06% | 0.07% | 0.07% | 0.08% | 0.04% |
+| FFNN + EWC + replay (ablation) | 0.00% | 0.00% | 0.01% | 0.04% | 0.03% | 0.03% | 0.04% |
 
 ### cicids2017 — multiclass — drift-triggered adaptation (stream of tasks 2..T, seed 42)
 
@@ -187,7 +230,7 @@ Selected: `{"ffnn_ewc_replay": {"lambda": 10.0, "gamma": 0.9}, "gnn_ewc": {"lamb
 
 ## csecicids2018
 
-### csecicids2018 — multiclass — task sequence (test split, mean ± std over seeds [42, 43, 44])
+### csecicids2018 — multiclass — task sequence (interleaved split, test, mean ± std over seeds [42, 43, 44])
 
 | Model | EWC λ / γ | Accuracy (seen) | Macro-F1 (seen) | Retention (task-1 recall) | FPR | BWT (category recall) |
 |---|---|---|---|---|---|---|
@@ -228,46 +271,7 @@ Task order: BruteForce → DoS → DDoS → WebAttack → Infiltration → Botne
 | **GNN + EWC + replay (ours)** | 0.00% | 0.00% | 0.01% | 0.01% | 0.39% | 0.35% |
 | FFNN + EWC + replay (ablation) | 0.00% | 0.00% | 0.00% | 0.00% | 0.12% | 0.12% |
 
-### csecicids2018 — binary — task sequence (test split, mean ± std over seeds [42])
-
-| Model | EWC λ / γ | Accuracy (seen) | Macro-F1 (seen) | Retention (task-1 recall) | FPR | BWT (category recall) |
-|---|---|---|---|---|---|---|
-| XGBoost static | – | 0.947 | 0.514 | 1.000 | 0.00% | 0.000 |
-| GNN naive retrain | – | 0.948 | 0.530 | 0.000 | 0.00% | -0.946 |
-| **GNN + EWC + replay (ours)** | 10 / 0.9 | 0.995 | 0.977 | 1.000 | 0.53% | 0.000 |
-| FFNN + EWC + replay (ablation) | 10 / 0.9 | 0.999 | 0.995 | 1.000 | 0.10% | -0.028 |
-| FFNN naive retrain | – | 0.948 | 0.526 | 0.000 | 0.00% | -0.995 |
-| GNN + EWC only | 100 / 0.9 | 0.949 | 0.539 | 0.000 | 0.00% | -0.807 |
-| GNN + replay only | – | 0.995 | 0.977 | 1.000 | 0.51% | -0.029 |
-
-Task order: BruteForce → DoS → DDoS → WebAttack → Infiltration → Botnet. Metrics after the final task; 'seen' = test windows of all tasks.
-
-**Macro-F1 over time**
-
-| Model | after 1 (BruteForce) | after 2 (DoS) | after 3 (DDoS) | after 4 (WebAttack) | after 5 (Infiltration) | after 6 (Botnet) |
-|---|---|---|---|---|---|---|
-| XGBoost static | 1.000 | 0.523 | 0.505 | 0.510 | 0.514 | 0.514 |
-| GNN naive retrain | 1.000 | 0.999 | 0.999 | 0.965 | 0.498 | 0.530 |
-| **GNN + EWC + replay (ours)** | 1.000 | 0.999 | 1.000 | 0.999 | 0.976 | 0.977 |
-| FFNN + EWC + replay (ablation) | 1.000 | 1.000 | 1.000 | 1.000 | 0.995 | 0.995 |
-
-**Retention over time**
-
-| Model | after 1 (BruteForce) | after 2 (DoS) | after 3 (DDoS) | after 4 (WebAttack) | after 5 (Infiltration) | after 6 (Botnet) |
-|---|---|---|---|---|---|---|
-| XGBoost static | 1.000 | 1.000 | 1.000 | 1.000 | 1.000 | 1.000 |
-| GNN naive retrain | 1.000 | 1.000 | 1.000 | 0.000 | 0.000 | 0.000 |
-| **GNN + EWC + replay (ours)** | 1.000 | 1.000 | 1.000 | 1.000 | 1.000 | 1.000 |
-| FFNN + EWC + replay (ablation) | 1.000 | 1.000 | 1.000 | 1.000 | 1.000 | 1.000 |
-
-**FPR over time**
-
-| Model | after 1 (BruteForce) | after 2 (DoS) | after 3 (DDoS) | after 4 (WebAttack) | after 5 (Infiltration) | after 6 (Botnet) |
-|---|---|---|---|---|---|---|
-| XGBoost static | 0.00% | 0.00% | 0.00% | 0.00% | 0.00% | 0.00% |
-| GNN naive retrain | 0.00% | 0.00% | 0.01% | 0.00% | 0.57% | 0.00% |
-| **GNN + EWC + replay (ours)** | 0.00% | 0.00% | 0.00% | 0.02% | 0.58% | 0.53% |
-| FFNN + EWC + replay (ablation) | 0.00% | 0.00% | 0.00% | 0.00% | 0.10% | 0.10% |
+### csecicids2018 — binary — task sequence withdrawn: one seed, so it supports no claim (see README §6)
 
 ### csecicids2018 — multiclass — drift-triggered adaptation (stream of tasks 2..T, seed 42)
 
