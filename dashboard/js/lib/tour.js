@@ -18,7 +18,7 @@ const STEPS = [
         + "That shape is what the graph model sees and a per-flow model cannot." },
   { view: "models", title: "The evidence",
     body: "Accuracy over the task sequence, forgetting, unseen attacks and the IP-leakage test. "
-        + "Turn on Compare models in the header to see every baseline." },
+        + "Turn on Compare models in the top bar to see every baseline." },
 ];
 
 let index = 0;

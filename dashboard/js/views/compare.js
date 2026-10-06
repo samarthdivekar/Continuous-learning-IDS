@@ -20,7 +20,7 @@ async function render() {
   root.innerHTML = `
     <div class="view-head"><div><h2>Model comparison</h2>
       <p>${state.compare ? "Every baseline and ablation" : "The deployed model and its two reference points"} through the identical
-      chronological task sequence (${esc(dataset)}, ${esc(mode)}). Use <b>Compare models</b> in the header to ${state.compare ? "narrow this down" : "show all of them"}.
+      chronological task sequence (${esc(dataset)}, ${esc(mode)}). Use <b>Compare models</b> in the top bar to ${state.compare ? "narrow this down" : "show all of them"}.
       Mean over seeds; the band shows ± 1 std.</p></div>
       <div class="toolbar"><select id="cmp-metric" aria-label="metric to plot over the task sequence">${METRICS.map(([k, t]) => `<option value="${k}">${t}</option>`).join("")}</select></div></div>
     <div class="card"><div class="card-head"><div><h3 id="cmp-title"></h3><p class="sub">x = after training task k</p></div>
@@ -38,7 +38,7 @@ async function render() {
     </div>`;
   try { data = await get(`/results/continual?dataset=${dataset}&mode=${mode}`); }
   catch (e) { showError(root.querySelector(".card"), e, { what: "the task-sequence results" }); return; }
-  models = shownModels(data.models);              // one model by default (header toggle shows all)
+  models = shownModels(data.models);              // one model by default (the top-bar toggle shows all)
   $("#cmp-rm", root).innerHTML = models.map((m) => `<option value="${m}">${esc(label(m))}</option>`).join("");
   $("#cmp-cm-model", root).innerHTML = $("#cmp-rm", root).innerHTML;
   $("#cmp-cm-task", root).innerHTML = data.tasks.map((t, i) => `<option value="${i}" ${i === data.tasks.length - 1 ? "selected" : ""}>after ${i + 1}. ${esc(t)}</option>`).join("");

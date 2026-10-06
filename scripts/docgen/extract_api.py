@@ -100,8 +100,11 @@ def dashboard():
 def tabs():
     html = (ROOT / "dashboard/index.html").read_text(encoding="utf-8")
     out = []
-    for m in re.finditer(r'<button class="tab[^"]*" data-view="([^"]+)" title="([^"]*)">([^<]*)', html):
-        out.append({"view": m.group(1), "title": m.group(2), "label": m.group(3).strip()})
+    # sidebar items: <button class="tab nav-item" data-view=".." data-group=".." title=".."> icon <span class="nav-label">
+    pattern = (r'<button class="tab[^"]*" data-view="([^"]+)" data-group="([^"]+)" title="([^"]*)">'
+               r'.*?<span class="nav-label">([^<]*)</span>')
+    for m in re.finditer(pattern, html, re.S):
+        out.append({"view": m.group(1), "group": m.group(2), "title": m.group(3), "label": m.group(4).strip()})
     return out
 
 

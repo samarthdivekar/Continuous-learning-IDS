@@ -14,19 +14,20 @@ loaded from a CDN &mdash; Chart.js for the charts and d3-force for the network l
 so what is in the repository is what runs in the browser.</p>
 
 <h3>6.1 Design system</h3>
-<p>Dark by default, with a light theme switched by the &#9680; button. Colours are CSS custom properties defined
-once on <span class="mono">:root</span>; a model keeps the same colour on every chart of every tab, so a line can
-be recognised without reading the legend.</p>
+<p>Dark by default, with a light theme switched from the sidebar. Colours are CSS custom properties defined once
+on <span class="mono">:root</span>. The chrome is quiet (cool greys and one indigo accent for "you are here" and
+primary actions); colour with meaning is reserved for data. A model keeps the same colour on every chart of
+every page, so a line can be recognised without reading the legend. Text contrast is measured, not estimated:
+16.3:1, 10.0:1 and 5.8:1 for the three text levels in dark, and 4.95:1 for white on a primary button.</p>
 
 <h4>Colour roles</h4>
 {table(["Token", "Value", "Used for"],
        [[f'<span class="mono">{esc(n)}</span>', f'<span class="mono">{esc(v)}</span>',
-         {"--accent": "primary actions, our model's series",
+         {"--accent": "chrome accent: the current page, switches, focus",
           "--good": "healthy status, approved decisions",
-          "--warn": "warnings, the stream pill",
+          "--warn": "warnings and degraded-service banners",
           "--critical": "errors, rejected decisions, attack edges",
           "--m-ours": "GNN + EWC + replay (our model)",
-          "--m-ours-topo": "the topology-augmented variant",
           "--m-gnn-naive": "GNN naive retraining",
           "--m-xgb": "XGBoost static baseline",
           "--m-ffnn": "FFNN + EWC + replay",
@@ -40,14 +41,16 @@ be recognised without reading the legend.</p>
 {table(["Component", "Class", "What it is"],
        [["Card", '<span class="mono">.card</span>', "the panel every chart and table sits in; rounded, bordered, with an optional header row"],
         ["KPI tile", '<span class="mono">.kpi</span>', "one large number with a label above and a detail line below"],
-        ["Segmented control", '<span class="mono">.seg</span>', "a row of buttons where exactly one is active (dataset, label mode, scope, sub-tabs)"],
-        ["Status pill", '<span class="mono">.pill</span>', "a coloured dot and a word for API, ML, DB and stream state"],
+        ["Segmented control", '<span class="mono">.seg</span>', "a row of buttons where exactly one is active (dataset, label mode, scope)"],
+        ["Toggle switch", '<span class="mono">.toggle</span>', "an on/off switch with a sliding knob (Compare models)"],
+        ["Sub-page tabs", '<span class="mono">.sub-nav</span>', "underlined tabs that split one page into sections (Models, Adaptation &amp; trust)"],
+        ["Status row", '<span class="mono">.status-row</span>', "a coloured dot, a name and a one-word state for API, model service, database and stream"],
         ["Tag", '<span class="mono">.tag</span>', "small rounded label: severity, 'dry run', a window number"],
         ["Data table", '<span class="mono">.data</span>', "compact table; numeric columns right-aligned, a highlighted row for the row that matters"],
         ["Heat cell", '<span class="mono">.heat</span>', "table cell whose background opacity encodes a value from 0 to 1"],
         ["Chart", '<span class="mono">.chart</span>', "fixed-height canvas rendered by Chart.js (line, bar, horizontal bar, logarithmic)"],
         ["Graph stage", '<span class="mono">.graph-stage</span>', "the force-directed network canvas with hover tooltip"],
-        ["Banner", '<span class="mono">.banner</span>', "full-width message under the header when something is wrong"],
+        ["Banner", '<span class="mono">.banner</span>', "message under the top bar when something is wrong, naming what still works"],
         ["Drawer", '<span class="mono">.drawer</span>', "the Help panel sliding in from the right with a glossary"],
         ["Tour card", '<span class="mono">.tour</span>', "the five-step guided walk, bottom right"],
         ["Toast", '<span class="mono">.toast</span>', "transient confirmation, bottom right, disappears after a few seconds"],
@@ -57,10 +60,11 @@ be recognised without reading the legend.</p>
 <ul>
 <li><b>Grid</b> &mdash; panels are laid out with CSS grid helpers (<span class="mono">.g2</span>,
 <span class="mono">.g3</span>, <span class="mono">.g4</span>, <span class="mono">.g-5-7</span>,
-<span class="mono">.g-7-5</span>, <span class="mono">.g-8-4</span>). Below 900&nbsp;px everything becomes one
-column; below 1500&nbsp;px the header compacts so it fits a projector in one line.</li>
-<li><b>Type</b> &mdash; the system UI font for text, a monospace font for anything an analyst might copy
-(IP addresses, firewall rules, file paths).</li>
+<span class="mono">.g-7-5</span>, <span class="mono">.g-8-4</span>). Below 1480&nbsp;px the top bar drops its field
+captions; below 1200&nbsp;px the sidebar becomes an icon rail; below 860&nbsp;px it becomes a drawer opened from a
+menu button and every grid becomes one column.</li>
+<li><b>Type</b> &mdash; Inter for text and JetBrains Mono for anything an analyst might copy (IP addresses,
+firewall rules, file paths), both self-hosted.</li>
 <li><b>Numbers</b> &mdash; shown the way a person reads them: thousands separators, percentages with sensible
 precision, and never scientific notation (a port renders as 56,737, not 5.674e+04).</li>
 </ul>
@@ -70,31 +74,36 @@ precision, and never scientific notation (a port renders as 56,737, not 5.674e+0
 # ------------------------------------------------------------------ 6.2 shell
 add(f"""
 <section class="page-break">
-<h3>6.2 The shell: header, tabs, and the parts that are always there</h3>
-<p>One HTML page (<span class="mono">dashboard/index.html</span>) holds the header, the tab strip and eight empty
-sections. <span class="mono">js/main.js</span> routes between them: changing the URL hash loads that tab's module
-on first use, so nothing is fetched for a tab nobody opens.</p>
+<h3>6.2 The shell: sidebar, top bar, and the parts that are always there</h3>
+<p>One HTML page (<span class="mono">dashboard/index.html</span>) holds a sidebar, a slim top bar and eight empty
+page sections. <span class="mono">js/main.js</span> routes between them: changing the URL hash loads that page's
+module on first use, so nothing is fetched for a page nobody opens.</p>
 
-<h4>Header controls (always visible)</h4>
+<h4>Sidebar (navigation, status, utilities)</h4>
+{table(["Part", "Widget", "What it does"],
+       [["Operate / Evaluate", "navigation list with icons", "one item per page; the current page is highlighted, a LIVE badge marks a running stream, and hovering shows the page's number key"],
+        ["API &middot; Model service &middot; Database &middot; Stream", "status rows", "polled every 4 seconds from /health and /demo/status; a coloured dot and one word (online, offline, idle, or stream progress)"],
+        ["&#9654;", "icon button", "starts the five-step guided tour"],
+        ["?", "icon button", "opens the Help drawer (glossary, where to start); opens itself on a first visit"],
+        ["Presentation", "icon button", "larger type and thicker chart lines for a projector; fine print is hidden"],
+        ["Theme", "icon button", "toggles dark and light; charts are re-rendered with the new palette"]])}
+
+<h4>Top bar (context shared by every page)</h4>
 {table(["Control", "Widget", "What it does"],
-       [["CIC-IDS2017 / CSE-CIC-IDS2018", "segmented control", "switches dataset; every open tab re-reads its data for that dataset"],
-        ["Multiclass / Binary", "segmented control", "switches between named attack types and attack-vs-benign"],
-        ["API &middot; ML &middot; DB &middot; Stream", "status pills", "polled every 4 seconds from /health; green when healthy, red when not; the stream pill shows live progress"],
-        ["Compare models", "checkbox", "off shows the deployed model and two reference points; on shows every baseline and ablation"],
-        ["&#9654; Tour", "button", "starts the five-step guided walk"],
-        ["? Help", "button", "opens the Help drawer (glossary, where to start); opens itself on a first visit"],
-        ["&#9680;", "button", "toggles dark and light theme; charts are re-rendered with the new palette"]])}
+       [["Breadcrumb", "text", "the current group and page"],
+        ["CIC-IDS2017 / CSE-CIC-IDS2018", "segmented control", "switches dataset; every open page re-reads its data"],
+        ["Multiclass / Binary", "segmented control", "named attack types or attack-vs-benign; Binary is disabled for CSE-CIC-IDS2018, whose binary task sequence was withdrawn"],
+        ["Compare models", "toggle switch", "off shows the deployed model and two reference points; on shows every baseline and ablation"],
+        ["Jump to&hellip; (Ctrl&nbsp;K)", "button", "opens the command palette"],
+        ["&#9776;", "icon button", "on a phone: opens the sidebar as a drawer"]])}
 
-<h4>Tabs</h4>
-{table(["Group", "Tab", "Module", "What it answers"],
-       [["Operate", t["label"].replace(" LIVE", ""), f'<span class="mono">views/{t["view"]}.js</span>', t["title"]]
-        if i < 5 else
-        ["Evaluate", t["label"].replace(" LIVE", ""), f'<span class="mono">views/{t["view"]}.js</span>', t["title"]]
-        for i, t in enumerate(S["tabs"])])}
+<h4>Pages</h4>
+{table(["Group", "Page", "Module", "What it answers"],
+       [[t["group"], t["label"], f'<span class="mono">views/{t["view"]}.js</span>', t["title"]] for t in S["tabs"]])}
 
 <h4>Keyboard</h4>
 <ul>
-<li><span class="mono">1</span>&ndash;<span class="mono">8</span> &mdash; switch tab</li>
+<li><span class="mono">1</span>&ndash;<span class="mono">8</span> &mdash; switch page</li>
 <li><span class="mono">?</span> &mdash; open or close the Help drawer &nbsp;&middot;&nbsp;
     <span class="mono">Esc</span> &mdash; close it</li>
 </ul>
@@ -295,7 +304,7 @@ its own strategy (replay + EWC for ours, plain fine-tuning for the naive baselin
 invalidated.</li>
 <li>Windows, metrics and drift events are written to the database as rows.</li>
 <li>The browser polls <span class="mono">/stream/windows</span>, <span class="mono">/metrics</span> and
-<span class="mono">/drift-status</span> and updates the charts, the feed and the stream pill.</li>
+<span class="mono">/drift-status</span> and updates the charts, the feed and the stream status row.</li>
 </ol>
 
 <h3>7.3 Flicking the "Compare models" switch</h3>
