@@ -93,6 +93,17 @@ def test_sensor_flows_are_scored_and_stored(client):
         assert i["proposed"]["dry_run"] is True and i["flow_ids"]
 
 
+def test_live_graph(client):
+    out = client.post("/sensor/flows", json={"site": "home", "flows": _flows(client, 20)}).json()
+    g = client.get(f"/live/graph/{out['window_id']}").json()
+    assert g["n_edges"] == 20 and g["nodes"] and g["edges"]
+    assert all({"id", "ip", "degree", "attack_degree"} <= set(n) for n in g["nodes"])
+    assert all({"source", "target", "flows", "category"} <= set(e) for e in g["edges"])
+    ids = {n["id"] for n in g["nodes"]}
+    assert all(e["source"] in ids and e["target"] in ids for e in g["edges"])
+    assert client.get("/live/graph/999999").status_code == 404
+
+
 def test_empty_chunk_is_a_heartbeat(client):
     r = client.post("/sensor/flows", json={"site": "office", "flows": []})
     assert r.status_code == 200 and r.json()["n_flows"] == 0

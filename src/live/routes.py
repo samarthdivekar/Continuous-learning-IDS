@@ -179,6 +179,54 @@ def live_sites():
     return {"sites": sorted(out, key=lambda d: d["site"]), "online_seconds": ONLINE_SECONDS}
 
 
+@router.get("/live/graph/{window_id}")
+def live_graph(window_id: int, max_nodes: int = Query(150, ge=5, le=800)):
+    """One live window as a host/flow graph, coloured by the model's prediction (live traffic is
+    unlabelled, so there is no ground truth — edges are the predicted category, nodes that send or
+    receive predicted-attack flows are marked). Same shape the Graph explorer renders."""
+    with _app().state.Session() as s:
+        rows = s.scalars(select(LiveFlow).where(LiveFlow.window_id == window_id).order_by(LiveFlow.id)).all()
+    if not rows:
+        raise HTTPException(404, f"no live window {window_id}")
+    hosts = {}
+    for r in rows:
+        for ip in (r.src_ip, r.dst_ip):
+            hosts.setdefault(ip, len(hosts))
+    n = len(hosts)
+    deg = np.zeros(n, int); out_deg = np.zeros(n, int); in_deg = np.zeros(n, int); atk = np.zeros(n, int)
+    pairs = {}
+    for r in rows:
+        si, di = hosts[r.src_ip], hosts[r.dst_ip]
+        out_deg[si] += 1; in_deg[di] += 1; deg[si] += 1; deg[di] += 1
+        is_atk = r.predicted != "Benign"
+        if is_atk:
+            atk[si] += 1; atk[di] += 1
+        p = pairs.setdefault((si, di), {"flows": 0, "attack_flows": 0, "unfamiliar": 0, "cats": {}})
+        p["flows"] += 1
+        if is_atk:
+            p["attack_flows"] += 1
+            p["cats"][r.predicted] = p["cats"].get(r.predicted, 0) + 1
+        if r.unfamiliar:
+            p["unfamiliar"] += 1
+    order = sorted(range(n), key=lambda i: (atk[i] > 0, deg[i]), reverse=True)[:max_nodes]
+    keep = set(order)
+    ip_of = {i: ip for ip, i in hosts.items()}
+    cat_counts = {}
+    for r in rows:
+        if r.predicted != "Benign":
+            cat_counts[r.predicted] = cat_counts.get(r.predicted, 0) + 1
+    edges = [{"source": si, "target": di, "flows": p["flows"], "attack_flows": p["attack_flows"],
+              "unfamiliar": p["unfamiliar"], "wrong": 0,
+              "category": max(p["cats"], key=p["cats"].get) if p["cats"] else "Benign"}
+             for (si, di), p in pairs.items() if si in keep and di in keep]
+    n_attack = int(sum(1 for r in rows if r.predicted != "Benign"))
+    return {"window_id": window_id, "n_nodes": n, "n_edges": len(rows), "n_attack_edges": n_attack,
+            "category_counts": cat_counts, "truncated": n > max_nodes,
+            "nodes": [{"id": i, "ip": ip_of[i], "degree": int(deg[i]), "out_degree": int(out_deg[i]),
+                       "in_degree": int(in_deg[i]), "attack_degree": int(atk[i])} for i in order],
+            "edges": edges, "note": "Live traffic: edges are the model's predicted category, not ground truth."}
+
+
 @router.get("/live/windows")
 def live_windows(site: str | None = None, limit: int = Query(120, ge=1, le=2000), since_id: int = 0):
     Session = _app().state.Session

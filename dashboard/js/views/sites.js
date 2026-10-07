@@ -3,9 +3,10 @@
 // per site. Here you watch per-site traffic, triage incidents (dry-run rules), label flows and adapt the
 // model without forgetting. Distinct from "Live stream", which replays the recorded dataset.
 import { catColor, css, esc, get, int, pct, post, toast } from "../lib/core.js";
+import { GraphView } from "../lib/graphview.js";
 import { withBusy } from "../lib/ui.js";
 
-let root, timer, sel = null, teachSel, incSig = "";
+let root, timer, sel = null, teachSel, incSig = "", gview, gWindow = null;
 
 const CLASSES = ["Benign", "BruteForce", "DoS", "WebAttack", "Infiltration", "Botnet", "PortScan", "DDoS"];
 
@@ -25,6 +26,12 @@ export async function mount(el) {
       or replay a capture: <span class="mono">python sensor/agent.py --server http://THIS-PC:8000 --site lab --replay attack.pcap</span>
     </div></div>
     <div id="st-sites" class="grid g4" style="margin-bottom:16px"></div>
+    <div class="card" id="st-graphcard" style="margin-bottom:16px">
+      <div class="card-head"><div><h3 id="st-gtitle">Live traffic graph</h3>
+        <p class="sub" id="st-gsub">hosts are dots, flows are lines; red = the model predicts an attack. Scroll to zoom, drag to pan, hover a host.</p></div>
+        <div class="toolbar"><button class="icon-btn small" id="st-gfit" title="Fit the graph">⤢ Fit</button></div></div>
+      <div class="graph-stage" id="st-gstage" style="height:340px"></div>
+      <div class="legend" id="st-glegend" style="margin-top:10px"></div></div>
     <div class="card" id="st-model" style="margin-bottom:16px"></div>
     <div class="grid g-8-4">
       <div class="card"><div class="card-head"><div><h3>Incidents <span id="st-scope" class="muted"></span></h3>
@@ -40,6 +47,8 @@ export async function mount(el) {
     </div>`;
   root.querySelector("#st-reset").addEventListener("click", (e) =>
     withBusy(e.target, async () => { try { const r = await post("/live/reset"); toast(`model reset to v${r.version}`); await tick(); } catch (err) { toast(err.message); } }));
+  gview = new GraphView(root.querySelector("#st-gstage"));
+  root.querySelector("#st-gfit").addEventListener("click", () => gview.fit());
   await tick();
   timer = setInterval(tick, 3000);
 }
@@ -70,7 +79,35 @@ async function tick() {
     if (sig !== incSig) { incSig = sig; renderIncidents(inc); renderUnfamiliar(inc.unfamiliar); }
   }
   // the teach panel has a text input; rebuild it only when the selected site changes
-  if (sel !== teachSel) { teachSel = sel; renderTeach(sel); }
+  if (sel !== teachSel) { teachSel = sel; renderTeach(sel); gWindow = null; }
+  await renderGraph();
+}
+
+async function renderGraph() {
+  // show the most recent non-empty window of the selected site, reloading only when a newer one arrives
+  const q = sel ? `?site=${encodeURIComponent(sel)}&limit=8` : "?limit=8";
+  const w = await get(`/live/windows${q}`).catch(() => null);
+  const latest = w && [...w.windows].reverse().find((x) => x.n_flows > 0);
+  if (!latest) {
+    if (gWindow !== "none") { gWindow = "none"; gview.setData({ nodes: [], edges: [] });
+      root.querySelector("#st-gsub").textContent = "waiting for traffic from this site…";
+      root.querySelector("#st-glegend").innerHTML = ""; }
+    return;
+  }
+  if (latest.window_id === gWindow) return;
+  gWindow = latest.window_id;
+  const g = await get(`/live/graph/${latest.window_id}`).catch(() => null);
+  if (!g || gWindow !== latest.window_id) return;
+  gview.mode = "truth";
+  gview.setData(g);
+  root.querySelector("#st-gtitle").textContent = `Live traffic graph · ${esc(latest.site)}`;
+  root.querySelector("#st-gsub").innerHTML = `${int(g.n_nodes)} hosts, ${int(g.n_edges)} flows · ${int(g.n_attack_edges)} predicted attack` +
+    (g.truncated ? ` · showing the busiest ${g.nodes.length} hosts` : "");
+  const cats = Object.entries(g.category_counts || {});
+  root.querySelector("#st-glegend").innerHTML = (cats.length
+    ? cats.map(([c, v]) => `<span class="item" style="cursor:default"><i class="line" style="background:${catColor(c)}"></i>${esc(c)} <span class="muted num">${int(v)}</span></span>`).join("")
+    : `<span class="item" style="cursor:default"><i class="line" style="background:var(--benign-edge)"></i>all benign</span>`)
+    + `<span class="item" style="cursor:default"><i class="line" style="background:var(--critical);height:10px;width:10px;border-radius:50%"></i>host in a predicted attack</span>`;
 }
 
 function renderSites(sites) {

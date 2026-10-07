@@ -158,7 +158,7 @@ export class GraphView {
       const cats = {};
       edges.forEach((l) => { if (l.attack_flows) cats[l.category] = (cats[l.category] || 0) + l.attack_flows; });
       const wrong = edges.reduce((s, l) => s + (l.wrong || 0), 0);
-      this.tip.innerHTML = `<b>Host #${best.id}</b><br>degree ${int(best.degree)} · out ${int(best.out_degree)} · in ${int(best.in_degree)}` +
+      this.tip.innerHTML = `<b>${best.ip ? esc(best.ip) : `Host #${best.id}`}</b><br>degree ${int(best.degree)} · out ${int(best.out_degree)} · in ${int(best.in_degree)}` +
         `<br>attack flows ${int(best.attack_degree)}` +
         (Object.keys(cats).length ? `<br>${Object.entries(cats).map(([c, v]) => `${esc(c)}: ${int(v)}`).join(" · ")}` : "") +
         (this.mode === "errors" ? `<br>misclassified flows on shown edges: <b>${int(wrong)}</b>` : "");
