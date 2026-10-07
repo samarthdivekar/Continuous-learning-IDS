@@ -1,0 +1,18 @@
+{
+  "kind": "sweep",
+  "folders": [
+    "window_1000",
+    "continual",
+    "window_20000"
+  ],
+  "labels": [
+    "1000",
+    "5000",
+    "20000"
+  ],
+  "seeds": [
+    42,
+    43,
+    44
+  ]
+}

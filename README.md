@@ -169,6 +169,7 @@ IP-remap → plots → `results/RESULTS.md` → database seed. Individual steps:
 | incidents (§7) | `python -m experiments.run_incidents --budgets 0 0.001 0.0001 0.00001` | `results/<ds>/multiclass/incidents/` |
 | safety gate (§7) | `python -m experiments.run_drift_stream --runs gnn_ewc_replay:adwin_gate --out-name drift_gate` | `results/<ds>/multiclass/drift_gate/` |
 | label budget (§7) | `python -m experiments.run_drift_stream --runs gnn_ewc_replay:adwin --out-name drift_al100_hybrid --set drift.label_budget=100 drift.label_strategy=hybrid` | `results/<ds>/multiclass/drift_al100_hybrid/` |
+| window size (§2) | `python -m experiments.run_continual --set window.flows_per_window=1000 --seeds 42 43 44 --models gnn_ewc_replay ffnn_ewc_replay --out-name window_1000 --no-checkpoints` (and 20000), then `python -m experiments.aggregate_seeds sweep --folders window_1000 continual window_20000 --labels 1000 5000 20000 --seeds 42 43 44 --out window_size_sweep` | `results/<ds>/multiclass/window_size_sweep/` |
 | topology augmentation (appendix) | `python -m experiments.run_continual --seeds 42 43 44 --models gnn_ewc_replay_topo --out-name appendix_topo --no-checkpoints` and `python -m experiments.run_ip_remap --models gnn_ewc_replay_topo` | `appendix_topo/`, `ip_remap/` |
 
 The §7 scripts need the per-task checkpoints written by the core-table step.
@@ -558,6 +559,36 @@ where EWC prevented two replay-only collapses; the sweep was not repeated there.
   naive retraining forgets the first attack completely; our model learns every new category and keeps
   retention at 0.998–1.000, close to a model retrained on all data.
 
+#### Does the window size matter? (window-size study, `results/cicids2017/multiclass/window_size_sweep/`)
+
+Every number above uses windows of 5,000 flows, a size that was chosen, not tuned. Re-running the headline model
+and its per-flow control on the interleaved split with 1,000 and 20,000 flows per window (seeds 42–44,
+`--set window.flows_per_window=…`):
+
+| Flows per window | 1,000 | 5,000 (default) | 20,000 |
+|---|---|---|---|
+| GNN + EWC + replay, macro-F1 | 0.936 ± 0.035 | 0.964 ± 0.020 | 0.784 ± 0.070 |
+| FFNN + EWC + replay, macro-F1 | 0.889 ± 0.007 | 0.928 ± 0.020 | 0.889 ± 0.005 |
+| Graph minus per-flow, per seed | +0.038 / +0.020 / +0.083 | +0.028 / +0.011 / +0.069 | −0.145 / −0.020 / −0.152 |
+| GNN false-positive rate | 0.14 % | 0.07 % | 0.10 % |
+| Test flows | 419,440 | 416,344 | 400,000 |
+
+* **The graph's advantage holds at 1,000 flows and reverses at 20,000.** At 1,000 the GNN beats the FFNN on
+  every seed, as at 5,000. At 20,000 it loses on every seed, by up to 0.15.
+* **What breaks at 20,000 is the two smallest classes.** The GNN detects none of the 26 WebAttack test flows on
+  any seed and none of the 62 Botnet flows on two of three seeds (0.98 on the third); the FFNN detects all of
+  both on every seed. Every other category stays at 0.96–1.00 for the GNN. A likely reason, not tested: in a
+  20,000-flow window a few dozen attack flows are a tiny part of the graph their neighbours are averaged over.
+* **At 1,000 flows the GNN is less stable on DoS** (recall 0.69, 0.94, 0.96 by seed, against 0.99, 0.87, 0.99 at
+  5,000) and WebAttack (0.80, 1.00, 0.85).
+* **Caveat:** changing the window size changes where window boundaries fall, so the interleaved split puts
+  different flows in test (the test-flow row). The comparison is between three valid splits, not one fixed test
+  set; the paired graph-minus-per-flow gap within each size is the like-for-like number.
+
+So 5,000 is a reasonable choice and the conclusion does not depend on it being exactly 5,000, but it is not a free
+parameter: windows that are too large drown small attacks, and a deployment would need to keep windows near
+this size.
+
 ### 3. Binary mode (attack vs benign, CIC-IDS2017)
 
 Binary is domain-incremental (the "attack" class persists across tasks), and the picture changes:
@@ -848,11 +879,10 @@ CIC-IDS2017 test windows of 5,000 flows. Laptop: GTX 1650 (4 GB), 8-core CPU, 24
   on both datasets. On top of replay it made no detectable difference on the interleaved split but, on the
   temporal split, prevented two replay-only collapses (§2). The replay-budget sweep (§2) shows replay alone is
   flat from five stored windows per category on the interleaved split; it was not repeated on the temporal one.
-* **Experiments still running or not run.** A Windows Smart App Control policy, enforced after a restart,
-  blocked PyTorch for part of this work; it has since been turned off and runs are continuing. Not yet in
-  this README: the window-size sensitivity study, calibration on CSE-CIC-IDS2018, the third unseen-attack seed
-  and extra seeds for CSE-CIC-IDS2018 drift and IP-remap, extra CIC-IDS2017 IP-remap and unseen-attack seeds,
-  and the 5-seed re-run of the interleaved table. Each is one command in the reproduce table; nothing they
+* **Experiments still running or not run.** A Windows Smart App Control policy blocked PyTorch for part of
+  this work and a Windows Update restart killed a later batch; runs are continuing. Not yet in this README:
+  the third unseen-attack seed on both datasets, extra seeds for CSE-CIC-IDS2018 drift and IP-remap, and the
+  5-seed re-run of the interleaved table. Each is one command in the reproduce table; nothing they
   would produce is claimed anywhere.
 * **Small test classes.** WebAttack has 24 test flows and Botnet 73 in CIC-IDS2017; per-category numbers
   for them are noisy (one flow = 1–4 %).

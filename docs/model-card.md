@@ -63,7 +63,9 @@ of the same session (optimistic); *temporal* trains on each attack's earlier tra
   attack flows, where the model is overconfident (99.4 % mean confidence, 97.7 % accuracy).
 * **Replay budget** (interleaved split, 3 seeds): replay-only macro-F1 is 0.304 with no stored windows, 0.702
   with one per category and 0.948–0.957 from five upwards; the default is ten.
-* **Not measured:** sensitivity to window size (the sweep is in the README's reproduce table).
+* **Window size** (interleaved split, 3 seeds): 0.936 at 1,000 flows per window, 0.964 at 5,000 (default)
+  and 0.784 at 20,000. The per-flow FFNN scores 0.889, 0.928 and 0.889, so the graph's advantage holds at
+  1,000 and reverses at 20,000. Test sets differ between sizes.
 
 ## Known failure modes
 
@@ -74,6 +76,8 @@ of the same session (optimistic); *temporal* trains on each attack's earlier tra
   Infiltration where an identical run flagged 3.
 * **Attacks it does not catch unseen:** Infiltration, WebAttack and mostly Botnet are missed by every model
   when held out.
+* **Large windows drown small attacks.** At 20,000 flows per window the model detects none of the 26
+  WebAttack test flows on any seed and no Botnet flows on two of three seeds; keep windows near 5,000.
 * **Small classes.** WebAttack has 24 test flows and Botnet 73 on the interleaved CIC-IDS2017 split; their
   per-class numbers move by several points per flow.
 * **Drift detection needs labels.** ADWIN watches the labelled error rate; a label-free confidence trigger
