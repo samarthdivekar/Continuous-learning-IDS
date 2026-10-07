@@ -678,13 +678,19 @@ flow sample, **3 seeds (42, 43, 44)**, hyper-parameters reused from CIC-IDS2017,
 | FFNN + EWC + replay (ablation) / adwin | 63 | 33 | 0.801 | 1.000 |
 | XGBoost static / never | 0 | 0 | 0.282 | 1.000 |
 
-**IP-remap** (macro-F1 of the same trained model; single run, seed 42, indicative only)
+**IP-remap** (macro-F1 of the same trained model; seeds 42 / 43 / 44, `results/csecicids2018/multiclass/ip_remap_seeds/`)
 
 | Model | Normal | Hosts permuted | Sources randomised |
 |---|---|---|---|
-| GNN + EWC + replay (ours) | 0.948 | 0.948 | 0.754 |
-| GNN naive retrain | 0.281 | 0.281 | 0.277 |
-| FFNN + EWC + replay (ablation) | 0.850 | 0.850 | 0.850 |
+| GNN + EWC + replay (ours) | 0.922 ± 0.051 (0.948 / 0.863 / 0.954) | identical | **0.729 ± 0.034** (0.754 / 0.742 / 0.690) |
+| GNN naive retrain | 0.292 | identical | 0.278 |
+| FFNN + EWC + replay (ablation) | 0.836 ± 0.029 (0.850 / 0.855 / 0.802) | identical | identical |
+
+Permuting host identities changes nothing on any seed. Randomising sources costs the GNN 0.12–0.26 macro-F1
+(0.729 on average), much less than the collapse to 0.431 on CIC-IDS2017, but enough to put it below the
+per-flow FFNN (0.836), which is unaffected. The topology dependence replicates on both datasets; its size
+depends on the dataset. Seed 43 is also the weak seed under normal scoring (0.863, false-positive rate
+0.52 % against ≤ 0.01 % on the other two), the seed instability discussed below.
 
 **What 2018 confirms, and what it does not.**
 
@@ -710,8 +716,8 @@ flow sample, **3 seeds (42, 43, 44)**, hyper-parameters reused from CIC-IDS2017,
   operations, so the GNN's decision boundary between benign traffic and the NMAP-style Infiltration traffic is
   fragile. Across the three seeds now in the table, macro-F1 spans 0.863–0.945 (± 0.042): read any single 2018
   GNN number as one draw from a wide distribution.
-* **Topology dependence replicates, less severely.** Randomising source hosts drops the GNN from 0.948 to
-  0.754 (2017: 0.952 → 0.431 over three seeds) while the FFNN is unaffected; host permutation changes nothing.
+* **Topology dependence replicates, less severely.** Randomising source hosts drops the GNN from 0.922 to
+  0.729 over three seeds (2017: 0.952 → 0.431), below the unaffected FFNN; host permutation changes nothing.
 
 ### 7. Product layer: novelty, abstention, incidents, explanations, safe adaptation
 
@@ -889,7 +895,7 @@ CIC-IDS2017 test windows of 5,000 flows. Laptop: GTX 1650 (4 GB), 8-core CPU, 24
   flat from five stored windows per category on the interleaved split; it was not repeated on the temporal one.
 * **Experiments still running or not run.** A Windows Smart App Control policy blocked PyTorch for part of
   this work and a Windows Update restart killed a later batch; runs are continuing. Not yet in this README:
-  the third unseen-attack seed on both datasets, extra seeds for CSE-CIC-IDS2018 drift and IP-remap, and the
+  the third unseen-attack seed on CSE-CIC-IDS2018, extra seeds for CSE-CIC-IDS2018 drift, and the
   5-seed re-run of the interleaved table. Each is one command in the reproduce table; nothing they
   would produce is claimed anywhere.
 * **Small test classes.** WebAttack has 24 test flows and Botnet 73 in CIC-IDS2017; per-category numbers
