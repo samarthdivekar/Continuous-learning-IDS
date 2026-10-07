@@ -171,6 +171,22 @@ def live_adapt(body: LiveAdaptBody):
         raise HTTPException(422, str(exc))
 
 
+class LiveFprBody(BaseModel):
+    flows: list[dict]
+    teach_fraction: float = 0.5
+    epochs: int | None = None
+
+
+@app.post("/live/fpr_study")
+def live_fpr_study(body: LiveFprBody):
+    try:
+        return svc.live.fpr_study(body.flows, teach_fraction=body.teach_fraction, epochs=body.epochs)
+    except ValueError as exc:
+        raise HTTPException(422, str(exc))
+    except FileNotFoundError as exc:
+        raise HTTPException(503, str(exc))
+
+
 @app.post("/live/reset")
 def live_reset():
     return svc.live.reset()

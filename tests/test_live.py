@@ -146,6 +146,19 @@ def test_label_then_adapt_is_gated_and_learns_once(client):
     assert client.post("/live/reset").json()["reset"] is True
 
 
+def test_fpr_study_measures_and_restores(client):
+    before = client.get("/live/model").json()["version"]
+    flows = _flows(client, 20)
+    r = client.post("/live/fpr_study", json={"flows": flows, "teach_fraction": 0.5, "epochs": 1})
+    assert r.status_code == 200, r.text
+    out = r.json()
+    assert out["n_teach"] == 10 and out["n_holdout"] == 10 and out["model_unchanged"] is True
+    assert 0.0 <= out["fpr_before"] <= 1.0 and 0.0 <= out["fpr_after"] <= 1.0
+    assert {"old_attack_f1_before", "old_attack_f1_after"} <= set(out)
+    assert client.get("/live/model").json()["version"] == before      # the study changed nothing
+    assert client.post("/live/fpr_study", json={"flows": flows[:1]}).status_code == 422
+
+
 def test_flow_meter_reports_missing_docker(monkeypatch):
     monkeypatch.setattr(flowmeter.shutil, "which", lambda name: None)
     with pytest.raises(FlowMeterError, match="not installed"):

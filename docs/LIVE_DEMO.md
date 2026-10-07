@@ -132,6 +132,30 @@ The replay goes through the exact same pipeline, so it looks identical in the co
 
 ---
 
+## 3a. A real number: false alarms on your own traffic
+
+The honest open question for this project is how well a model trained on lab data holds up on real traffic.
+You can measure one piece of that on your own network, and quote it in the viva:
+
+1. Capture ~10 minutes of **normal** use (browse, stream, whatever is ordinary for you); do nothing unusual
+   so you can treat it all as benign. Save it as `normal.pcap` (Wireshark → File → Save, or the sensor's
+   ring-buffer files).
+2. On the central machine (the one with Docker and the flow-meter image):
+   ```bash
+   python sensor/measure_fpr.py --pcap normal.pcap --server http://localhost:8000
+   ```
+
+It splits the capture into a teach half and a held-out half, measures the **false-positive rate** on the
+held-out half, teaches the teach half as benign, measures again, and restores the model (so it only
+measures, changing nothing). It prints before/after, and what teaching cost the model's recall on attacks it
+already knew. A real sentence for the report: *"on N minutes of my own traffic the model flagged X% of
+benign flows; after two minutes of teaching, Y%."*
+
+Be honest about what it means: the number is only for the network you captured on, it is not a dataset
+result, and on a **small or unrepresentative capture teaching can make things slightly worse** (a tiny
+benign sample is not enough to learn "normal" from) — which is itself a finding worth stating. Capture
+enough, and capture traffic that is genuinely typical.
+
 ## 4. Two sites at once (LAN + the MAN story)
 
 1. Central machine on your Wi-Fi runs the stack.

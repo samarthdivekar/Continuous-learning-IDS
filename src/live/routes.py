@@ -57,6 +57,9 @@ def _ml(method: str, path: str, body: dict | None = None):
                               epochs=body.get("epochs"))
         if path == "/live/reset":
             return live.reset()
+        if path == "/live/fpr_study":
+            return live.fpr_study(body["flows"], teach_fraction=body.get("teach_fraction", 0.5),
+                                  epochs=body.get("epochs"))
         return live.describe()
     except ValueError as exc:
         raise HTTPException(422, str(exc))
@@ -365,6 +368,20 @@ def live_adapt(body: AdaptIn):
             s.execute(update(LiveFlow).where(LiveFlow.id.in_(used)).values(used_for_learning=True))
             s.commit()
     return res
+
+
+class FprStudyIn(BaseModel):
+    flows: list[SensorFlow] = Field(min_length=2, max_length=200_000)
+    teach_fraction: float = Field(default=0.5, gt=0.0, lt=1.0)
+    epochs: int | None = Field(default=None, ge=1, le=20)
+
+
+@router.post("/live/fpr_study")
+def live_fpr_study(body: FprStudyIn):
+    """Measure false alarms on supplied benign traffic before vs after teaching (model left unchanged).
+    The flows must be real benign traffic; this is how the live FPR number in docs/LIVE_DEMO.md is made."""
+    return _ml("POST", "/live/fpr_study", {"flows": [f.model_dump() for f in body.flows],
+                                           "teach_fraction": body.teach_fraction, "epochs": body.epochs})
 
 
 @router.post("/live/reset")

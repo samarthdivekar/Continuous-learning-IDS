@@ -163,6 +163,39 @@ class LiveEngine:
         self.history.append(rec)
         return rec
 
+    def fpr_study(self, flows: list[dict], teach_fraction: float = 0.5, epochs: int | None = None) -> dict:
+        """Measure what teaching does to false alarms on the user's own benign traffic, honestly:
+        split the flows into a teach half and a held-out half, measure the false-positive rate on the
+        held-out half before and after teaching the teach half as benign, and restore the model so this
+        is a measurement, not a silent change. Also report old-attack macro-F1 before/after, since
+        teaching on benign-only traffic could trade attack recall for fewer false alarms."""
+        with self.svc.lock:
+            learner = self.ensure()
+            k = int(len(flows) * teach_fraction)
+            teach, hold = flows[:k], flows[k:]
+            if len(teach) < 1 or len(hold) < 1:
+                raise ValueError("need enough flows for both a teach split and a held-out split")
+
+            def fpr(fl):
+                logits, _ = learner.predict_details(self.graph(fl))
+                pred = logits.argmax(1)
+                return float((pred != 0).mean()), int((pred != 0).sum())
+
+            fpr_before, flagged_before = fpr(hold)
+            old_before = self._old_attack_metrics()
+            snap = learner.snapshot_state()
+            g = self.graph(teach, labels=[0] * len(teach), window_id=LIVE_WINDOW_OFFSET)
+            learner.learn([g], tag="fpr_study", epochs=epochs)
+            fpr_after, flagged_after = fpr(hold)
+            old_after = self._old_attack_metrics()
+            learner.restore_state(snap)        # measurement only: the deployed model is left unchanged
+        return {"n_flows": len(flows), "n_teach": len(teach), "n_holdout": len(hold),
+                "fpr_before": fpr_before, "fpr_after": fpr_after,
+                "flagged_before": flagged_before, "flagged_after": flagged_after,
+                "old_attack_f1_before": old_before["macro_f1"], "old_attack_f1_after": old_after["macro_f1"],
+                "old_attack_recall_before": old_before["attack_recall"],
+                "old_attack_recall_after": old_after["attack_recall"], "model_unchanged": True}
+
     def reset(self) -> dict:
         with self.svc.lock:
             self.learner = None
