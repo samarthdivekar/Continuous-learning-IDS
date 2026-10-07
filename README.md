@@ -424,20 +424,27 @@ cell 0.0–0.07 %.)
 * **Infiltration and WebAttack are missed by every model in both seeds** (WebAttack has 7 held-out flows in the
   15 % sample).
 
-**CIC-IDS2017** (`results/cicids2017/binary/loao/`, single run, seed 42, indicative only)
+**CIC-IDS2017** (seeds 42 / 43 / 44: `loao/`, `loao_seed43/`, `loao_seed44/`; combined in `results/cicids2017/binary/loao_seeds/`)
 
-| Held out | XGBoost | FFNN (per-flow) | GNN (graph) |
+| Held out (flows) | XGBoost | FFNN (per-flow) | GNN (graph) |
 |---|---|---|---|
-| DoS | 0.7 % | 3.0 % | **67.7 %** |
-| WebAttack | 0.0 % | 0.0 % | **54.2 %** |
-| Infiltration | 26.9 % | 49.3 % | **67.7 %** |
-| PortScan / DDoS | ≥ 98.8 % | ≥ 98.8 % | 100 % |
-| BruteForce / Botnet | 0 % | ≤ 0.8 % | 0 % |
+| DoS (33,606) | 0.7 / 2.6 / 0.4 % | 3.0 / 0.6 / 1.9 % | **67.7 / 62.7 / 68.0 %** |
+| WebAttack (24) | 0 / 0 / 0 % | 0 / 0 / 0 % | 54.2 / **100** / 8.3 % |
+| Infiltration (16,434) | 26.9 / 40.3 / 39.7 % | 49.3 / 47.4 / 49.3 % | **67.7 / 50.9 / 56.6 %** |
+| PortScan / DDoS | ≥ 98.7 % | ≥ 98.7 % | ≥ 99.99 % |
+| BruteForce / Botnet | 0 % | ≤ 0.8 % | ≤ 0.8 % |
+
+* **Unseen DoS replicates on 2017 too:** 63–68 % for the graph model on all three seeds, against at most 3 %
+  for the per-flow models.
+* **Infiltration:** the graph model is ahead on every seed (51–68 % vs 47–49 % for the FFNN), but this is the
+  one category where per-flow models also see half of it.
+* **WebAttack has 24 flows and swings from 8 % to 100 %**; read it as unstable, not as a result.
+* BruteForce and Botnet are missed by every model on every seed, PortScan and DDoS caught by every model.
 
 **Reading.** Host-level structure (fan-out, fan-in, who talks to whom) lets the graph model flag attack types
 a per-flow model cannot see at all: in half the held-out runs on 2018 it caught most of an attack it was never
-trained on, where the per-flow model caught essentially none. Unseen DoS and DDoS hold across seeds (and DoS
-points the same way on 2017). It is not a dependable property for a given attack type: BruteForce and Botnet
+trained on, where the per-flow model caught essentially none. Unseen DoS and DDoS hold across seeds, and unseen
+DoS also holds on 2017 over three seeds. It is not a dependable property for a given attack type: BruteForce and Botnet
 swap between seeds, and Infiltration and WebAttack are missed by everything. It also rests on attackers being
 few hosts (§5).
 
