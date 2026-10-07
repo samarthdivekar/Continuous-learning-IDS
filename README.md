@@ -858,8 +858,9 @@ CIC-IDS2017 test windows of 5,000 flows. Laptop: GTX 1650 (4 GB), 8-core CPU, 24
   hosts; a real network with many or spoofed attackers could look much more like the randomised case.
   The graph's advantage (and its unseen-attack detection) should be read with this in mind.
   Training with randomised sources ([appendix](#appendix-topology-augmentation)) recovers 0.914 under randomisation, but costs in-distribution
-  macro-F1 (0.906 ± 0.043 vs 0.964 ± 0.020, 3 seeds) and loses the small WebAttack class in two of three
-  seeds. The dependence can be traded away, but not for free.
+  macro-F1 and stability: two trainings of seeds 42–44 gave 0.906 ± 0.043 and 0.938 ± 0.063 (default model
+  0.964 ± 0.020), and the small WebAttack class was lost in three of the six trainings. The dependence can be
+  traded away, but not for free.
 * **The graph advantage in distribution is modest.** +0.036 (interleaved, 3 seeds) and +0.044 (temporal,
   5 seeds) macro-F1 on CIC-IDS2017, both indicative with the seeds available; a tie in 2017 binary; on
   2018 multiclass +0.075 with the GNN's own seeds ranging 0.863–0.945. The FFNN has the lower false-positive rate on the interleaved
@@ -1000,11 +1001,21 @@ An appendix experiment, not a model the console offers. `gnn_ewc_replay_topo` is
 with each window's flow sources, with probability 0.5, reassigned to random hosts from a pool of 65,536 (the
 same perturbation as the `random_src` IP-remap test). It trades one weakness for others. Under randomised
 sources it keeps 0.914 macro-F1 where the default GNN falls to 0.427 (IP-remap run, seed 42 only; single run,
-indicative only). On the standard task sequence over seeds 42–44 it scored 0.906 ± 0.043 against the default
-model's 0.964 ± 0.020 in the same earlier run, with more forgetting (BWT −0.135 vs −0.021), and it lost the
-24-flow WebAttack test class in two of three seeds (recall 12 %, 92 %, 12 %), because randomising sources
-erases WebAttack's one-attacker-one-victim pattern. It is worth considering only where spoofed or NAT-hidden
-sources are expected, and it is not the default model.
+indicative only). On the standard task sequence it was trained twice over seeds 42–44 with the identical
+configuration (`continual/`, alongside the default model, and `appendix_topo/`):
+
+| Training | Macro-F1 per seed (42 / 43 / 44) | Mean ± std | BWT | WebAttack recall per seed |
+|---|---|---|---|---|
+| first (`continual/`) | 0.874 / 0.955 / 0.889 | 0.906 ± 0.043 | −0.135 | 12 % / 92 % / 12 % |
+| re-run (`appendix_topo/`) | 0.973 / 0.975 / 0.866 | 0.938 ± 0.063 | −0.079 | 92 % / 96 % / 0 % |
+| default model (`continual/`) | 0.975 / 0.941 / 0.975 | 0.964 ± 0.020 | −0.021 | 96 % / 96 % / 96 % |
+
+When it keeps WebAttack it matches the default model (0.955–0.975); in three of six trainings it loses the
+24-flow class and with it 0.09–0.11 macro-F1, with more forgetting than the default. A plausible reason, not
+tested: randomising sources erases WebAttack's one-attacker-one-victim pattern. The re-run changes the earlier
+summary ("lost in two of three seeds") into "lost in about half of trainings", which is the honest reading of
+six runs. It is worth considering only where spoofed or NAT-hidden sources are expected, and it is not the
+default model.
 
 ## References
 
