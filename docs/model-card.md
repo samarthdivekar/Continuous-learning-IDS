@@ -83,8 +83,9 @@ of the same session (optimistic); *temporal* trains on each attack's earlier tra
   per-class numbers move by several points per flow.
 * **Drift detection needs labels.** ADWIN watches the labelled error rate; a label-free confidence trigger
   missed most drift. On CIC-IDS2017 (3 seeds) ADWIN retrains about twice as often as a fixed schedule; it ends
-  lower when attacks arrive in clean blocks and higher when two attacks are mixed. On CSE-CIC-IDS2018 it
-  beat the schedule on cost and quality in one run.
+  lower when attacks arrive in clean blocks and higher when two attacks are mixed. On CSE-CIC-IDS2018 (3 seeds)
+  it uses about half the retrains of a fixed schedule (23 vs 48) but only ties it on quality (0.836 ± 0.117 vs
+  0.828 ± 0.010), winning on one seed and losing on another.
 * **Uncertainty-only active learning fails.** Labelling only the least certain flows never labels a new attack
   the model confidently mistakes for an old one; mixing in random labels fixes it (one run).
 

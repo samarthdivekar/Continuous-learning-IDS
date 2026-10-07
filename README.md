@@ -682,16 +682,16 @@ flow sample, **3 seeds (42, 43, 44)**, hyper-parameters reused from CIC-IDS2017,
 
 **Binary task sequence: withdrawn.** It was run with one seed, and in that seed the per-flow FFNN beat the graph model. One seed cannot support either claim, and the additional seeds could not be run, so the section was removed and the console no longer offers CSE-CIC-IDS2018 in binary mode. (The binary leave-one-attack-out experiment in §1 is separate and stays.)
 
-**Drift-triggered adaptation** (stream of tasks 2–6; single run, seed 42, indicative only)
+**Drift-triggered adaptation** (stream of tasks 2–6; 3 seeds 42/43/44, `results/csecicids2018/multiclass/drift_seeds/`)
 
 | Model / policy | Drift flags | Retrains | Final macro-F1 | Retention |
 |---|---|---|---|---|
-| GNN + EWC + replay (ours) / adwin | 50 | 24 | 0.943 | 1.000 |
-| GNN + EWC + replay (ours) / periodic | 0 | 48 | 0.825 | 1.000 |
-| GNN + EWC + replay (ours) / oracle | 0 | 5 | 0.999 | 1.000 |
-| GNN + EWC + replay (ours) / never | 0 | 0 | 0.155 | 1.000 |
-| GNN naive retrain / adwin | 39 | 20 | 0.281 | 0.000 |
-| FFNN + EWC + replay (ablation) / adwin | 63 | 33 | 0.801 | 1.000 |
+| GNN + EWC + replay (ours) / adwin | 46 | 23 | **0.836 ± 0.117** (0.943 / 0.711 / 0.854) | 1.000 |
+| GNN + EWC + replay (ours) / periodic | 0 | 48 | 0.828 ± 0.010 | 1.000 |
+| GNN + EWC + replay (ours) / oracle | 0 | 5 | 0.887 ± 0.097 (0.999 / 0.837 / 0.824) | 1.000 |
+| GNN + EWC + replay (ours) / never | 0 | 0 | 0.154 ± 0.001 | 1.000 |
+| GNN naive retrain / adwin | 38 | 19 | 0.203 ± 0.068 | 0.000 |
+| FFNN + EWC + replay (ablation) / adwin | 58 | 32 | 0.789 ± 0.015 | 1.000 |
 | XGBoost static / never | 0 | 0 | 0.282 | 1.000 |
 
 **IP-remap** (macro-F1 of the same trained model; seeds 42 / 43 / 44, `results/csecicids2018/multiclass/ip_remap_seeds/`)
@@ -714,10 +714,13 @@ depends on the dataset. Seed 43 is also the weak seed under normal scoring (0.86
   FFNN naive and EWC-only drop to 0 (BWT −0.83 to −1.00), exactly as on CIC-IDS2017.
 * **EWC alone fails here too.** In multiclass, EWC-only ends at 0.286 with retention 0 (one seed), as on
   CIC-IDS2017.
-* **ADWIN paid off on this stream, in a single run.** 24 drift-triggered retrains beat a periodic schedule
-  (48 retrains, 0.825) on both cost and quality (0.943), and the model without adaptation collapses to 0.155.
-  On CIC-IDS2017 it retrained about twice as often as the schedule over three seeds (§4), so the efficiency
-  claim is one run on this dataset and does not hold on the other.
+* **ADWIN saves retrains; the quality win does not survive three seeds.** It uses about half the retrains of
+  a fixed schedule (23 vs 48) on every seed, but on final macro-F1 it only ties the schedule on average
+  (0.836 ± 0.117 vs 0.828 ± 0.010) and is far more variable: it beat the schedule on seed 42 (0.943 vs 0.825),
+  roughly tied on seed 44 (0.854 vs 0.840) and lost on seed 43 (0.711 vs 0.820). The earlier single-seed claim
+  that it won on both cost and quality was seed 42 only; across three seeds the honest reading is **half the
+  retrains at quality within noise of the schedule**. Adaptation itself is still essential — "never" collapses
+  to 0.154. On CIC-IDS2017 it also retrained about twice as often as the schedule (§4).
 * **GNN vs FFNN on 2018, over three seeds: the GNN is ahead, unevenly.** Multiclass macro-F1 is **0.911 ± 0.042**
   for the GNN against **0.836 ± 0.029** for the per-flow FFNN. The GNN is ahead in every seed (+0.095, +0.008,
   +0.123); the bootstrap interval of the paired difference is [+0.009, +0.123] (§2). With three seeds this is
@@ -911,7 +914,7 @@ CIC-IDS2017 test windows of 5,000 flows. Laptop: GTX 1650 (4 GB), 8-core CPU, 24
   flat from five stored windows per category on the interleaved split; it was not repeated on the temporal one.
 * **Experiments still running or not run.** A Windows Smart App Control policy blocked PyTorch for part of
   this work and a Windows Update restart killed a later batch; runs are continuing. Not yet in this README:
-  the third unseen-attack seed on CSE-CIC-IDS2018, extra seeds for CSE-CIC-IDS2018 drift, and the
+  the third unseen-attack seed on CSE-CIC-IDS2018 and the
   5-seed re-run of the interleaved table. Each is one command in the reproduce table; nothing they
   would produce is claimed anywhere.
 * **Small test classes.** WebAttack has 24 test flows and Botnet 73 in CIC-IDS2017; per-category numbers
