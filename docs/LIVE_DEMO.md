@@ -15,6 +15,27 @@ and you can label flows and watch the model adapt without forgetting old attacks
 
 ---
 
+## Quick start (desktop app)
+
+The easiest way to run everything is the control center:
+
+```
+python desktop/control_center.py        (or double-click desktop/GNN-IDS.bat)
+```
+
+One window: **Start stack**, **Open console**, start a **sensor** on a chosen interface, and a **Sandbox**
+button that replays a recorded attack into the live view. It only drives the existing pieces; it starts no
+attacks. If you prefer the command line, everything below still works.
+
+### The safe "watch it detect an attack" moment — sandbox replay
+
+In the console's **Live sites** tab (or the desktop app), pick an attack (DoS / PortScan / DDoS / …) and
+press **Replay recorded attack**. This takes a *real recorded window* of that attack from the dataset's
+held-out test set and runs it through the live scorer, so you see it detected live — the graph lights up
+red, incidents appear with the attacker IP and a dry-run rule — **without launching anything**. Nothing is
+generated and nothing is sent to any host. This is the reliable centrepiece; the live attack in §3 is the
+"for real" version you run by hand.
+
 ## 0. What runs where
 
 ```

@@ -299,8 +299,12 @@ the capture is refused. Flows are scored by a live copy of `gnn_ewc_replay` and 
 in training. Analyst labels adapt the live model as one more continual task — gated against forgetting:
 scored on held-out old-attack windows before and after, rolled back if macro-F1 drops more than 0.02. Two
 sites on different networks (a LAN plus a laptop on a hotspot, over a VPN) demonstrate the MAN topology.
-Nothing is ever blocked. Full walk-through: [`docs/LIVE_DEMO.md`](docs/LIVE_DEMO.md). This path exercises the
-trained model live; **it adds no numbers to the results above.**
+Nothing is ever blocked. A **sandbox replay** (`POST /sensor/replay_recorded`, a button in the Live sites
+tab) feeds a real recorded attack window from the held-out test set through the live scorer, so a detection
+can be shown without launching anything. A small **desktop control center** (`python desktop/control_center.py`,
+tkinter, no new dependency) starts the stack, opens the console, runs a sensor and triggers the sandbox
+replay. Full walk-through: [`docs/LIVE_DEMO.md`](docs/LIVE_DEMO.md). This path exercises the trained model
+live; **it adds no numbers to the results above.**
 
 ## Design
 
