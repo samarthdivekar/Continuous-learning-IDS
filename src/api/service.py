@@ -468,6 +468,42 @@ class MLService:
         self.demo.stop_event.set()
         return True
 
+    def recorded_flows(self, category: str, n: int = 5000, split: int = 2) -> list[dict]:
+        """A REAL recorded window containing one attack category, from the processed dataset's held-out
+        test split, shaped as sensor flows. The whole window is returned (benign background and attack
+        together) so its host/flow structure matches what the model was evaluated on — a window of only
+        attack flows is out-of-distribution and the graph model scores it benign. Used by the sandbox
+        replay: recorded traffic fed through the live scorer, never generated or sent to any host."""
+        import pyarrow.dataset as ds
+        cols = list(self.scaler.columns)
+        path = processed_dir(self.cfg) / "flows.parquet"
+        if not path.exists():
+            raise FileNotFoundError("processed data missing (run experiments.prepare_data)")
+        want = {c.lower() for c in ([category] if isinstance(category, str) else category)}
+        meta = [c for c in ("category", "split", "src_ip", "dst_ip", "ts", "window_id") if c not in cols]
+        d = ds.dataset(path).to_table(columns=[*meta, *cols]).to_pandas()
+        pool = d[(d["split"] == split) & (d["category"].str.lower().isin(want))]
+        if pool.empty:                                  # fall back to any split if the test split has none
+            pool = d[d["category"].str.lower().isin(want)]
+        if pool.empty:
+            raise KeyError(f"no recorded flows for category {category!r}")
+        # the window with the most flows of this category: real benign + attack mix, real structure
+        best_window = pool["window_id"].value_counts().idxmax()
+        sel = d[d["window_id"] == best_window].head(int(max(1, min(n, 20000))))
+        # the parquet stores SCALED features; invert them to raw units so the live scorer (which scales
+        # sensor input) reproduces the exact values the model was evaluated on, not double-scaled ones
+        raw = self.scaler.inverse_transform(sel[cols].to_numpy())
+        dp_i, pr_i = cols.index("dst_port"), cols.index("protocol")
+        out = []
+        for i, (s, dst, t) in enumerate(zip(sel["src_ip"], sel["dst_ip"], sel["ts"])):
+            row = raw[i]
+            out.append({"ts": (t.isoformat() if hasattr(t, "isoformat") else None),
+                        "src_ip": str(s), "dst_ip": str(dst),
+                        "dst_port": int(round(row[dp_i])) if np.isfinite(row[dp_i]) else None,
+                        "protocol": int(round(row[pr_i])) if np.isfinite(row[pr_i]) else None,
+                        "features": {c: (float(v) if np.isfinite(v) else 0.0) for c, v in zip(cols, row)}})
+        return out
+
     def request_retrain(self) -> dict:
         if self.demo is None or not self.demo.is_alive():
             return {"accepted": False, "reason": "no live stream running; start one with POST /demo/start"}

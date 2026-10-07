@@ -18,6 +18,11 @@ export async function mount(el) {
       sends short capture chunks; the server runs the same CICFlowMeter the training data came from, scores every flow
       with the live model, and shows it per site. Nothing is ever blocked — proposed actions are a dry run.</p></div>
       <div class="toolbar">
+        <label class="inline" title="Replay a real recorded attack from the dataset into the live view — safe, nothing is attacked">Sandbox
+          <select id="st-replay-cat" aria-label="recorded attack to replay">
+            <option>DoS</option><option>PortScan</option><option>DDoS</option>
+            <option>BruteForce</option><option>Infiltration</option><option>Botnet</option></select></label>
+        <button class="btn" id="st-replay" title="Feed a real recorded window of this attack through the live scorer">▶ Replay recorded attack</button>
         <button class="btn" id="st-reset" title="Forget live learning and go back to the trained model">⟲ Reset model</button>
       </div></div>
     <div class="card" id="st-nosites" style="margin-bottom:16px"><div class="empty">
@@ -47,6 +52,15 @@ export async function mount(el) {
     </div>`;
   root.querySelector("#st-reset").addEventListener("click", (e) =>
     withBusy(e.target, async () => { try { const r = await post("/live/reset"); toast(`model reset to v${r.version}`); await tick(); } catch (err) { toast(err.message); } }));
+  root.querySelector("#st-replay").addEventListener("click", (e) => withBusy(e.target, async () => {
+    const category = root.querySelector("#st-replay-cat").value;
+    try {
+      const r = await post("/sensor/replay_recorded", { category, site: "sandbox" });
+      const flagged = r.counts ? Object.entries(r.counts).filter(([k]) => k !== "Benign").map(([k, v]) => `${v} ${k}`).join(", ") : "";
+      toast(`Replayed ${r.replayed} recorded ${category} flows → ${flagged || "all benign"}`);
+      sel = "sandbox"; gWindow = null; await tick();
+    } catch (err) { toast(err.message); }
+  }));
   gview = new GraphView(root.querySelector("#st-gstage"));
   root.querySelector("#st-gfit").addEventListener("click", () => gview.fit());
   await tick();

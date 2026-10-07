@@ -187,6 +187,16 @@ def live_fpr_study(body: LiveFprBody):
         raise HTTPException(503, str(exc))
 
 
+@app.get("/live/recorded_flows")
+def live_recorded_flows(category: str, n: int = 5000):
+    try:
+        return {"category": category, "flows": svc.recorded_flows(category, n)}
+    except KeyError as exc:
+        raise HTTPException(404, str(exc))
+    except FileNotFoundError as exc:
+        raise HTTPException(503, str(exc))
+
+
 @app.post("/live/reset")
 def live_reset():
     return svc.live.reset()

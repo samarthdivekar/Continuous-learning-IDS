@@ -104,6 +104,18 @@ def test_live_graph(client):
     assert client.get("/live/graph/999999").status_code == 404
 
 
+def test_sandbox_replay_recorded_attack(client):
+    # DoS exists in the synthetic fixture (DoS Hulk burst); replay real recorded flows into a site
+    r = client.post("/sensor/replay_recorded", json={"category": "DoS", "site": "sandbox", "n": 50})
+    assert r.status_code == 200, r.text
+    out = r.json()
+    assert out["category"] == "DoS" and out["replayed"] >= 1 and out["n_flows"] == out["replayed"]
+    assert client.get("/live/sites").json()["sites"][0]["site"] == "sandbox"
+    w = client.get("/live/windows", params={"site": "sandbox"}).json()["windows"]
+    assert w and w[0]["source"] == "replay"
+    assert client.post("/sensor/replay_recorded", json={"category": "NoSuchAttack"}).status_code == 404
+
+
 def test_empty_chunk_is_a_heartbeat(client):
     r = client.post("/sensor/flows", json={"site": "office", "flows": []})
     assert r.status_code == 200 and r.json()["n_flows"] == 0

@@ -41,12 +41,21 @@ def _app():
     return appmod
 
 
-def _ml(method: str, path: str, body: dict | None = None):
+def _ml(method: str, path: str, body: dict | None = None, params: dict | None = None):
     """Forward to the ML service, or call the in-process engine (tests / single-process runs)."""
     a = _app()
     if a.state.ml_url:
-        return a._remote(method, path, json=body, timeout=600)
-    live = a.state.service.live
+        return a._remote(method, path, json=body, params=params, timeout=600)
+    svc = a.state.service
+    if path == "/live/recorded_flows":
+        try:
+            return {"category": params["category"],
+                    "flows": svc.recorded_flows(params["category"], int(params.get("n", 400)))}
+        except KeyError as exc:
+            raise HTTPException(404, str(exc))
+        except FileNotFoundError as exc:
+            raise HTTPException(503, str(exc))
+    live = svc.live
     try:
         if path == "/live/score":
             return live.score(body["flows"])
@@ -158,6 +167,25 @@ async def sensor_pcap(request: Request):
 @router.post("/sensor/flows")
 def sensor_flows(body: SensorFlowsIn):
     return process_flows(_site(body.site), [f.model_dump() for f in body.flows], body.source)
+
+
+class ReplayRecordedIn(BaseModel):
+    category: str = Field(max_length=32)
+    site: str = Field(default="sandbox")
+    n: int = Field(default=5000, ge=1, le=20000)
+
+
+@router.post("/sensor/replay_recorded")
+def replay_recorded(body: ReplayRecordedIn):
+    """Sandbox: replay REAL recorded flows of one attack category (from the dataset's held-out test
+    split) into a site, as if a sensor had seen them. Nothing is generated and nothing is sent to any
+    host — it is recorded traffic fed through the live scorer so a detection can be shown safely."""
+    data = _ml("GET", "/live/recorded_flows", params={"category": body.category, "n": body.n})
+    flows = data["flows"]
+    if not flows:
+        raise HTTPException(404, f"no recorded flows for category {body.category!r}")
+    return {**process_flows(_site(body.site), flows, "replay"), "category": body.category,
+            "replayed": len(flows)}
 
 
 # ------------------------------------------------------------------ views
