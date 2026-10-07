@@ -26,7 +26,7 @@ import sys
 from playwright.sync_api import sync_playwright
 
 PAGES = {
-    "overview": [], "soc": [], "live": [], "explorer": [], "classify": [],
+    "overview": [], "soc": [], "live": [], "sites": [], "explorer": [], "classify": [],
     "models": ["Accuracy & forgetting", "Unseen attacks & IP leakage"],
     "adapt": ["Drift & retraining", "Trust: novelty, abstention, alert load"],
     "repro": [],
