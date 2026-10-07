@@ -290,6 +290,18 @@ Set `GNNIDS_API_KEY` to require an `X-API-Key` header on every endpoint except `
 CICFlowMeter (install it separately; point to it with `--jar` or `CICFLOWMETER_JAR`), posts the flows to
 `/ingest` and prints the verdicts. With an existing flow CSV, skip conversion: `--csv flows.csv`.
 
+**Live traffic from sensor machines (`src/live/`, `sensor/`).** A sensor (`sensor/agent.py`, standard
+library + Wireshark's dumpcap) captures a machine's own traffic in short chunks and uploads each to
+`POST /sensor/pcap`; the server converts it with the **pinned corrected CICFlowMeter** (GintsEngelen fork at
+`e3bb9ce`, built by `sensor/cicflowmeter.Dockerfile`), whose CSV columns must equal the training data's or
+the capture is refused. Flows are scored by a live copy of `gnn_ewc_replay` and filed per site; the console's
+**Live sites** tab shows each site's traffic, incidents (with dry-run rules) and traffic unlike anything seen
+in training. Analyst labels adapt the live model as one more continual task — gated against forgetting:
+scored on held-out old-attack windows before and after, rolled back if macro-F1 drops more than 0.02. Two
+sites on different networks (a LAN plus a laptop on a hotspot, over a VPN) demonstrate the MAN topology.
+Nothing is ever blocked. Full walk-through: [`docs/LIVE_DEMO.md`](docs/LIVE_DEMO.md). This path exercises the
+trained model live; **it adds no numbers to the results above.**
+
 ## Design
 
 ### Graph construction (`src/graph/window_builder.py`)
