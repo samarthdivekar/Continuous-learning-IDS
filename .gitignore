@@ -21,3 +21,5 @@ scripts/docgen/project_documentation.html
 research paper/*.pdf
 # guide build intermediate
 docs/guide/guide.html
+sensor/_test/
+sensor/_lab/

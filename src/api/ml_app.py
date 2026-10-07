@@ -138,3 +138,44 @@ def demo_stop():
 @app.get("/demo/status")
 def demo_status():
     return svc.demo.describe() if svc.demo else {"status": "idle"}
+
+
+# ------------------------------------------------------------------ live traffic (src/live)
+class LiveScoreBody(BaseModel):
+    flows: list[dict]
+
+
+class LiveAdaptBody(BaseModel):
+    windows: list[dict]          # [{"flows": [...], "labels": [label name or null per flow]}]
+    epochs: int | None = None
+
+
+@app.post("/live/score")
+def live_score(body: LiveScoreBody):
+    try:
+        return svc.live.score(body.flows)
+    except ValueError as exc:                  # MissingFeaturesError
+        raise HTTPException(422, str(exc))
+    except FileNotFoundError as exc:
+        raise HTTPException(503, str(exc))
+
+
+@app.post("/live/adapt")
+def live_adapt(body: LiveAdaptBody):
+    from src.live.engine import label_id
+    try:
+        names = svc.live.names
+        windows = [(w["flows"], [label_id(names, lab) for lab in w["labels"]]) for w in body.windows]
+        return svc.live.adapt(windows, epochs=body.epochs)
+    except ValueError as exc:
+        raise HTTPException(422, str(exc))
+
+
+@app.post("/live/reset")
+def live_reset():
+    return svc.live.reset()
+
+
+@app.get("/live/model")
+def live_model():
+    return svc.live.describe()

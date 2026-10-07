@@ -85,6 +85,15 @@ class MLService:
         # retrained model never serves stale predictions.
         self._prob_cache: "OrderedDict[tuple, np.ndarray]" = OrderedDict()
         self._model_epoch = 0
+        self._live = None
+
+    @property
+    def live(self):
+        """The live-traffic model (src/live/engine.py), built on first use."""
+        if self._live is None:
+            from src.live.engine import LiveEngine
+            self._live = LiveEngine(self)
+        return self._live
 
     # ------------------------------------------------------------------ data
     @property

@@ -149,6 +149,43 @@ class ResponseAction(Base):
     note: Mapped[str | None] = mapped_column(Text, nullable=True)
 
 
+class LiveWindow(Base):
+    """One capture chunk from one sensor site, scored as one graph (live traffic, src/live)."""
+    __tablename__ = "live_windows"
+    id: Mapped[int] = mapped_column(PK, primary_key=True, autoincrement=True)
+    site: Mapped[str] = mapped_column(String(64), index=True)
+    received_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, index=True)
+    window_start: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    window_end: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    n_flows: Mapped[int] = mapped_column(Integer)
+    n_hosts: Mapped[int] = mapped_column(Integer)
+    n_flagged: Mapped[int] = mapped_column(Integer)          # predicted as an attack
+    n_unfamiliar: Mapped[int] = mapped_column(Integer)       # unlike anything seen in training (novelty)
+    counts: Mapped[dict] = mapped_column(JSONType)           # predicted label -> flows
+    model_version: Mapped[int] = mapped_column(Integer, default=0)
+    source: Mapped[str] = mapped_column(String(16), default="pcap")   # pcap | flows | replay
+
+
+class LiveFlow(Base):
+    __tablename__ = "live_flows"
+    id: Mapped[int] = mapped_column(PK, primary_key=True, autoincrement=True)
+    window_id: Mapped[int] = mapped_column(Integer, index=True)
+    site: Mapped[str] = mapped_column(String(64), index=True)
+    ts: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    src_ip: Mapped[str] = mapped_column(String(64))
+    dst_ip: Mapped[str] = mapped_column(String(64))
+    src_port: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    dst_port: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    protocol: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    features: Mapped[dict] = mapped_column(JSONType)
+    predicted: Mapped[str] = mapped_column(String(32))
+    confidence: Mapped[float] = mapped_column(Float)
+    novelty: Mapped[float | None] = mapped_column(Float, nullable=True)
+    unfamiliar: Mapped[bool] = mapped_column(Boolean, default=False)
+    analyst_label: Mapped[str | None] = mapped_column(String(32), nullable=True)   # set by /live/label
+    used_for_learning: Mapped[bool] = mapped_column(Boolean, default=False)
+
+
 # Tables converted to Timescale hypertables on Postgres, with their time column.
 HYPERTABLES = {"flow_records": "ts", "predictions": "ts", "metrics": "ts", "drift_events": "ts",
                "window_stats": "ts"}

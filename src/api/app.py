@@ -494,7 +494,9 @@ def create_app(database_url: str | None = None, service=None, load_models: bool 
         return d.describe() if d else {"status": "idle"}
 
     from src.api.results import router as results_router
+    from src.live.routes import router as live_router
     router.include_router(results_router)
+    router.include_router(live_router)
     app.include_router(router)
     app.include_router(router, prefix="/api")
 
