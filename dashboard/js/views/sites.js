@@ -12,44 +12,59 @@ const CLASSES = ["Benign", "BruteForce", "DoS", "WebAttack", "Infiltration", "Bo
 
 export async function mount(el) {
   root = el;
+  const stepNum = (n) => `<span style="display:inline-grid;place-items:center;width:24px;height:24px;border-radius:50%;background:var(--accent);color:#fff;font-size:13px;font-weight:700;margin-right:9px;vertical-align:middle">${n}</span>`;
   root.innerHTML = `
     <div class="view-head"><div><h2>Live sites</h2>
-      <p>Real traffic from sensor machines, not the recorded dataset. Each sensor (<span class="mono">sensor/agent.py</span>)
-      sends short capture chunks; the server runs the same CICFlowMeter the training data came from, scores every flow
-      with the live model, and shows it per site. Nothing is ever blocked — proposed actions are a dry run.</p></div>
+      <p>Watch traffic get scored by the model in real time, then teach it. Follow the three steps below.
+      Nothing is ever blocked — proposed actions are a dry run.</p></div>
       <div class="toolbar">
-        <label class="inline" title="Replay a real recorded attack from the dataset into the live view — safe, nothing is attacked">Sandbox
+        <button class="btn" id="st-reset" title="Forget live learning and go back to the trained model">⟲ Reset model</button>
+      </div></div>
+
+    <div class="card" id="st-step1" style="margin-bottom:16px">
+      <div class="card-head"><div><h3>${stepNum(1)}Get traffic in</h3>
+        <p class="sub">pick any source — the easiest is the sandbox replay (safe, nothing real is attacked)</p></div></div>
+      <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:center;margin-top:4px">
+        <label class="inline">Replay a recorded attack:
           <select id="st-replay-cat" aria-label="recorded attack to replay">
             <option>DoS</option><option>PortScan</option><option>DDoS</option>
             <option>BruteForce</option><option>Infiltration</option><option>Botnet</option></select></label>
-        <button class="btn" id="st-replay" title="Feed a real recorded window of this attack through the live scorer">▶ Replay recorded attack</button>
-        <button class="btn" id="st-reset" title="Forget live learning and go back to the trained model">⟲ Reset model</button>
-      </div></div>
-    <div class="card" id="st-nosites" style="margin-bottom:16px"><div class="empty">
-      No sensors have reported yet. On a machine to monitor, run:<br>
-      <span class="mono">python sensor/agent.py --server http://THIS-PC:8000 --site home-lan --iface &lt;n&gt;</span><br>
-      or replay a capture: <span class="mono">python sensor/agent.py --server http://THIS-PC:8000 --site lab --replay attack.pcap</span>
-    </div></div>
-    <div id="st-sites" class="grid g4" style="margin-bottom:16px"></div>
-    <div class="card" id="st-graphcard" style="margin-bottom:16px">
-      <div class="card-head"><div><h3 id="st-gtitle">Live traffic graph</h3>
-        <p class="sub" id="st-gsub">hosts are dots, flows are lines; red = the model predicts an attack. Scroll to zoom, drag to pan, hover a host.</p></div>
-        <div class="toolbar"><button class="icon-btn small" id="st-gfit" title="Fit the graph">⤢ Fit</button></div></div>
-      <div class="graph-stage" id="st-gstage" style="height:340px"></div>
-      <div class="legend" id="st-glegend" style="margin-top:10px"></div></div>
-    <div class="card" id="st-model" style="margin-bottom:16px"></div>
-    <div class="grid g-8-4">
-      <div class="card"><div class="card-head"><div><h3>Incidents <span id="st-scope" class="muted"></span></h3>
-        <p class="sub">flagged flows of recent chunks, grouped by attacker/victim; each carries a dry-run rule</p></div></div>
-        <div id="st-incidents"></div></div>
-      <div class="grid" style="gap:16px">
-        <div class="card"><h3>Unfamiliar traffic</h3><p class="sub">called benign but unlike anything seen in training — candidates for a new attack</p>
-          <div id="st-unfamiliar"></div></div>
-        <div class="card"><h3>Teach the model</h3>
-          <p class="sub">label recent traffic, then adapt. Adaptation is gated: if it would forget old attacks, it is rolled back.</p>
-          <div id="st-teach"></div></div>
+        <button class="btn primary" id="st-replay" title="Feed a real recorded window of this attack through the live scorer">▶ Replay into the live view</button>
       </div>
-    </div>`;
+      <p class="note" style="margin-top:12px"><b>Other sources:</b> run the <b>cyber range</b> in the desktop app (an attacker VM vs the IDS),
+        or start a sensor on a machine: <span class="mono">python sensor/agent.py --server http://THIS-PC:8000 --site home --iface &lt;n&gt;</span></p>
+      <div id="st-nosites" class="empty" style="margin-top:10px"><span class="title">No traffic yet</span>Replay an attack above (or run the cyber range) and it appears below within a few seconds.</div>
+    </div>
+
+    <section id="st-step2" class="hidden" style="margin-bottom:16px">
+      <h3 style="margin:0 0 4px">${stepNum(2)}Watch it scored</h3>
+      <p class="sub" style="margin:0 0 12px">each source is a <b>site</b>; a red number means the model flagged attacks there</p>
+      <div id="st-sites" class="grid g4" style="margin-bottom:16px"></div>
+      <div class="card" id="st-graphcard">
+        <div class="card-head"><div><h3 id="st-gtitle">Live traffic graph</h3>
+          <p class="sub" id="st-gsub">hosts are dots, flows are lines; red = the model predicts an attack. Scroll to zoom, drag to pan, hover a host.</p></div>
+          <div class="toolbar"><button class="icon-btn small" id="st-gfit" title="Fit the graph">⤢ Fit</button></div></div>
+        <div class="graph-stage" id="st-gstage" style="height:340px"></div>
+        <div class="legend" id="st-glegend" style="margin-top:10px"></div></div>
+    </section>
+
+    <section id="st-step3" class="hidden">
+      <h3 style="margin:0 0 4px">${stepNum(3)}Review &amp; teach</h3>
+      <p class="sub" style="margin:0 0 12px">triage the incidents, then label traffic and adapt — the model learns without forgetting</p>
+      <div class="card" id="st-model" style="margin-bottom:16px"></div>
+      <div class="grid g-8-4">
+        <div class="card"><div class="card-head"><div><h3>Incidents <span id="st-scope" class="muted"></span></h3>
+          <p class="sub">flagged flows of recent chunks, grouped by attacker/victim; each carries a dry-run rule</p></div></div>
+          <div id="st-incidents"></div></div>
+        <div class="grid" style="gap:16px">
+          <div class="card"><h3>Unfamiliar traffic</h3><p class="sub">called benign but unlike anything seen in training — candidates for a new attack</p>
+            <div id="st-unfamiliar"></div></div>
+          <div class="card"><h3>Teach the model</h3>
+            <p class="sub">label recent traffic, then adapt. Adaptation is gated: if it would forget old attacks, it is rolled back.</p>
+            <div id="st-teach"></div></div>
+        </div>
+      </div>
+    </section>`;
   root.querySelector("#st-reset").addEventListener("click", (e) =>
     withBusy(e.target, async () => { try { const r = await post("/live/reset"); toast(`model reset to v${r.version}`); await tick(); } catch (err) { toast(err.message); } }));
   root.querySelector("#st-replay").addEventListener("click", (e) => withBusy(e.target, async () => {
@@ -74,7 +89,13 @@ async function tick() {
   if (!root || !root.isConnected) { clearInterval(timer); return; }
   let sites;
   try { sites = (await get("/live/sites")).sites; } catch { return; }
-  root.querySelector("#st-nosites").style.display = sites.length ? "none" : "";
+  const hasData = sites.length > 0;
+  // Steps 2 and 3 stay hidden until some traffic arrives, so an empty tab is one clear call to action
+  // instead of a wall of empty panels.
+  root.querySelector("#st-nosites").style.display = hasData ? "none" : "";
+  root.querySelector("#st-step2").classList.toggle("hidden", !hasData);
+  root.querySelector("#st-step3").classList.toggle("hidden", !hasData);
+  if (!hasData) return;
   renderSites(sites);
   if (sel && !sites.some((s) => s.site === sel)) sel = null;
   if (!sel && sites.length) sel = sites[0].site;
