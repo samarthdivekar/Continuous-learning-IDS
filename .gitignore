@@ -26,3 +26,4 @@ sensor/_lab/
 desktop/last_run.log
 desktop/activity.log
 sample_flows/*.csv
+reports/
