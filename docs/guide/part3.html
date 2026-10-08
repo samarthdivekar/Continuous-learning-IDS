@@ -179,8 +179,8 @@ dark.</li>
 <figure><img src="img/42_models_unseen.png"><figcaption>Unseen attacks &amp; IP leakage.</figcaption></figure>
 <ul>
 <li><b>Unseen attacks</b>: each model trained without one category, then tested on it. Bars show the share detected. When a
-second seed exists the table adds <b>Seeds</b> and <b>Per seed</b> columns (CSE-CIC-IDS2018 BruteForce reads 99.7&nbsp;% &middot;
-0.1&nbsp;%).</li>
+more than one seed exists the table adds <b>Seeds</b> and <b>Per seed</b> columns (CSE-CIC-IDS2018 BruteForce reads
+99.7&nbsp;% / 0.07&nbsp;% / 100&nbsp;% over three seeds; DoS 98.6&nbsp;% on all three).</li>
 <li><b>IP leakage test</b>: the same model scored normally, with host identities shuffled (<i>permute</i>: must not change, and
 does not), and with every flow's source randomised (<i>random_src</i>: the attacker stops being one hub; our model falls from
 0.952 to 0.431 in all three seeds, the per-flow model is unaffected). This is the project's most important honest limitation.</li>
@@ -450,7 +450,8 @@ supported way to run it.</li>
 <li><b>Where to find more:</b> README (all results), <span class="mono">docs/model-card.md</span>,
 <span class="mono">docs/positioning.md</span>, <span class="mono">DEMO.md</span>, and
 <span class="mono">docs/GNN-IDS_Technical_Documentation.pdf</span> (every API route and control).</li>
-<li><b>Results still arriving:</b> extra seeds for drift, IP-remap and unseen attacks, the window-size study and 2018
-re-runs are running in the background; the README is updated as each finishes.</li>
+<li><b>One run outstanding:</b> the extra-seed runs (window size, drift, IP-remap and unseen attacks on both
+datasets, the topology re-run) are all in the README now; only the 5-seed re-run of the interleaved table
+is still to do, and it keeps three seeds. Nothing unmeasured is claimed.</li>
 </ul>
 </section>
