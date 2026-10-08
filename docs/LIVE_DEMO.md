@@ -7,11 +7,13 @@ and you can label flows and watch the model adapt without forgetting old attacks
 > **It never blocks traffic.** Every proposed containment rule is a dry run — text you could paste into a
 > firewall yourself, never executed. The sensor only listens.
 
-> **Honest expectation.** The model has only ever been trained on two lab datasets (CIC-IDS2017 /
-> CSE-CIC-IDS2018). On your own Wi-Fi it will raise some false alarms until you teach it what your normal
-> traffic looks like (step 4). It has the best chance on the attacks it was trained on: **port scans
-> (nmap)** and **DoS (Slowloris / Hulk-style)**. Treat the demo as evidence of the pipeline and the
-> learning loop, not as a finished product.
+> **Honest expectation (measured, not assumed).** The model has only ever been trained on two lab datasets
+> (CIC-IDS2017 / CSE-CIC-IDS2018). A **real nmap scan run through this pipeline is NOT detected** — it reads
+> as benign, because modern scan traffic is out of the lab distribution (tested 2026-10-08). So the live
+> attack does **not** reliably light up the console. What *does* work every time is the **sandbox replay** of
+> recorded dataset attacks. Use the sandbox replay to show detection; use the live attack to show the honest
+> limitation and the learning loop (label it, adapt, try again). Treat the demo as evidence of the pipeline
+> and the continual-learning idea, not a finished product.
 
 ---
 
@@ -128,21 +130,26 @@ model card logs an adaptation and shows *old-attack macro-F1 before → after* s
 network without forgetting the attacks it already knew — that number is measured each time, and if it had
 dropped, the update would have been rolled back."*
 
-**Scene 3 — a known attack.** On the friend's laptop, run an attack the model was trained on, against your
-PC's IP (your PC is the victim). Examples (install these on the attacker machine yourself):
+**Scene 3 — a live attack (measured: not detected out of the box).** On the friend's laptop, run a scan
+against your PC's IP: `nmap -sS -T4 <victim-ip>`. **Tested finding (2026-10-08):** a real nmap SYN scan,
+captured and run through this pipeline, is **classified as benign** — 0 of 1,050 scan flows flagged, even
+mixed into a window of normal browsing. The model was trained on CIC-IDS2017 lab PortScan traffic, which was
+generated with a different tool, timing and network; a modern nmap scan is out of that distribution, so the
+graph model does not recognise it. This is the project's central honest limitation (README §1, §5), shown
+live. **Do not promise the audience it will light up** — it will not, and that is the point you explain.
 
-- Port scan: `nmap -sS -T4 <victim-ip>` (nmap).
-- DoS: `slowhttptest -c 500 -H -i 10 -r 200 -u http://<victim-ip>/` (slowhttptest), or a rate-limited
-  SYN flood with `hping3 --flood -S -p 80 <victim-ip>` — keep it short.
+**Scene 3b — teach it the live attack (continual learning on real traffic).** This is the strong version.
+In **Unfamiliar traffic** the scan's source host may appear (unlike anything in training); or select its
+flows in the incident/host lists. Label them **PortScan**, click **Adapt model now** (gated: old-attack
+macro-F1 is measured before/after and the update rolls back if it drops). Then run the scan again — now the
+model has a chance of flagging it, while still catching the recorded attacks. This demonstrates the actual
+thesis — *learning a new, real attack without forgetting the old ones* — on traffic the model had never seen.
+(Whether a single adaptation generalises to the next scan depends on the capture; show the before/after
+honestly either way.)
 
-Within ~10–30 s an **incident** appears in the console: the attacker host, the category, a dry-run rule.
-*"Detected from traffic shape alone, grouped into one incident, with a proposed action I would apply by hand."*
-
-**Scene 4 — a new attack (continual learning, part 2).** Run something the model does not know well (e.g. a
-different tool, or a protocol it never saw). It will likely show up under **Unfamiliar traffic** (flagged as
-"unlike anything in training") even if it is not classified. Pick a label for those flows, click **Adapt
-model now**, and show that the attack is now caught while Scene-3's attack and the lab attacks are still
-caught (old-attack F1 held). *"This is the whole point: it keeps learning new attacks without forgetting."*
+**The reliable detection demo is the sandbox replay** (below): recorded CIC-IDS attacks run through the live
+scorer and are detected every time (DoS 97 %, PortScan 100 %, DDoS 95 %). Use that to *show detection works*,
+and the live nmap scan to *show the honest limitation and the learning loop*.
 
 **Backup:** record each attack once beforehand (`sensor/agent.py` can also just capture to a file, or use
 Wireshark), and if the live run misbehaves, replay it:
