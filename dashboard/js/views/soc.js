@@ -38,19 +38,19 @@ export async function mount_(el) {
       <div class="card" id="soc-controls">
         <h3>What to review</h3>
         <div class="seg" id="soc-scope" role="group" aria-label="scope" style="width:100%;margin-bottom:12px">
-          <button data-v="window" class="on" title="Incidents in one traffic window" style="flex:1">One window</button>
-          <button data-v="scan" title="Incidents across the most recent windows, like a shift's queue" style="flex:1">Recent</button>
+          <button data-v="scan" class="on" title="Incidents across the most recent windows, like a shift's queue" style="flex:1">Recent (shift queue)</button>
+          <button data-v="window" title="Incidents in one traffic window" style="flex:1">One window</button>
         </div>
-        <label class="stacked" id="soc-win-wrap">Traffic window
+        <label class="stacked hidden" id="soc-win-wrap">Traffic window
           <select id="soc-win"></select></label>
-        <label class="stacked hidden" id="soc-scan-wrap">Windows to scan
+        <label class="stacked" id="soc-scan-wrap">Windows to scan
           <select id="soc-limit"><option>10</option><option selected>20</option><option>50</option></select></label>
         <label class="stacked">Detector
           <select id="soc-model">${NEURAL.map((m) => `<option value="${m}">${esc(label(m))}</option>`).join("")}</select></label>
         <label class="stacked" title="Hide alerts the model is less sure about than this">
           Minimum confidence <span id="soc-th-v" class="num muted">0%</span>
           <input type="range" id="soc-th" min="0" max="0.99" step="0.01" value="0" style="width:100%"></label>
-        <button class="btn primary" id="soc-go" style="width:100%;margin-top:4px">Load incidents</button>
+        <button class="btn primary" id="soc-go" style="width:100%;margin-top:4px">Scan windows</button>
 
         <h3 style="margin-top:18px">Filter the queue</h3>
         <label class="stacked">Category

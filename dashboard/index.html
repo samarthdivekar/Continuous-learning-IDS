@@ -35,29 +35,31 @@
     <button class="tab nav-item" data-view="soc" data-group="Operate" title="Alerts grouped into incidents, with explanations and approve/reject">
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 4.5 6v5.5c0 4.6 3.2 8.4 7.5 9.5 4.3-1.1 7.5-4.9 7.5-9.5V6z"/><path d="M12 8.5v4.5M12 16.5v.01"/></svg>
       <span class="nav-label">Incident queue</span><span class="nav-key">2</span></button>
-    <button class="tab nav-item" data-view="live" data-group="Operate" title="Replay traffic and watch the model detect drift and adapt">
-      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12h4l2.5 6 5-12 2.5 6h4"/></svg>
-      <span class="nav-label">Live stream</span><span class="badge hidden" id="live-badge">LIVE</span><span class="nav-key">3</span></button>
-    <button class="tab nav-item" data-view="sites" data-group="Operate" title="Real traffic from sensor machines, scored per site; label and adapt">
+    <button class="tab nav-item" data-view="sites" data-group="Operate" title="Real traffic, the cyber range and the sandbox: score, label and adapt">
       <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="8" height="6" rx="1"/><rect x="13" y="14" width="8" height="6" rx="1"/><path d="M7 10v4h10M7 14h0"/></svg>
-      <span class="nav-label">Live sites</span><span class="badge hidden" id="sites-badge">LIVE</span><span class="nav-key">4</span></button>
-    <button class="tab nav-item" data-view="explorer" data-group="Operate" title="See one traffic window as a graph of hosts and flows">
-      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="6" cy="6" r="2.5"/><circle cx="18" cy="8" r="2.5"/><circle cx="10" cy="18" r="2.5"/><path d="M8.4 6.4l7.2 1.2M6.9 8.4l2.3 7.2M16.5 10.1l-4.9 5.9"/></svg>
-      <span class="nav-label">Graph explorer</span><span class="nav-key">5</span></button>
-    <button class="tab nav-item" data-view="classify" data-group="Operate" title="Classify a held-out window or an uploaded CSV of flows">
-      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3H6.5A1.5 1.5 0 0 0 5 4.5v15A1.5 1.5 0 0 0 6.5 21h11a1.5 1.5 0 0 0 1.5-1.5V8z"/><path d="M14 3v5h5M8.5 13h7M8.5 16.5h4.5"/></svg>
-      <span class="nav-label">Classify</span><span class="nav-key">6</span></button>
+      <span class="nav-label">Live sites</span><span class="badge hidden" id="sites-badge">LIVE</span><span class="nav-key">3</span></button>
+    <button class="tab nav-item" data-view="live" data-group="Operate" title="Replay the recorded dataset through the models and watch drift and adaptation">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12h4l2.5 6 5-12 2.5 6h4"/></svg>
+      <span class="nav-label">Stream replay</span><span class="badge hidden" id="live-badge">DEMO</span><span class="nav-key">4</span></button>
 
     <div class="nav-section">Evaluate</div>
     <button class="tab nav-item" data-view="models" data-group="Evaluate" title="Accuracy, forgetting, unseen attacks and the IP-leakage test">
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 21h18"/><rect x="5" y="11" width="3" height="7" rx="1"/><rect x="10.5" y="5" width="3" height="13" rx="1"/><rect x="16" y="8" width="3" height="10" rx="1"/></svg>
-      <span class="nav-label">Models</span><span class="nav-key">7</span></button>
+      <span class="nav-label">Models</span><span class="nav-key">5</span></button>
     <button class="tab nav-item" data-view="adapt" data-group="Evaluate" title="Drift detection, retraining, novelty, abstention and alert load">
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11a8 8 0 0 0-14.3-4.9L4 8M4 4v4h4M4 13a8 8 0 0 0 14.3 4.9L20 16M20 20v-4h-4"/></svg>
-      <span class="nav-label">Adaptation &amp; trust</span><span class="nav-key">8</span></button>
+      <span class="nav-label">Adaptation &amp; trust</span><span class="nav-key">6</span></button>
     <button class="tab nav-item" data-view="repro" data-group="Evaluate" title="Data, settings and how to reproduce every number">
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9.5 3h5M10.5 3v6.2L5.2 18.4A1.8 1.8 0 0 0 6.8 21h10.4a1.8 1.8 0 0 0 1.6-2.6L13.5 9.2V3"/><path d="M7.6 15h8.8"/></svg>
-      <span class="nav-label">Reproducibility</span><span class="nav-key">9</span></button>
+      <span class="nav-label">Reproducibility</span><span class="nav-key">7</span></button>
+
+    <div class="nav-section">More</div>
+    <button class="tab nav-item" data-view="explorer" data-group="More" title="See one traffic window as a graph of hosts and flows">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="6" cy="6" r="2.5"/><circle cx="18" cy="8" r="2.5"/><circle cx="10" cy="18" r="2.5"/><path d="M8.4 6.4l7.2 1.2M6.9 8.4l2.3 7.2M16.5 10.1l-4.9 5.9"/></svg>
+      <span class="nav-label">Graph explorer</span><span class="nav-key">8</span></button>
+    <button class="tab nav-item" data-view="classify" data-group="More" title="Classify a held-out window or an uploaded CSV of flows">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3H6.5A1.5 1.5 0 0 0 5 4.5v15A1.5 1.5 0 0 0 6.5 21h11a1.5 1.5 0 0 0 1.5-1.5V8z"/><path d="M14 3v5h5M8.5 13h7M8.5 16.5h4.5"/></svg>
+      <span class="nav-label">Classify</span><span class="nav-key">9</span></button>
   </nav>
 
   <div class="side-foot">
@@ -136,9 +138,9 @@
     <li><b>Take the tour</b> &mdash; the ▶ button at the bottom of the sidebar walks you through the console in five steps.</li>
     <li><b>Overview</b> &mdash; the results in one screen.</li>
     <li><b>Incident queue</b> &mdash; what an analyst works through: incidents, why they were flagged, what to do.</li>
-    <li><b>Live stream</b> &mdash; press Start to replay traffic and watch detection and self-updating happen.</li>
-    <li><b>Live sites</b> &mdash; real traffic from sensor machines, scored per site; label flows and adapt the model.</li>
-    <li><b>Graph explorer</b> &mdash; see an attack as a shape: scans fan out, floods fan in.</li>
+    <li><b>Live sites</b> &mdash; the live view: replay a recorded attack, run the cyber range, or feed a sensor; then label and adapt.</li>
+    <li><b>Stream replay</b> &mdash; replays the recorded dataset through the models to show drift detection and self-updating.</li>
+    <li><b>Graph explorer</b> (under More) &mdash; see an attack as a shape: scans fan out, floods fan in.</li>
   </ol>
   <p class="muted">The bar at the top sets the context for every page: the dataset (2017 / 2018), whether attacks are named
   (multiclass) or only attack/benign (binary), and <b>Compare models</b>, which adds every baseline next to the deployed model.

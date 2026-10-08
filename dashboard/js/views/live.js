@@ -13,9 +13,10 @@ const shown = () => (state.compare ? HEADLINE : STORY);
 export async function mount_(el) {
   root = el;
   root.innerHTML = `
-    <div class="view-head"><div><h2>Live stream</h2>
-      <p>Replays the chronological traffic stream (tasks 2 → last) through four models at once. Each window is predicted first,
-      then its delayed labels feed ADWIN; a confirmed error increase triggers an adaptation cycle (EWC + replay for ours).</p></div>
+    <div class="view-head"><div><h2>Stream replay <span class="muted" style="font-size:0.5em;vertical-align:middle">(recorded dataset demo)</span></h2>
+      <p>Replays the <b>recorded dataset's</b> chronological stream (tasks 2 → last) through the models at once — this is a demo of
+      the training data, not live sensor traffic (that's <b>Live sites</b>). Each window is predicted first, then its delayed
+      labels feed ADWIN; a confirmed error increase triggers an adaptation cycle (EWC + replay for ours).</p></div>
       <div class="toolbar">
         <label class="inline">Speed <input type="range" id="lv-speed" min="0" max="1" step="0.05" value="0.3"><span id="lv-speed-v" class="num">0.30 s/window</span></label>
         <button class="btn primary" id="lv-start">▶ Start stream</button>
