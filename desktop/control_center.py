@@ -41,6 +41,8 @@ class App:
         self.ui: "queue.Queue" = queue.Queue()        # callables to run on the main (UI) thread
         self.sensor_proc: subprocess.Popen | None = None
         self.api = StringVar(value=API_DEFAULT)
+        self.api_url = API_DEFAULT
+        self.api.trace_add("write", lambda *a: setattr(self, "api_url", self.api.get()))
         self.site = StringVar(value="home-lan")
         self.iface = StringVar(value="")
         self.category = StringVar(value=CATEGORIES[0])
@@ -169,12 +171,12 @@ class App:
                               env={**os.environ, **(env or {})}, creationflags=0x08000000 if os.name == "nt" else 0)
 
     def _get(self, path: str, timeout=3):
-        req = urllib.request.Request(f"{self.api.get().rstrip('/')}{path}", headers=api_key_headers())
+        req = urllib.request.Request(f"{self.api_url.rstrip('/')}{path}", headers=api_key_headers())
         with urllib.request.urlopen(req, timeout=timeout) as r:
             return json.load(r)
 
     def _post(self, path: str, body: dict, timeout=120):
-        req = urllib.request.Request(f"{self.api.get().rstrip('/')}{path}", data=json.dumps(body).encode(),
+        req = urllib.request.Request(f"{self.api_url.rstrip('/')}{path}", data=json.dumps(body).encode(),
                                      headers={"Content-Type": "application/json", **api_key_headers()}, method="POST")
         with urllib.request.urlopen(req, timeout=timeout) as r:
             return json.load(r)
@@ -258,13 +260,14 @@ class App:
         self._run_async(work)
 
     def run_cyber_range(self):
-        self.ui.put(lambda: self.btn_range.configure(state=DISABLED, text="Running cyber range..."))
+        server = self.api_url            # plain string, safe to pass into the worker thread
+        self.btn_range.configure(state=DISABLED, text="Running cyber range...")
         self._log("starting the cyber range (isolated attacker + IDS). This takes a couple of minutes...")
 
         def work():
             try:
                 proc = subprocess.Popen(
-                    [str(PY), str(ROOT / "demo" / "cyber_range.py"), "--server", self.api.get()],
+                    [str(PY), str(ROOT / "demo" / "cyber_range.py"), "--server", server],
                     cwd=str(ROOT), stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1,
                     creationflags=0x08000000 if os.name == "nt" else 0)
                 for line in proc.stdout:
