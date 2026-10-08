@@ -1,11 +1,14 @@
 // Live Stream: replay the chronological stream through four models, watch them diverge,
 // see ADWIN flag drift and trigger adaptation; manual retrain; speed control.
-import { color, css, esc, get, HEADLINE, int, label, pct, post, toast } from "../lib/core.js";
+import { color, css, esc, get, HEADLINE, int, label, pct, post, state, STORY, toast } from "../lib/core.js";
 import { legend, lineOptions, markerPlugin, modelDataset, mount } from "../lib/charts.js";
 import { withBusy } from "../lib/ui.js";
 
 let root, timer, runId = null, lastIdx = -1, windows = {}, retrains = {}, charts = {};
 const OURS = "gnn_ewc_replay";
+// Respect the top-bar "Compare models" toggle, like Overview and Models do: the story (3) by default,
+// every streamed model when Compare is on. (Previously this view always showed all four.)
+const shown = () => (state.compare ? HEADLINE : STORY);
 
 export async function mount_(el) {
   root = el;
@@ -52,7 +55,7 @@ export async function mount_(el) {
     catch (e) { toast(e.message); }
   }));
   // one marker per adaptation, in that model's colour, so you can see who retrained when
-  const marks = () => HEADLINE.flatMap((m) => (retrains[m] || []).map((x) => ({ x, color: color(m), alpha: m === OURS ? 0.6 : 0.3 })));
+  const marks = () => shown().flatMap((m) => (retrains[m] || []).map((x) => ({ x, color: color(m), alpha: m === OURS ? 0.6 : 0.3 })));
   // a 200-window stream polled every 2 s redraws a lot: decimate the points Chart.js keeps and
   // never animate, so the line extends smoothly instead of flickering
   const streaming = (opts) => ({
@@ -65,7 +68,7 @@ export async function mount_(el) {
   }
   charts.err = mount(root.querySelector("#lv-err"), { type: "line", data: { datasets: [] }, plugins: [markerPlugin(marks)],
     options: streaming(lineOptions({ yMax: 1, xTitle: "stream window" })) });
-  legend(root.querySelector("#lv-legend"), HEADLINE, () => Object.values(charts));
+  legend(root.querySelector("#lv-legend"), shown(), () => Object.values(charts));
   await tick();
   timer = setInterval(tick, 2000);
 }
@@ -94,6 +97,7 @@ async function tick() {
   root.querySelector("#lv-stop").disabled = !alive;
   root.querySelector("#lv-retrain").disabled = !alive;
 
+  legend(root.querySelector("#lv-legend"), shown(), () => Object.values(charts));
   let w;
   try { w = await get(`/stream/windows?since_index=${lastIdx}&limit=5000`); } catch { return; }
   if (w.run_id !== runId) { runId = w.run_id; windows = {}; retrains = {}; lastIdx = -1; }
@@ -106,7 +110,7 @@ async function tick() {
   const m = await get(`/metrics?source=stream${runId ? `&run_id=${encodeURIComponent(runId)}` : ""}`).catch(() => ({ series: {} }));
   for (const [key, chart] of Object.entries(charts)) {
     if (key === "err") continue;
-    chart.data.datasets = HEADLINE.filter((mm) => m.series[mm]).map((mm) =>
+    chart.data.datasets = shown().filter((mm) => m.series[mm]).map((mm) =>
       modelDataset(mm, m.series[mm].filter((p) => p[key] != null).map((p) => ({ x: Math.max(0, p.stream_index), y: p[key] }))));
     chart.update();
   }
@@ -114,7 +118,7 @@ async function tick() {
   charts.err.data.datasets = [
     { label: "true attack share", data: ours.map((r) => ({ x: r.stream_index, y: r.true_attack_fraction })), fill: true,
       borderWidth: 0, pointRadius: 0, backgroundColor: css("--grid"), stepped: true },
-    ...HEADLINE.filter((mm) => windows[mm]).map((mm) => modelDataset(mm, windows[mm].map((r) => ({ x: r.stream_index, y: r.error_rate })), { pointRadius: 0 })),
+    ...shown().filter((mm) => windows[mm]).map((mm) => modelDataset(mm, windows[mm].map((r) => ({ x: r.stream_index, y: r.error_rate })), { pointRadius: 0 })),
     { label: "ADWIN flag (ours)", data: ours.filter((r) => r.drift_flag).map((r) => ({ x: r.stream_index, y: r.error_rate })),
       showLine: false, pointStyle: "triangle", rotation: 180, pointRadius: 8, backgroundColor: css("--ink"), borderColor: css("--ink") },
   ];
@@ -127,7 +131,7 @@ async function tick() {
 
   const ds = await get(`/drift-status?limit=60${runId ? `&run_id=${encodeURIComponent(runId)}` : ""}`).catch(() => null);
   if (ds) {
-    root.querySelector("#lv-retrains").innerHTML = HEADLINE.map((mm) => {
+    root.querySelector("#lv-retrains").innerHTML = shown().map((mm) => {
       const p = ds.per_model[mm] || { drift_flags: 0, retrains_triggered: 0 };
       return `<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--grid)">
         <span><span class="swatch" style="background:${color(mm)}"></span>${esc(label(mm))}</span>

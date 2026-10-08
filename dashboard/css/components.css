@@ -387,8 +387,11 @@ pre.rule {
 .dropzone .note { margin: 0; margin-left: auto; }
 
 /* ---------------- triage layout (incident queue) ---------------- */
-.triage { display: grid; grid-template-columns: 250px minmax(0, 1fr) minmax(0, 1.25fr); gap: var(--s-4); align-items: start; }
-@media (max-width: 1400px) { .triage { grid-template-columns: 220px minmax(0, 1fr); } }
+.triage { display: grid; grid-template-columns: 240px minmax(0, 1fr) minmax(0, 1.2fr); gap: var(--s-4); align-items: start; }
+/* Below ~1100px there isn't room for three columns: keep filters + queue side by side and let the
+   incident detail span the full width directly beneath the queue, so a picked incident is still visible
+   (the old rule dropped to two columns for three cards, orphaning the detail far below the fold). */
+@media (max-width: 1100px) { .triage { grid-template-columns: 220px minmax(0, 1fr); } .triage > #soc-detail { grid-column: 1 / -1; } }
 .banner-msg { flex: 1; min-width: 0; }
 .model-cell { display: inline-flex; align-items: center; white-space: nowrap; }
 .mono.small { font-size: var(--t-xs); }
