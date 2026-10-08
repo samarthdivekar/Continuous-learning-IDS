@@ -118,6 +118,14 @@ class App:
         ttk.Label(box, text="real recorded flows -> live scorer; watch it on the Live sites tab",
                   foreground="#888").grid(row=0, column=3, sticky="w", **pad)
 
+        # --- demo lab (cyber range)
+        lab = ttk.LabelFrame(self.root, text="Demo lab - cyber range (isolated, caged; port scan only, no DoS)", padding=10)
+        lab.pack(fill=BOTH, expand=False, padx=12, pady=6)
+        self.btn_range = ttk.Button(lab, text="Run cyber range", command=self.run_cyber_range)
+        self.btn_range.grid(row=0, column=0, **pad)
+        ttk.Label(lab, text="two isolated VMs on your PC: an attacker scans a virtual network, the IDS detects it, "
+                  "you teach it, it learns - no real machine is touched", foreground="#888").grid(row=0, column=1, sticky="w", **pad)
+
         # --- log
         logf = ttk.LabelFrame(self.root, text="Activity", padding=8)
         logf.pack(fill=BOTH, expand=True, padx=12, pady=(6, 12))
@@ -247,6 +255,26 @@ class App:
                 return
             flagged = ", ".join(f"{v} {k}" for k, v in (r.get("counts") or {}).items() if k != "Benign")
             self._log(f"replayed {r.get('replayed', 0)} flows -> {flagged or 'all benign'}. Open the Live sites tab.")
+        self._run_async(work)
+
+    def run_cyber_range(self):
+        self.ui.put(lambda: self.btn_range.configure(state=DISABLED, text="Running cyber range..."))
+        self._log("starting the cyber range (isolated attacker + IDS). This takes a couple of minutes...")
+
+        def work():
+            try:
+                proc = subprocess.Popen(
+                    [str(PY), str(ROOT / "demo" / "cyber_range.py"), "--server", self.api.get()],
+                    cwd=str(ROOT), stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1,
+                    creationflags=0x08000000 if os.name == "nt" else 0)
+                for line in proc.stdout:
+                    if line.strip():
+                        self._log(line.rstrip())
+                proc.wait()
+            except Exception as e:
+                self._log(f"cyber range failed: {e}")
+            finally:
+                self.ui.put(lambda: self.btn_range.configure(state=NORMAL, text="Run cyber range"))
         self._run_async(work)
 
     # ----------------------------------------------------------------- status

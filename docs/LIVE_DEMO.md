@@ -29,7 +29,24 @@ One window: **Start stack**, **Open console**, start a **sensor** on a chosen in
 button that replays a recorded attack into the live view. It only drives the existing pieces; it starts no
 attacks. If you prefer the command line, everything below still works.
 
-### The safe "watch it detect an attack" moment — sandbox replay
+### The self-contained demo — cyber range (no second machine, no real network)
+
+The strongest demo runs entirely on your one PC: **Run cyber range** in the control center (or
+`python demo/cyber_range.py --server http://localhost:8000`). It spins up two isolated Docker "VMs" on a
+caged network (no route to your PC, your Wi-Fi or the internet): an **attacker** that runs an nmap **port
+scan** (reconnaissance only — never a DoS) against a small **virtual network** of throwaway hosts, while the
+**IDS** captures, scores, and you teach it. It walks the whole story automatically and tears down after:
+
+1. the real scan is scored **benign** (the lab-trained model has never seen it),
+2. you **label** it PortScan and **adapt** (gated — it cannot forget),
+3. a **fresh** scan is now **detected**,
+4. the recorded attacks **still detect** (no forgetting).
+
+Measured run (2026-10-08): scan #1 0/1330 flagged → after teaching, scan #2 **1545/1605 flagged**, old-attack
+macro-F1 **0.975 → 0.975**, recorded DoS/PortScan/DDoS still 95–100 %. (It flags the scans as the neighbouring
+category *Infiltration*, not PortScan — say so.) Nothing real is attacked; the attacker container is caged.
+
+### The simplest "watch it detect" moment — sandbox replay
 
 In the console's **Live sites** tab (or the desktop app), pick an attack (DoS / PortScan / DDoS / …) and
 press **Replay recorded attack**. This takes a *real recorded window* of that attack from the dataset's
