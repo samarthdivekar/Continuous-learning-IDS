@@ -138,14 +138,21 @@ generated with a different tool, timing and network; a modern nmap scan is out o
 graph model does not recognise it. This is the project's central honest limitation (README §1, §5), shown
 live. **Do not promise the audience it will light up** — it will not, and that is the point you explain.
 
-**Scene 3b — teach it the live attack (continual learning on real traffic).** This is the strong version.
-In **Unfamiliar traffic** the scan's source host may appear (unlike anything in training); or select its
-flows in the incident/host lists. Label them **PortScan**, click **Adapt model now** (gated: old-attack
-macro-F1 is measured before/after and the update rolls back if it drops). Then run the scan again — now the
-model has a chance of flagging it, while still catching the recorded attacks. This demonstrates the actual
-thesis — *learning a new, real attack without forgetting the old ones* — on traffic the model had never seen.
-(Whether a single adaptation generalises to the next scan depends on the capture; show the before/after
-honestly either way.)
+**Scene 3b — teach it the live attack (continual learning on real traffic). This is the strong version, and
+it is measured to work.** Label the scan's flows **PortScan** (via the incident buttons, or the Unfamiliar
+list), click **Adapt model now** (gated: old-attack macro-F1 is measured before/after and the update rolls
+back if it drops). Tested result on two separate real nmap scans (2026-10-08):
+
+- Before: a real scan is **0 % detected**.
+- After teaching one scan: that scan is flagged **~97 %**, and a **held-out scan it never saw is flagged
+  ~74 %** — so it generalises, it did not just memorise.
+- The recorded CIC-IDS attacks **still detect at full rate** afterwards (DoS/PortScan/DDoS 95–100 %), and the
+  gate confirms old-attack macro-F1 held at **0.975 → 0.975**.
+
+This is the thesis on real traffic: *it learned a new, real attack from a handful of labels without forgetting
+the old ones.* **Honest quirk to mention:** it flags the scans as the neighbouring category **Infiltration**
+rather than PortScan — it learned "this is an attack" but assigned the wrong name, because the real scan sits
+between categories in the lab model's feature space. Say so; it is a more credible demo than hiding it.
 
 **The reliable detection demo is the sandbox replay** (below): recorded CIC-IDS attacks run through the live
 scorer and are detected every time (DoS 97 %, PortScan 100 %, DDoS 95 %). Use that to *show detection works*,
