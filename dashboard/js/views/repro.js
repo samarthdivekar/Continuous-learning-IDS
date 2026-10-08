@@ -34,9 +34,22 @@ async function render() {
   });
   $("#rp-tuning", root).innerHTML = skeleton("table");
   $("#rp-info", root).innerHTML = skeleton("lines");
-  let t;
+  let t, reusedFrom = null;
   try { t = await get(`/results/tuning?dataset=${dataset}`); }
-  catch (e) { showError($("#rp-tuning", root), e, { what: "the tuning results" }); }
+  catch (e) {
+    // CSE-CIC-IDS2018 has no tuning run of its own: it reuses CIC-IDS2017's validation selections
+    // (tuning_from). Show those, clearly labelled, rather than an error.
+    if (e.status === 404 && dataset !== "cicids2017") {
+      try { t = await get("/results/tuning?dataset=cicids2017"); reusedFrom = "cicids2017"; }
+      catch (e2) { showError($("#rp-tuning", root), e2, { what: "the tuning results" }); }
+    } else { showError($("#rp-tuning", root), e, { what: "the tuning results" }); }
+  }
+  if (reusedFrom) {
+    const note = `<div class="callout" style="margin-bottom:12px">This dataset reuses the validation selections
+      (EWC λ/γ and training budget) chosen on <b>CIC-IDS2017</b> — <span class="mono">tuning_from: cicids2017</span>
+      in its config — so there is no separate sweep for it. The CIC-IDS2017 selections it inherits are shown below.</div>`;
+    $("#rp-tuning", root).insertAdjacentHTML("beforebegin", note);
+  }
   if (t?.sweep) {
     const models = [...new Set(t.sweep.map((r) => r.model))];
     const sets = [];
