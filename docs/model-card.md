@@ -53,10 +53,11 @@ of the same session (optimistic); *temporal* trains on each attack's earlier tra
 * **False-positive rate:** 0.04 % (temporal) and 0.07 % (interleaved) of benign flows on CIC-IDS2017.
 * **Graph vs per-flow, paired over seeds:** +0.044 (temporal, CI +0.019 to +0.058) and +0.036 (interleaved,
   CI +0.011 to +0.069). Indicative only: with three or five seeds no test can reach conventional significance.
-* **Attacks never seen in training** (CSE-CIC-IDS2018, binary, leave-one-attack-out, two seeds): over 80 % of
-  the held-out attack's flows detected in 6 of 12 runs, against at most 0.07 % for the per-flow FFNN. DoS
-  (98.6 %, 98.6 %) and DDoS (99.4 %, 82.6 %) replicate; BruteForce (99.7 %, 0.1 %) and Botnet (8.5 %, 84.9 %)
-  do not; Infiltration and WebAttack 0 %.
+* **Attacks never seen in training** (CSE-CIC-IDS2018, binary, leave-one-attack-out, three seeds): over 80 % of
+  the held-out attack's flows detected in 8 of 18 runs, against at most 0.07 % for the per-flow FFNN. DoS
+  replicates perfectly (98.6 % on all three seeds) and DDoS on all three but declining (99.4 / 82.6 / 67.5 %);
+  BruteForce (99.7 / 0.07 / 100 %) and Botnet (8.5 / 84.9 / 11.0 %) are unstable run to run; Infiltration and
+  WebAttack 0 %.
 * **Serving speed** (laptop, GTX 1650): a 5,000-flow window is scored in 5.5 ms on the GPU and 10.5 ms on the
   CPU (p50), about 630,000 and 460,000 flows per second, excluding flow export and graph building.
 * **Calibration** (CIC-IDS2017, one run): expected calibration error 0.52 % over all test flows but 2.24 % on
@@ -72,7 +73,7 @@ of the same session (optimistic); *temporal* trains on each attack's earlier tra
 * **Topology dependence.** When each flow's source host is randomised at test time, macro-F1 falls from 0.952
   to 0.431 on CIC-IDS2017 (3 seeds, every seed 0.427–0.436) and from 0.922 to 0.729 on CSE-CIC-IDS2018
   (3 seeds, 0.690–0.754), below the per-flow FFNN, which is unaffected.
-* **Seed instability.** Unseen-attack detection for BruteForce and Botnet swapped between two seeds; on
+* **Seed instability.** Unseen-attack detection for BruteForce and Botnet varies run to run across three seeds; on
   CSE-CIC-IDS2018 the identical seed-42 configuration scored 0.855, 0.948 and 0.945 in three trainings, and one run flagged 9,196 benign flows as
   Infiltration where an identical run flagged 3.
 * **Attacks it does not catch unseen:** Infiltration, WebAttack and mostly Botnet are missed by every model

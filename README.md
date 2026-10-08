@@ -416,28 +416,31 @@ robustness is least settled. Each model is trained on every attack category but 
 category; the table gives the share of the held-out category's flows flagged as an attack. The models are
 trained jointly here (no continual learning), so the comparison isolates what the graph adds.
 
-**CSE-CIC-IDS2018** (`results/csecicids2018/binary/loao/`, seed 42; second seed in `loao_seed43/`)
+**CSE-CIC-IDS2018** (seeds 42 / 43 / 44: `loao/`, `loao_seed43/`, `loao_seed44/`; combined in `results/csecicids2018/binary/loao_seeds/`)
 
-| Held out | XGBoost | FFNN (per-flow) | GNN (graph), seed 42 | GNN, seed 43 |
-|---|---|---|---|---|
-| DoS | 90.1 % | 0.1 % | **98.6 %** | **98.6 %** |
-| DDoS | 0.0 % | 0.0 % | **99.4 %** | **82.6 %** |
-| BruteForce | 0.0 % | 0.0 % | 99.7 % | **0.1 %** |
-| Botnet | 0.0 % | 0.0 % | 8.5 % | **84.9 %** |
-| Infiltration | 0.0 % | 0.0 % | 0.0 % | 0.0 % |
-| WebAttack | 0.0 % | 0.0 % | 0.0 % | 0.0 % |
+| Held out | XGBoost | FFNN (per-flow) | GNN (graph), seeds 42 / 43 / 44 |
+|---|---|---|---|
+| DoS | 87.2 % | ≤ 0.07 % | **98.6 / 98.6 / 98.6 %** |
+| DDoS | 0.0 % | 0.0 % | **99.4 / 82.6 / 67.5 %** |
+| BruteForce | 0.0 % | ≤ 0.02 % | 99.7 / 0.07 / 100 % |
+| Botnet | 0.0 % | 0.0 % | 8.5 / 84.9 / 11.0 % |
+| Infiltration | 0.0 % | 0.0 % | 0 / 0 / 0.3 % |
+| WebAttack | 0.0 % | 0.0 % | 0 / 0 / 0 % |
 
-(XGBoost and FFNN columns are seed 42; in seed 43 they are within a few points: XGBoost DoS 84.8 %, every other
-cell 0.0–0.07 %.)
+(XGBoost and FFNN are the mean over the three seeds; both move by at most a few points between seeds —
+XGBoost DoS 90.1 / 84.8 / 86.8 %, every other FFNN cell 0.0–0.07 %.)
 
-* **The per-flow model sees nothing unseen, in either seed.** Across all 12 held-out runs (six categories, two
+* **The per-flow model sees nothing unseen, on any seed.** Across all 18 held-out runs (six categories, three
   seeds) the FFNN flags at most 0.07 % of the unseen attack's flows. The graph model flags more than 80 % in
-  6 of the 12.
-* **Unseen DoS and DDoS replicate.** DoS 98.6 % in both seeds; DDoS 99.4 % and 82.6 %.
-* **BruteForce and Botnet do not; they swap.** BruteForce goes from 99.7 % to 0.1 %, Botnet from 8.5 % to
-  84.9 %. On one run BruteForce looked like the strongest evidence in the project; which of these the model
-  catches depends on the training run, not only on the attack.
-* **Infiltration and WebAttack are missed by every model in both seeds** (WebAttack has 7 held-out flows in the
+  8 of the 18.
+* **Unseen DoS replicates perfectly: 98.6 % on all three seeds** — the most reliable unseen-attack result in
+  the project, against ≤ 0.07 % for the per-flow FFNN. DDoS is detected on all three but declining (99.4 /
+  82.6 / 67.5 %).
+* **BruteForce and Botnet are unstable, run to run.** BruteForce is 99.7 / 0.07 / 100 % (caught on two seeds,
+  missed on one); Botnet is 8.5 / 84.9 / 11.0 % (caught only on seed 43). Which of these the model catches
+  depends on the training run, not only on the attack — the single-run "BruteForce is the strongest evidence"
+  was seed 42 alone.
+* **Infiltration and WebAttack are missed by every model on every seed** (WebAttack has 7 held-out flows in the
   15 % sample).
 
 **CIC-IDS2017** (seeds 42 / 43 / 44: `loao/`, `loao_seed43/`, `loao_seed44/`; combined in `results/cicids2017/binary/loao_seeds/`)
@@ -459,10 +462,10 @@ cell 0.0–0.07 %.)
 
 **Reading.** Host-level structure (fan-out, fan-in, who talks to whom) lets the graph model flag attack types
 a per-flow model cannot see at all: in half the held-out runs on 2018 it caught most of an attack it was never
-trained on, where the per-flow model caught essentially none. Unseen DoS and DDoS hold across seeds, and unseen
-DoS also holds on 2017 over three seeds. It is not a dependable property for a given attack type: BruteForce and Botnet
-swap between seeds, and Infiltration and WebAttack are missed by everything. It also rests on attackers being
-few hosts (§5).
+trained on, where the per-flow model caught essentially none. Unseen DoS holds on all three seeds on both
+datasets and DDoS on all three on 2018. It is not a dependable property for a given attack type: BruteForce and
+Botnet are unstable run to run, and Infiltration and WebAttack are missed by everything. It also rests on
+attackers being few hosts (§5).
 
 ### 2. Learning seven attacks in sequence (multiclass, in distribution)
 
@@ -725,7 +728,7 @@ depends on the dataset. Seed 43 is also the weak seed under normal scoring (0.86
   for the GNN against **0.836 ± 0.029** for the per-flow FFNN. The GNN is ahead in every seed (+0.095, +0.008,
   +0.123); the bootstrap interval of the paired difference is [+0.009, +0.123] (§2). With three seeds this is
   indicative, and the next point explains why the GNN's own numbers move so much.
-* **Unseen attacks:** see §1. DoS and DDoS replicate across two seeds (FFNN ≤ 0.07 %); BruteForce and Botnet
+* **Unseen attacks:** see §1. DoS replicates on all three seeds (98.6 %) and DDoS on all three (FFNN ≤ 0.07 %); BruteForce and Botnet
   swap between seeds.
 * **The GNN is unstable on Infiltration.** The identical configuration (same seed 42, same data) has now been
   trained three times: **0.855** in the original task-sequence run, **0.948** in the IP-remap run, and
@@ -912,11 +915,10 @@ CIC-IDS2017 test windows of 5,000 flows. Laptop: GTX 1650 (4 GB), 8-core CPU, 24
   on both datasets. On top of replay it made no detectable difference on the interleaved split but, on the
   temporal split, prevented two replay-only collapses (§2). The replay-budget sweep (§2) shows replay alone is
   flat from five stored windows per category on the interleaved split; it was not repeated on the temporal one.
-* **Experiments still running or not run.** A Windows Smart App Control policy blocked PyTorch for part of
-  this work and a Windows Update restart killed a later batch; runs are continuing. Not yet in this README:
-  the third unseen-attack seed on CSE-CIC-IDS2018 and the
-  5-seed re-run of the interleaved table. Each is one command in the reproduce table; nothing they
-  would produce is claimed anywhere.
+* **One experiment not run.** The planned extra-seed runs (window-size, both datasets' drift, IP-remap and
+  unseen-attack seeds, the topology re-run) are now in; the only item still outstanding is the 5-seed re-run
+  of the interleaved task-sequence table, which keeps three seeds. It is one command in the reproduce table;
+  nothing it would produce is claimed anywhere.
 * **Small test classes.** WebAttack has 24 test flows and Botnet 73 in CIC-IDS2017; per-category numbers
   for them are noisy (one flow = 1–4 %).
 * **Validation selections are within noise.** The chosen λ = 10, γ = 0.9 beats neighbouring settings by
