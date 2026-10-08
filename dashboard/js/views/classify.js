@@ -1,5 +1,5 @@
 // Classify: run every loaded model on a cached window or on an uploaded CSV of flows; compare verdicts.
-import { $, catColor, color, esc, get, HEADLINE, int, label, pct, post, toast } from "../lib/core.js";
+import { $, catColor, color, esc, get, int, label, pct, post, shownModels, toast } from "../lib/core.js";
 import { mount } from "../lib/charts.js";
 import { showError, skeleton, withBusy } from "../lib/ui.js";
 
@@ -28,10 +28,14 @@ export async function mount_(el) {
         <div class="toolbar" style="margin-top:8px"><button class="btn primary" id="cl-run-f" disabled>Classify file</button></div></div>
     </div>
     <div class="card" style="margin-top:16px"><h3>Verdicts</h3><div id="cl-out"><div class="empty">Run a classification above.</div></div></div>`;
-  try { catalog = (await get("/windows/catalog")).filter((w) => w.split === "test"); }
+  // Only test windows that actually contain attacks: a benign-only window makes every model say "all
+  // benign", which looks like the models agree on nothing / the tab is broken. Attack-heavy first.
+  try { catalog = (await get("/windows/catalog")).filter((w) => w.split === "test" && w.n_attack > 0)
+                    .sort((a, b) => b.n_attack - a.n_attack); }
   catch (e) { catalog = []; showError($("#cl-out", root), e, { what: "the window catalogue" }); }
-  const firstAttack = catalog.find((w) => w.n_attack > 200);
-  $("#cl-win", root).innerHTML = catalog.map((w) => `<option value="${w.window_id}" ${firstAttack && w.window_id === firstAttack.window_id ? "selected" : ""}>#${w.window_id} · task ${w.task_id + 1} ${esc(w.task_category)} · ${int(w.n_attack)} attack flows</option>`).join("");
+  $("#cl-win", root).innerHTML = catalog.length
+    ? catalog.map((w, idx) => `<option value="${w.window_id}" ${idx === 0 ? "selected" : ""}>#${w.window_id} · task ${w.task_id + 1} ${esc(w.task_category)} · ${int(w.n_attack)} attack flows</option>`).join("")
+    : `<option value="">no held-out windows with attacks</option>`;
   $("#cl-run-w", root).addEventListener("click", () => run({ window_id: Number($("#cl-win", root).value) }));
   $("#cl-run-f", root).addEventListener("click", () => {
     try { run({ flows: parseCsv(fileText), store: false }); } catch (e) { toast(e.message); }
@@ -77,7 +81,7 @@ async function run(body) {
       : `<div class="empty">${esc(e.message)}</div>`;
     return;
   }
-  const models = HEADLINE.filter((m) => r.models[m]);
+  const models = shownModels(Object.keys(r.models));   // 3 (the story) by default, all when Compare is on
   const allLabels = [...new Set([...Object.keys(r.true_counts || {}), ...models.flatMap((m) => Object.keys(r.models[m].counts))])];
   out.innerHTML = `
     <p class="sub">${int(r.n_flows)} flows between ${int(r.n_nodes)} hosts${r.warnings?.length ? ` · <span class="tag warn">${esc(r.warnings[0])}</span>` : ""}

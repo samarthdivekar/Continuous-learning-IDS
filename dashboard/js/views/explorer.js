@@ -1,9 +1,13 @@
 // Graph Explorer: browse every window graph, colour by ground truth or by a model's mistakes.
-import { $, catColor, esc, get, HEADLINE, int, label, pct, prefs, toast } from "../lib/core.js";
+import { $, catColor, esc, get, HEADLINE, int, label, pct, prefs, shownModels, toast } from "../lib/core.js";
 import { GraphView } from "../lib/graphview.js";
 import { showError, skeleton } from "../lib/ui.js";
 
 let root, view, catalog = [], current = null, serviceDataset = null;
+// The model dropdown only matters in "Model errors" mode (it overlays that model's mistakes); in
+// "Ground truth" mode the graph is the same for every model. Offer the story's three models by default,
+// all when Compare is on — consistent with the rest of the console.
+const modelOptions = () => shownModels(HEADLINE).map((m) => `<option value="${m}">${esc(label(m))}</option>`).join("");
 
 export async function mount_(el) {
   root = el;
@@ -16,7 +20,7 @@ export async function mount_(el) {
         <div class="card-head"><div><h3 id="ex-title">Select a window</h3><p class="sub" id="ex-sub">–</p></div>
           <div class="toolbar">
             <div class="seg" id="ex-mode" role="group" aria-label="edge colouring"><button data-v="truth" class="on">Ground truth</button><button data-v="errors">Model errors</button></div>
-            <select id="ex-model" aria-label="model whose errors are overlaid">${HEADLINE.map((m) => `<option value="${m}">${esc(label(m))}</option>`).join("")}</select>
+            <select id="ex-model" aria-label="model whose errors are overlaid" title="Pick a model to see its mistakes (switches to Model errors)" disabled>${modelOptions()}</select>
             <label class="inline">Hosts <input type="range" id="ex-nodes" min="30" max="400" step="10" value="${prefs.get("ex.nodes", "150")}"><span id="ex-nodes-v" class="num"></span></label>
             <button class="icon-btn small" id="ex-fit" title="Zoom so the whole graph fits">⤢ Fit</button>
           </div></div>
@@ -43,9 +47,17 @@ export async function mount_(el) {
   nodes.addEventListener("change", () => { prefs.set("ex.nodes", nodes.value); if (current) load(current); });
   root.querySelectorAll("#ex-mode button").forEach((b) => b.addEventListener("click", () => {
     root.querySelectorAll("#ex-mode button").forEach((x) => x.classList.toggle("on", x === b));
-    view.mode = b.dataset.v; if (current) load(current);
+    view.mode = b.dataset.v;
+    $("#ex-model", root).disabled = view.mode !== "errors";     // the model only matters for error overlay
+    if (current) load(current);
   }));
-  $("#ex-model", root).addEventListener("change", () => { if (current && view.mode === "errors") load(current); });
+  // Picking a model implies "show me this model's mistakes" — switch to Model errors so the choice has a
+  // visible effect (in Ground truth the graph is identical for every model, which looked like a bug).
+  $("#ex-model", root).addEventListener("change", () => {
+    root.querySelectorAll("#ex-mode button").forEach((x) => x.classList.toggle("on", x.dataset.v === "errors"));
+    view.mode = "errors"; $("#ex-model", root).disabled = false;
+    if (current) load(current);
+  });
   $("#ex-fit", root).addEventListener("click", () => view.fit());
   view.onEdge = (edge) => explainEdge(edge);
   ["#ex-task", "#ex-split", "#ex-attack"].forEach((s) => $(s, root).addEventListener("change", renderList));
@@ -63,7 +75,12 @@ export async function mount_(el) {
   if (first) load(first.window_id);
 }
 export { mount_ as mount };
-export function refresh() { if (current) load(current); }
+export function refresh() {
+  // the Compare toggle may have changed the model set: rebuild the dropdown, keeping the selection if it survives
+  const sel = $("#ex-model", root);
+  if (sel) { const keep = sel.value; sel.innerHTML = modelOptions(); if ([...sel.options].some((o) => o.value === keep)) sel.value = keep; }
+  if (current) load(current);
+}
 
 function renderList() {
   const t = $("#ex-task", root).value, s = $("#ex-split", root).value, a = $("#ex-attack", root).checked;
