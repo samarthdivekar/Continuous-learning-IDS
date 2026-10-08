@@ -142,6 +142,11 @@ class App:
     # --------------------------------------------------------------- helpers
     def _log(self, msg: str):
         self.msgs.put(msg)
+        try:                                   # also to a file, so failures are diagnosable even if the box is empty
+            with open(ROOT / "desktop" / "activity.log", "a", encoding="utf-8") as f:
+                f.write(msg.rstrip() + "\n")
+        except Exception:
+            pass
 
     def _pump(self):
         try:
@@ -264,18 +269,24 @@ class App:
         self.btn_range.configure(state=DISABLED, text="Running cyber range...")
         self._log("starting the cyber range (isolated attacker + IDS). This takes a couple of minutes...")
 
+        script = ROOT / "demo" / "cyber_range.py"
+        self._log(f"launching: {PY} {script} --server {server}")
+
         def work():
             try:
+                # PYTHONUNBUFFERED so the child's output streams line by line instead of buffering to the end
+                env = {**os.environ, "PYTHONUNBUFFERED": "1", "PYTHONIOENCODING": "utf-8"}
                 proc = subprocess.Popen(
-                    [str(PY), str(ROOT / "demo" / "cyber_range.py"), "--server", server],
+                    [str(PY), "-u", str(script), "--server", server],
                     cwd=str(ROOT), stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1,
-                    creationflags=0x08000000 if os.name == "nt" else 0)
+                    env=env, creationflags=0x08000000 if os.name == "nt" else 0)
                 for line in proc.stdout:
                     if line.strip():
                         self._log(line.rstrip())
                 proc.wait()
+                self._log(f"cyber range finished (exit code {proc.returncode}).")
             except Exception as e:
-                self._log(f"cyber range failed: {e}")
+                self._log(f"cyber range failed to launch: {e!r}")
             finally:
                 self.ui.put(lambda: self.btn_range.configure(state=NORMAL, text="Run cyber range"))
         self._run_async(work)
