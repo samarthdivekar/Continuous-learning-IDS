@@ -38,6 +38,7 @@ class App:
     def __init__(self, root: Tk):
         self.root = root
         self.msgs: "queue.Queue[str]" = queue.Queue()
+        self.ui: "queue.Queue" = queue.Queue()        # callables to run on the main (UI) thread
         self.sensor_proc: subprocess.Popen | None = None
         self.api = StringVar(value=API_DEFAULT)
         self.site = StringVar(value="home-lan")
@@ -49,6 +50,19 @@ class App:
         self._build()
         self._pump()
         self._poll_status()
+        self._raise_window()
+
+    def _raise_window(self):
+        """Bring the window in front of the launcher console so it is actually seen."""
+        try:
+            self.root.update_idletasks()
+            self.root.deiconify()
+            self.root.lift()
+            self.root.attributes("-topmost", True)
+            self.root.after(600, lambda: self.root.attributes("-topmost", False))
+            self.root.focus_force()
+        except Exception:
+            pass
 
     # ------------------------------------------------------------------ UI
     def _build(self):
@@ -128,6 +142,14 @@ class App:
                 self.log.see(END)
         except queue.Empty:
             pass
+        # run any UI updates posted by worker threads (tkinter must only be touched from this thread)
+        try:
+            while True:
+                self.ui.get_nowait()()
+        except queue.Empty:
+            pass
+        except Exception:
+            pass
         self.root.after(150, self._pump)
 
     def _run_async(self, fn):
@@ -181,8 +203,8 @@ class App:
             lines = [ln.strip() for ln in (r.stdout or "").splitlines() if "." in ln and ("(" in ln or "\\" in ln or ln[0].isdigit())]
             self._log(r.stdout.strip() or r.stderr.strip() or "no output")
             if lines:
-                self.root.after(0, lambda: self.iface_cb.configure(values=lines))
-                self.root.after(0, lambda: self.iface.set(lines[0]))
+                self.ui.put(lambda: self.iface_cb.configure(values=lines))
+                self.ui.put(lambda: self.iface.set(lines[0]))
         self._run_async(work)
 
     def toggle_sensor(self):
@@ -210,7 +232,7 @@ class App:
             for line in p.stdout:
                 self._log(line.rstrip())
             self._log("sensor stopped.")
-            self.root.after(0, lambda: self.btn_sensor.configure(text="Start sensor"))
+            self.ui.put(lambda: self.btn_sensor.configure(text="Start sensor"))
         self._run_async(lambda: reader(self.sensor_proc))
 
     def replay(self):
@@ -239,15 +261,34 @@ class App:
                 color = "#1a7f37"
             except Exception:
                 txt, color = "offline  -  start the stack", "#b00020"
-            self.root.after(0, lambda: self.status_lbl.configure(text=txt, foreground=color))
+            self.ui.put(lambda: self.status_lbl.configure(text=txt, foreground=color))
         self._run_async(work)
         self.root.after(3000, self._poll_status)
 
 
 def main():
-    root = Tk()
-    App(root)
-    root.mainloop()
+    import datetime
+    import traceback
+    logp = Path(__file__).resolve().parent / "last_run.log"
+
+    def note(msg):
+        try:
+            with open(logp, "a", encoding="utf-8") as f:
+                f.write(f"{datetime.datetime.now():%H:%M:%S} {msg}\n")
+        except Exception:
+            pass
+
+    note("starting")
+    try:
+        root = Tk()
+        note("Tk() created")
+        App(root)
+        note("App built, entering mainloop")
+        root.mainloop()
+        note("mainloop returned normally")
+    except Exception:
+        note("CRASH:\n" + traceback.format_exc())
+        raise
 
 
 if __name__ == "__main__":
