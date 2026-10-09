@@ -23,3 +23,5 @@ httpx==0.28.1
 pytest==9.1.1
 # optional: console smoke test (scripts/ui_smoke.py); drives the installed Edge, no browser download
 playwright==1.63.0
+# optional: build the research-paper reference PDF (docs/build_paper_reference.py)
+reportlab==5.0.1
