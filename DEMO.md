@@ -83,7 +83,7 @@ Examiners reward measured limitations:
 | Question | Answer |
 |---|---|
 | "Is it better than a commercial NDR?" | Not comparable — this is an evaluated research prototype with dry-run response only. The README says so. |
-| "Why not just XGBoost?" | It cannot learn new attack types: 0.231 macro-F1 and it detects 1.3 % of attacks it never saw. |
+| "Why not just XGBoost?" | It cannot learn new attack types: 0.231 macro-F1 (multiclass), and in binary mode it detects none of the DoS, WebAttack, Botnet, PortScan or DDoS flows and 0.13 % of Infiltration. |
 | "Does the graph really help?" | In distribution, modestly: +0.036 (interleaved, 3 seeds) and +0.044 (temporal, 5 seeds), indicative only. On attacks never seen in training, clearly but unevenly: over 80 % in 8 of 18 held-out runs (2018, 3 seeds) vs ≤ 0.07 % for the per-flow model; DoS replicates on all three seeds, DDoS is caught on all three but declining, BruteForce and Botnet swap between seeds. |
 | "What about false alarms?" | 0.07 % at flow level; abstention removes them entirely at the right α, and incident grouping leaves 50 items with 84 % precision. |
 | "Can it run live?" | Scoring a 5,000-flow window takes 5.5 ms on the laptop GPU and 10.5 ms on the CPU (p50), about 630,000 and 460,000 flows per second (README §8). That excludes flow export and graph building from raw traffic. |
