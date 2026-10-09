@@ -640,8 +640,8 @@ this size.
 
 Binary is domain-incremental (the "attack" class persists across tasks), and the picture changes:
 ours 0.9993 macro-F1, FFNN + EWC + replay 0.9991, and **GNN + EWC only reaches 0.9945 with retention 1.0**
-— on CIC-IDS2017, EWC alone works in the setting it was designed for (this did **not** replicate on
-CSE-CIC-IDS2018). GNN naive keeps 0.76 retention; FFNN naive collapses
+— on CIC-IDS2017, EWC alone works in the setting it was designed for. Whether this generalises is open: the
+only CSE-CIC-IDS2018 binary run (one seed, since withdrawn, §6) had EWC-only at 0.539 with retention 0. GNN naive keeps 0.76 retention; FFNN naive collapses
 to 0.003. The static XGBoost (trained on task 1 only) detects **none** of the DoS, WebAttack, Botnet,
 PortScan or DDoS test flows and 0.13 % of Infiltration; its overall attack detection rate of 1.3 % is almost
 entirely the BruteForce it was trained on.
