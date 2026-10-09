@@ -22,8 +22,8 @@ the docs checked against `results/`.
 | Check | Before | After |
 |---|---|---|
 | Environment vs `requirements.lock.txt` | 71/71 pins match, no reinstall needed | — |
-| `python -m pytest` | 127 passed | see Final checks |
-| `scripts/ui_smoke.py` (strict: any console error fails) | 77 page loads, 0 problems | see Final checks |
+| `python -m pytest` | 127 passed | 129 passed (2 new) |
+| `scripts/ui_smoke.py` (strict: any console error fails) | 77 page loads, 0 problems | 77 page loads, 0 problems (cold start) |
 | Demo pages (Overview + Compare, Sandbox DoS replay, Incident queue, Graph explorer, Reproducibility) | all render; screenshots in `docs/screens/review_50/` | — |
 
 **Found by measuring, not by the smoke test** (`scripts/ui_timing.py`, new): after Live sites had been opened once,
@@ -156,3 +156,16 @@ attacks, unreliably.** Preliminary (joint training, 3 seeds); not in the README 
 
 * The external-review experiment chains are paused (see top); the README still makes no claim from them.
 * Cyber range not re-run tonight (optional step). The demo uses the sandbox replay, which always works.
+
+## Final checks (03:50, 10 October)
+
+* Stack restarted from cold: model service up with all four models on CUDA.
+* `python -m pytest`: 129 passed. `scripts/ui_smoke.py`: 77 page loads, 0 problems.
+* Scripted demo walk (`logs/review50/demo_walk.log`), 15/15 checks, no browser console errors: Overview headline and
+  Compare models → Sandbox DoS replay (graph switches to the sandbox, DoS incident listed) → Incident queue (incident
+  opens with explanation and dry-run iptables rule; recorded practice queue loads) → Graph explorer (graph and
+  model-error overlay) → Classify a held-out window → Drift replay plays → Models, Adaptation & trust, Reproducibility.
+* Lint: the only real findings (two unused imports) fixed; doc links and referenced paths all resolve.
+* `git diff review-50-before --stat`: docs, new experiment files, results of the new experiment, tests, the lag fix and
+  the dashboard-server log fix — nothing else.
+* Not done: the optional cyber-range run (the demo uses the sandbox replay); the 2023 dataset (deferred; usage budget).
