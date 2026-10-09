@@ -65,6 +65,11 @@ MODEL_SPECS = {
     "ffnn_ctx_joint":      {"family": "ffnn", "ewc": False, "replay": False, "joint": True, "ctx": True},
     # XGBoost that keeps learning (the frozen-after-task-1 model is a strawman on its own): refit on the new task
     # plus a class-balanced reservoir of earlier flows (replay), or on everything seen so far (joint).
+    # Standard continual-learning baselines on the same graph network (review point 3): distillation from the
+    # previous model (LwF), and replay that also matches stored outputs (DER++). Hyper-parameters are the papers'
+    # defaults (configs/default.yaml: cl), not tuned here.
+    "gnn_lwf":             {"family": "gnn", "ewc": False, "replay": False, "lwf": True},
+    "gnn_derpp":           {"family": "gnn", "ewc": False, "replay": True, "der": True},
     "xgboost_replay":      {"family": "xgb", "xgb_mode": "replay"},
     "xgboost_joint":       {"family": "xgb", "xgb_mode": "joint"},
     "xgboost_ctx_replay":  {"family": "xgb", "xgb_mode": "replay", "ctx": True},
@@ -256,6 +261,29 @@ class GNNLearner(_TorchLearner):
         self.buffer = GraphReplayBuffer(rcfg["graphs_per_class"], rcfg["graphs_per_step"],
                                         rcfg["min_class_edges"], seed=self.cfg["seed"]) \
             if self.spec.get("replay") else None
+        self.der_logits: dict[int, torch.Tensor] = {}     # DER++: window id -> outputs when it was stored
+
+    def _distill(self, sub: Data, teacher, T: float) -> torch.Tensor:
+        """LwF (Li & Hoiem, 2017): keep the outputs on the new task's flows close to the previous model's."""
+        sub = sub.to(self.device)
+        m = sub.target_mask
+        new = self.model(sub.x, sub.edge_index, sub.edge_attr)[m]
+        with torch.no_grad():
+            old = teacher(sub.x, sub.edge_index, sub.edge_attr)[m]
+        return F.kl_div(F.log_softmax(new / T, dim=-1), F.softmax(old / T, dim=-1), reduction="batchmean") * T * T
+
+    def _der_loss(self, stored: list, replayed: list) -> torch.Tensor:
+        """DER++ (Buzzega et al., 2020): MSE between the outputs on replayed flows now and when they were stored."""
+        losses = []
+        for g, sub in zip(stored, replayed):
+            target = self.der_logits.get(int(g.window_id))
+            if target is None:
+                continue
+            sub = sub.to(self.device)
+            m = sub.target_mask
+            out = self.model(sub.x, sub.edge_index, sub.edge_attr)[m]
+            losses.append(F.mse_loss(out, target[sub.e_id.cpu()[m.cpu()]].to(self.device)))
+        return torch.stack(losses).mean() if losses else torch.zeros((), device=self.device)
 
     # -- loss helpers --------------------------------------------------------
     def _labels(self, g) -> torch.Tensor:
@@ -321,22 +349,35 @@ class GNNLearner(_TorchLearner):
                             for g in train_graphs]).numpy()
         weight = class_weights(labels, self.num_classes, tcfg["class_weight_power"],
                                tcfg["class_weight_clip"]).to(self.device)
+        # LwF: the model as it was before this task is the teacher for the outputs on the new data
+        teacher = None
+        if self.spec.get("lwf") and self.n_learn_calls > 0:
+            teacher = copy.deepcopy(self.model).eval()
+            for p_ in teacher.parameters():
+                p_.requires_grad_(False)
+        ccfg = self.cfg.get("cl") or {}
         self.model.train()
         steps, last = 0, float("nan")
         for _ in range(epochs):
             for gi in self.rng.permutation(len(train_graphs)):
                 for sub in iter_training_subgraphs(self._augment(train_graphs[gi]), ns, self.rng):
                     loss = self._loss_on(sub, weight)
+                    if teacher is not None:
+                        loss = loss + float(ccfg.get("lwf_lambda", 1.0)) * self._distill(sub, teacher,
+                                                                                      float(ccfg.get("lwf_T", 2.0)))
                     replay_loss = torch.zeros((), device=self.device)
                     if self.buffer is not None and self.buffer.categories:
                         # Fixed replay budget per step (see replay_buffer.py). Stored
                         # windows are batched into one disjoint-union graph.
-                        replayed = [next(iter_training_subgraphs(self._augment(r), ns, self.rng))
-                                    for r in self.buffer.sample()]
+                        stored = self.buffer.sample()
+                        replayed = [next(iter_training_subgraphs(self._augment(r), ns, self.rng)) for r in stored]
                         if replayed:
                             rb = Batch.from_data_list(replayed)
                             replay_loss = self._loss_on(rb, weight,
                                                         category_balanced=rcfg.get("category_balanced_loss", False))
+                            if self.spec.get("der"):     # DER++: also match the outputs recorded at storage time
+                                replay_loss = replay_loss + float(ccfg.get("der_alpha", 0.5)) * self._der_loss(
+                                    stored, replayed)
                     penalty = self.ewc.penalty() if self.ewc is not None else 0.0
                     total = loss + rcfg["replay_weight"] * replay_loss + penalty
                     self._check_finite(total, tag)
@@ -356,6 +397,13 @@ class GNNLearner(_TorchLearner):
             idx = self.rng.permutation(len(graphs))[: self.cfg["ewc"]["fisher_batches"]]
             extra["ewc"] = self.ewc.consolidate((graphs[i] for i in idx), self._raw_task_loss, lr=self.lr, tag=tag)
         if self.buffer is not None:
+            if self.spec.get("der"):                  # DER++ stores each window's outputs as they are now
+                self.model.eval()
+                with torch.no_grad():
+                    for g in graphs:
+                        self.der_logits[int(g.window_id)] = self.model(
+                            g.x.to(self.device), g.edge_index.to(self.device), g.edge_attr.to(self.device)).cpu()
+                self.model.train()
             self.buffer.add_many(graphs)
             extra["buffer"] = self.buffer.summary()
         self.n_learn_calls += 1
