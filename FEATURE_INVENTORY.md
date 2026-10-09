@@ -65,7 +65,7 @@ Five layers, one deployment path (`scripts/run_stack.ps1`):
 - **Predict / graph**: `/predict`, `/graph/{id}`, `/explain/{id}/{edge}`, `/windows`, `/windows/catalog`
 - **Incidents**: `/incidents/scan`, `/incidents/{id}`, `/incidents/{id}/report`, `/incidents/{id}/cef`, `/actions`, `/actions/{id}/decision`
 - **Stream demo**: `/metrics`, `/drift-status`, `/stream/windows`, `/demo/start|stop|status`, `/retrain`
-- **Live traffic**: `/sensor/pcap`, `/sensor/flows`, `/sensor/replay_recorded`, `/live/{sites,windows,graph,incidents,model,score,label,adapt,reset,fpr_study,recorded_flows}`
+- **Live traffic**: `/sensor/pcap`, `/sensor/flows`, `/sensor/replay_recorded`, `/live/{sites,windows,graph,site_graph,incidents,incidents/cef,actions,model,score,label,unlabel,adapt,reset,drift,purge,fpr_study,recorded_flows}`
 
 ---
 
@@ -92,15 +92,16 @@ Also: guided tour, help/glossary, presentation mode, light/dark, command palette
 
 ## 7. Live-traffic / deployment layer
 - **Sensor** (`sensor/agent.py`) — captures a machine's traffic (Wireshark/dumpcap) or replays a pcap, ships flows.
-- **Pinned CICFlowMeter** (Docker, `sensor/cicflowmeter.Dockerfile`) — converts packets → the exact training features; rejects a capture whose columns don't match.
-- **Live model** — scores sensor traffic per site; flags unfamiliar traffic; groups into incidents (dry-run rules).
-- **Teach-and-adapt on live traffic** — label flows → the model adapts (gated, can't forget). FPR measurement tool.
-- **Two-site (LAN/MAN)** — sensors on different networks over a VPN → one console.
+- **Pinned CICFlowMeter** (Docker, `sensor/cicflowmeter.Dockerfile`) — converts packets → the exact training features; rejects a capture whose columns don't match; non-IP records dropped.
+- **Live model** — scores each chunk inside the site's last 2 min (≤ 5,000 flows, the training window size); conformal abstention (no alarm when unsure attack-vs-normal → *Unsure* list); unfamiliar-traffic flag; per-site incidents over the last 15 min with dry-run rules, approve/reject into the decision log, CEF export.
+- **Teach-and-adapt on live traffic** — label flows (analyst + time recorded, undo, bulk "normal" skips suspicious flows) → the model adapts on a copy (scoring continues), trained on merged site windows; **rolled back** if old-attack macro-F1, any category's recall, recorded-benign FPR or the site's held-back normal FPR worsens. Accepted updates survive a restart. Live drift = disagreement with analyst labels. Retention purge (7 days). FPR measurement tool.
+- **Two-site (LAN/MAN)** — `run_stack.ps1 -BindHost <LAN/Tailscale IP>` (requires an API key) → sensors on different networks → one console.
 
 ## 8. Cyber range (the VMs)
-- Self-contained, isolated Docker range (attacker + victim containers, no route out).
-- Attacker runs an nmap **port scan** (recon only, no DoS) against the virtual network.
-- Walks the full loop: scan → (often undetected) → teach → fresh scan detected → old attacks kept.
+- Self-contained, isolated Docker range (no route out): 6 servers each capturing its own traffic, 6 workstations making normal web / shell / mail sessions, 1 attacker.
+- **Streamed live** into the console (site CYBER-RANGE) every few seconds — no batch upload at the end.
+- Attacker runs nmap **port scans** (recon only, no DoS): a SYN scan, then a *different* TCP connect scan.
+- Measures, with exact ground truth: false alarms on normal traffic before/after teaching, detection of each scan, the gate's verdict, no forgetting of recorded attacks, and latency.
 - **Writes an HTML report** after each run (`reports/`), opens it automatically.
 
 ## 9. Desktop app
@@ -115,7 +116,7 @@ Also: guided tour, help/glossary, presentation mode, light/dark, command palette
 - **10 sample CSVs** (`sample_flows/`) for the Classify tab.
 
 ## 11. Testing & reproducibility
-- **103 automated tests** (pytest); **UI smoke test** (44 page loads × light/dark).
+- **117 automated tests** (pytest); **UI smoke test** (88 page loads: every tab × desktop/phone × dark/light, plus CSE-CIC-IDS2018, binary and compare mode).
 - `experiments/reproduce_all.py` — regenerates every number with one command.
 - Every result folder has `run_info.json` (seed, config, versions, GPU, data hash, command).
 

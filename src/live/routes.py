@@ -579,6 +579,39 @@ def live_drift(minutes: float = Query(60, gt=0, le=10080)):
 
 
 HOLDOUT_EVERY = 5            # every 5th flow an analyst marked normal is held back to measure false alarms
+MIN_GROUP_FLOWS = 1000       # a training graph smaller than this is folded into its neighbour
+
+
+def _training_groups(rows) -> list[list]:
+    """The labelled live traffic as training graphs shaped like the training data (cyber range, 2026-10-09):
+      * per site, consecutive capture chunks merged up to 5,000 flows — training on few-second chunk graphs
+        made the model forget (old-attack macro-F1 0.975 -> 0.642; merged: 0.974);
+      * a normal-only period and a period containing an attack are kept in separate graphs — merged together,
+        the scanned servers turned the normal flows next to them 'attack-like' (site false alarms 49 % after
+        teaching; kept apart: 3 %);
+      * but a group under 1,000 flows joins its neighbour, since a tiny graph again caused forgetting."""
+    by_site: dict[str, dict[int, list]] = {}
+    for r in rows:
+        by_site.setdefault(r.site, {}).setdefault(r.window_id, []).append(r)
+    out = []
+    for chunks in by_site.values():
+        groups: list[tuple[str, list]] = []
+        for wid in sorted(chunks):
+            fl = chunks[wid]
+            kind = "attack" if any(r.analyst_label not in (None, "Benign") for r in fl) else "normal"
+            if groups and groups[-1][0] == kind and len(groups[-1][1]) + len(fl) <= CONTEXT_MAX_FLOWS:
+                groups[-1][1].extend(fl)
+            else:
+                groups.append((kind, list(fl)))
+        merged: list[list] = []
+        for _, fl in groups:
+            if merged and (len(fl) < MIN_GROUP_FLOWS or len(merged[-1]) < MIN_GROUP_FLOWS) \
+                    and len(merged[-1]) + len(fl) <= CONTEXT_MAX_FLOWS:
+                merged[-1].extend(fl)
+            else:
+                merged.append(list(fl))
+        out += merged
+    return out
 
 
 class AdaptIn(BaseModel):
@@ -600,29 +633,22 @@ def live_adapt(body: AdaptIn):
             raise HTTPException(409, "no new labelled flows; label some first (POST /live/label)")
         rows = s.scalars(select(LiveFlow).where(LiveFlow.window_id.in_(wids))
                          .order_by(LiveFlow.site, LiveFlow.id)).all()
-        # Train on windows shaped like the training data: each site's labelled chunks, in order, merged into
-        # graphs of up to 5,000 flows. Learning from many few-second chunk graphs instead made the model
-        # forget (measured on the cyber range: old-attack macro-F1 0.975 -> 0.642 vs 0.975 -> 0.974 merged).
         windows, used, holdout = [], [], []
         n_benign = 0
-        by_site: dict[str, list] = {}
-        for r in rows:
-            by_site.setdefault(r.site, []).append(r)
-        for site_rows in by_site.values():
-            for i in range(0, len(site_rows), CONTEXT_MAX_FLOWS):
-                part, labels, hold = site_rows[i:i + CONTEXT_MAX_FLOWS], [], []
-                for j, r in enumerate(part):
-                    lab = r.analyst_label
-                    if lab == "Benign":
-                        n_benign += 1
-                        if n_benign % HOLDOUT_EVERY == 0:      # held back: stays in the graph unlabelled, measured only
-                            hold.append(j)
-                            lab = None
-                    labels.append(lab)
-                windows.append({"flows": [{"src_ip": r.src_ip, "dst_ip": r.dst_ip, "features": r.features}
-                                          for r in part], "labels": labels})
-                holdout.append(hold)
-                used += [r.id for r in part if r.analyst_label is not None]
+        for part in _training_groups(rows):
+            labels, hold = [], []
+            for j, r in enumerate(part):
+                lab = r.analyst_label
+                if lab == "Benign":
+                    n_benign += 1
+                    if n_benign % HOLDOUT_EVERY == 0:          # held back: stays in the graph unlabelled, measured only
+                        hold.append(j)
+                        lab = None
+                labels.append(lab)
+            windows.append({"flows": [{"src_ip": r.src_ip, "dst_ip": r.dst_ip, "features": r.features}
+                                      for r in part], "labels": labels})
+            holdout.append(hold)
+            used += [r.id for r in part if r.analyst_label is not None]
     res = _ml("POST", "/live/adapt", {"windows": windows, "epochs": body.epochs, "holdout": holdout})
     if res.get("accepted"):
         with Session() as s:

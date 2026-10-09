@@ -7,7 +7,7 @@ The range runs on a caged Docker network (`--internal`: no route to your PC, you
 
   * 6 server hosts (10.88.0.11-16) offering web and a few TCP services. Each runs its own capture
     (tcpdump, rotated every few seconds) - one sensor per machine, like `sensor/agent.py` on a real host.
-  * 2 workstations (10.88.0.21-22) making ordinary requests to the servers the whole time, so the
+  * 6 workstations (10.88.0.21-26) making ordinary requests to the servers the whole time, so the
     console sees normal traffic as well as the attack, and false alarms are measured, not assumed.
   * 1 attacker (10.88.0.100) that runs an nmap PORT SCAN when the script says so (reconnaissance only -
     never a DoS or anything destructive).
@@ -50,7 +50,7 @@ NET = "gnnids-range"
 SUBNET = "10.88.0.0/24"
 IMAGE = "gnnids-range"
 SERVERS = [f"10.88.0.{i}" for i in (11, 12, 13, 14, 15, 16)]
-CLIENTS = ["10.88.0.21", "10.88.0.22"]
+CLIENTS = [f"10.88.0.{i}" for i in range(21, 27)]   # six busy workstations
 ATTACKER_IP = "10.88.0.100"
 SITE = "cyber-range"
 CHUNK_SECONDS = 3
@@ -113,12 +113,20 @@ def up(capdir: Path):
         if r.returncode != 0:
             sys.exit(f"could not start {name}: {r.stderr[-300:]}")
     targets = " ".join(SERVERS)
-    for ip in CLIENTS:      # ordinary office traffic: web pages and short service connections, all day long
+    for ip in CLIENTS:
+        # Ordinary office traffic, all day long: web pages, plus interactive sessions that look like their real
+        # protocols - a remote-shell session (several exchanges over seconds) and a mail hand-off (greeting,
+        # envelope, quit). An earlier version used one-line "hello" connections; at flow level those are
+        # indistinguishable from a TCP connect-scan probe, and after teaching the scan ~35 % of them were
+        # flagged - a real limit of per-flow features, kept in docs/LIVE_DEMO.md.
         script = (f"set -- {targets}; while true; do i=$((RANDOM % 6 + 1)); eval t=\\${{$i}}; "
                   "wget -q -T 2 -O /dev/null http://$t/ 2>/dev/null; "
-                  "if [ $((RANDOM % 3)) -eq 0 ]; then echo hello | nc -w 1 $t 22 >/dev/null 2>&1; fi; "
-                  "if [ $((RANDOM % 5)) -eq 0 ]; then echo QUIT | nc -w 1 $t 25 >/dev/null 2>&1; fi; "
-                  "sleep 0.$((RANDOM % 8 + 2)); done")
+                  "if [ $((RANDOM % 4)) -eq 0 ]; then (echo SSH-2.0-OpenSSH_9.6; sleep 1; echo ls -la; sleep 2; "
+                  "echo cat notes.txt; sleep 1; echo exit; sleep 1) | nc -w 6 $t 22 >/dev/null 2>&1 & fi; "
+                  "if [ $((RANDOM % 6)) -eq 0 ]; then (echo HELO ws.local; sleep 0.5; echo MAIL FROM:a@ws.local; "
+                  "sleep 0.5; echo RCPT TO:b@srv.local; sleep 0.5; echo DATA; echo report attached; echo .; "
+                  "sleep 0.5; echo QUIT) | nc -w 4 $t 25 >/dev/null 2>&1 & fi; "
+                  "sleep 0.$((RANDOM % 3 + 1)); done")
         sh(["docker", "run", "-d", "--rm", "--name", f"gnnids-ws{ip.split('.')[-1]}", "--network", NET, "--ip", ip,
             IMAGE, "sh", "-c", script])
     print(f"isolated range up on {SUBNET} (no route out): {len(SERVERS)} servers capturing, "
@@ -331,6 +339,7 @@ def write_report(rep: dict) -> Path:
  <tr><td>False-positive rate, recorded benign traffic</td><td class=n>{pc(ob.get('fpr'))}</td><td class=n>{pc(oa.get('fpr'))}</td></tr>
  <tr><td>False-positive rate, this network's held-back normal traffic ({sh_.get('n_flows', 0)} flows)</td><td class=n>{pc(sh_.get('fpr_before'))}</td><td class=n>{pc(sh_.get('fpr_after'))}</td></tr>
  </table><p class=muted>Rolled back if macro-F1 drops by more than 0.02 or either false-positive rate rises by more than 0.5 points.
+ Trained one epoch at a time, keeping the last that passed: {ad.get('epochs_kept', 0)} of up to {ad.get('epochs_max', '–')}.
  Took {ad.get('seconds', '–')} s; the console kept scoring traffic meanwhile.</p></div>
 
  <h2>6 · Did it forget what it already knew?</h2>
@@ -357,7 +366,7 @@ def write_report(rep: dict) -> Path:
 def main():
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("--server", default="http://127.0.0.1:8000")
-    p.add_argument("--normal-seconds", type=int, default=30, help="length of each normal-traffic phase")
+    p.add_argument("--normal-seconds", type=int, default=60, help="length of each normal-traffic phase")
     p.add_argument("--keep", action="store_true", help="leave the range running afterwards")
     p.add_argument("--no-open", action="store_true", help="write the report but do not open it in a browser")
     args = p.parse_args()
@@ -404,11 +413,11 @@ def main():
         lb = api(args.server, "/live/label", {"label": "Benign", "flow_ids": n1["benign_ids"] + a1["benign_ids"],
                                               "analyst": "cyber-range", "only_unlabelled": False})
         rep["taught_attack"], rep["taught_benign"] = la["labelled"], lb["labelled"]
-        ad = api(args.server, "/live/adapt", {"site": SITE, "epochs": 3})
+        ad = api(args.server, "/live/adapt", {"site": SITE, "epochs": 5})
         rep["adapt"] = ad
         ob, oa = ad.get("old_attacks_before") or {}, ad.get("old_attacks_after") or {}
         print(f"labelled {la['labelled']} scan flows PortScan, {lb['labelled']} normal flows Benign; "
-              f"adaptation {'ACCEPTED' if ad.get('accepted') else 'ROLLED BACK: ' + str(ad.get('reason'))}")
+              f"adaptation {'ACCEPTED (kept ' + str(ad.get('epochs_kept')) + ' of up to ' + str(ad.get('epochs_max')) + ' epochs)' if ad.get('accepted') else 'ROLLED BACK: ' + str(ad.get('reason'))}")
         if ob:
             hold = ad.get("site_holdout") or {}
             print(f"  old-attack macro-F1 {ob['macro_f1']:.3f} -> {oa['macro_f1']:.3f}; recorded benign FPR "

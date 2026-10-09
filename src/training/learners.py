@@ -257,7 +257,10 @@ class GNNLearner(_TorchLearner):
         logits = model(sub.x, sub.edge_index, sub.edge_attr)
         return F.cross_entropy(logits[sub.target_mask], self._labels(sub)[sub.target_mask])
 
-    def learn(self, graphs: list[Data], tag: str = "", epochs: int | None = None) -> LearnStats:
+    def learn(self, graphs: list[Data], tag: str = "", epochs: int | None = None, finalize: bool = True) -> LearnStats:
+        """Train on `graphs`. With finalize=False only the gradient steps run: EWC consolidation and the
+        replay-buffer update are left to finalize(), so a caller can train epoch by epoch, check each
+        epoch, and consolidate once on the weights it keeps (live adaptation, src/live/engine.py)."""
         t0 = time.time()
         if not graphs:
             return LearnStats(tag, 0.0, 0, float("nan"), {"skipped": "no graphs"})
@@ -298,20 +301,22 @@ class GNNLearner(_TorchLearner):
                     steps += 1
                     last = float(total.detach())
 
+        extra = self.finalize(graphs, tag) if finalize else {"finalized": False}
+        stats = LearnStats(tag, time.time() - t0, steps, last, extra)
+        self.history.append(stats.__dict__)
+        return stats
+
+    def finalize(self, graphs: list[Data], tag: str = "") -> dict:
+        """End of a task: EWC consolidation (only AFTER training finished, EWC TRAP 1) and replay update."""
         extra = {}
-        # ---- consolidation happens only AFTER training finished (EWC TRAP 1) ----
         if self.ewc is not None:
             idx = self.rng.permutation(len(graphs))[: self.cfg["ewc"]["fisher_batches"]]
-            info = self.ewc.consolidate((graphs[i] for i in idx), self._raw_task_loss,
-                                        lr=self.lr, tag=tag)
-            extra["ewc"] = info
+            extra["ewc"] = self.ewc.consolidate((graphs[i] for i in idx), self._raw_task_loss, lr=self.lr, tag=tag)
         if self.buffer is not None:
             self.buffer.add_many(graphs)
             extra["buffer"] = self.buffer.summary()
         self.n_learn_calls += 1
-        stats = LearnStats(tag, time.time() - t0, steps, last, extra)
-        self.history.append(stats.__dict__)
-        return stats
+        return extra
 
     @torch.no_grad()
     def predict_proba(self, g: Data) -> np.ndarray:

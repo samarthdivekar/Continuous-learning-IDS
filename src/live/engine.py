@@ -306,6 +306,24 @@ class LiveEngine:
                 total += len(idx)
         return flagged / total if total else None
 
+    def _gate(self, before: dict, site_before, after: dict, site_after, n_hold: int) -> list[str]:
+        """Every reason this candidate must be rolled back (empty = it passes)."""
+        reasons = []
+        drop = before["macro_f1"] - after["macro_f1"]
+        if drop > self.max_drop:
+            reasons.append(f"macro-F1 on old attacks fell by {drop:.3f} (limit {self.max_drop:.3f})")
+        for cat, r0 in before["recall_per_category"].items():
+            r1 = after["recall_per_category"].get(cat, 0.0)
+            if r0 - r1 > self.max_recall_drop:
+                reasons.append(f"{cat} recall fell from {r0:.1%} to {r1:.1%} (limit {self.max_recall_drop:.0%} drop)")
+        fpr_rise = after["fpr"] - before["fpr"]
+        if fpr_rise > self.max_fpr_rise:
+            reasons.append(f"false alarms on old benign traffic rose by {fpr_rise:.2%} (limit {self.max_fpr_rise:.2%})")
+        if n_hold and site_after - site_before > self.max_fpr_rise:
+            reasons.append(f"false alarms on this site's held-out normal traffic rose by "
+                           f"{site_after - site_before:.2%} (limit {self.max_fpr_rise:.2%})")
+        return reasons
+
     def adapt(self, windows: list[tuple[list[dict], list[int | None]]], epochs: int | None = None,
               holdout: list[list[int]] | None = None) -> dict:
         """Learn from labelled live windows: [(flows, label id per flow or None)].
@@ -316,7 +334,8 @@ class LiveEngine:
           * false-positive rate on the site's own held-back normal traffic may not rise by more than
             `max_fpr_rise`. `holdout[i]` lists positions in window i that an analyst marked normal but
             that are left unlabelled (never trained on) and only measured.
-        Training runs on a copy, so sensor traffic keeps being scored while the model learns."""
+        Training runs on a copy, one epoch at a time, keeping the last epoch that passes all checks; the
+        sensor traffic keeps being scored meanwhile."""
         t0 = time.time()
         if not self._adapt_lock.acquire(blocking=False):
             return {"accepted": False, "reason": "an adaptation is already running", "version": self.version}
@@ -336,24 +355,26 @@ class LiveEngine:
             n_hold = sum(len(h) for h in hold)
             before = self._old_attack_metrics(clone)
             site_before = self._site_fpr(clone, graphs, hold)
-            clone.learn(graphs, tag=f"live_v{version + 1}", epochs=epochs)
-            after = self._old_attack_metrics(clone)
-            site_after = self._site_fpr(clone, graphs, hold)
-            drop = before["macro_f1"] - after["macro_f1"]
-            fpr_rise = after["fpr"] - before["fpr"]
-            site_rise = (site_after - site_before) if n_hold else 0.0
-            reasons = []
-            if drop > self.max_drop:
-                reasons.append(f"macro-F1 on old attacks fell by {drop:.3f} (limit {self.max_drop:.3f})")
-            for cat, r0 in before["recall_per_category"].items():
-                r1 = after["recall_per_category"].get(cat, 0.0)
-                if r0 - r1 > self.max_recall_drop:
-                    reasons.append(f"{cat} recall fell from {r0:.1%} to {r1:.1%} (limit {self.max_recall_drop:.0%} drop)")
-            if fpr_rise > self.max_fpr_rise:
-                reasons.append(f"false alarms on old benign traffic rose by {fpr_rise:.2%} (limit {self.max_fpr_rise:.2%})")
-            if site_rise > self.max_fpr_rise:
-                reasons.append(f"false alarms on this site's held-out normal traffic rose by {site_rise:.2%} "
-                               f"(limit {self.max_fpr_rise:.2%})")
+            # The gate as early stopping: train one epoch at a time and keep the LAST epoch that passes every
+            # check. More epochs learn the new traffic more (fewer false alarms on it) but forget more; on the
+            # cyber range, 3 epochs at once lost WebAttack while 1 epoch passed (README, live traffic).
+            max_epochs = int(epochs or self.svc.cfg["train"]["gnn_epochs"])
+            best, best_eval, epochs_kept = None, None, 0
+            first_eval = None
+            for e in range(1, max_epochs + 1):
+                clone.learn(graphs, tag=f"live_v{version + 1}_e{e}", epochs=1, finalize=False)
+                ev = (self._old_attack_metrics(clone), self._site_fpr(clone, graphs, hold))
+                why = self._gate(before, site_before, ev[0], ev[1], n_hold)
+                first_eval = first_eval or (ev, why)
+                if why:
+                    break
+                best, best_eval, epochs_kept = clone.snapshot_state(), ev, e
+            if best is not None:
+                clone.restore_state(best)
+                clone.finalize(graphs, tag=f"live_v{version + 1}")
+                (after, site_after), reasons = best_eval, []
+            else:                                 # not even one epoch passed: report why the first failed
+                (after, site_after), reasons = first_eval
             accepted = not reasons
             if accepted:                         # the new weights need their own thresholds
                 new_threshold, new_q = self._calibrate(clone)
@@ -365,6 +386,7 @@ class LiveEngine:
                     self.live_graphs.extend(graphs)
                 rec = {"accepted": accepted, "version": self.version, "windows": len(graphs),
                        "labelled_flows": n_labelled, "seconds": round(time.time() - t0, 1),
+                       "epochs_kept": epochs_kept, "epochs_max": max_epochs,
                        "old_attacks_before": before, "old_attacks_after": after,
                        "site_holdout": None if not n_hold else
                        {"n_flows": n_hold, "fpr_before": site_before, "fpr_after": site_after},

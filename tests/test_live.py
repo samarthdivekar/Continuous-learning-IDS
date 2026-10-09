@@ -237,6 +237,21 @@ def test_live_drift_is_the_error_on_analyst_labels(client, monkeypatch):
     assert s["adapt_recommended"] and s["by_label"]["PortScan"]["model_disagreed"] == 30
 
 
+def test_training_groups_keep_normal_and_attack_periods_apart():
+    from types import SimpleNamespace as NS
+    from src.live import routes
+    mk = lambda wid, n, lab: [NS(site="a", window_id=wid, analyst_label=lab) for _ in range(n)]   # noqa: E731
+    rows = mk(1, 800, "Benign") + mk(2, 700, "Benign") + mk(3, 2000, "PortScan") + mk(4, 300, None)
+    groups = routes._training_groups(rows)
+    assert [len(g) for g in groups] == [1500, 2300]          # normal period | attack period (+ its tail)
+    small = mk(1, 200, "Benign") + mk(2, 2000, "PortScan")
+    assert [len(g) for g in routes._training_groups(small)] == [2200]   # a tiny group joins its neighbour
+    other = mk(5, 1200, "Benign")
+    for r in other:
+        r.site = "b"
+    assert sorted(len(g) for g in routes._training_groups(rows + other)) == [1200, 1500, 2300]   # per site
+
+
 def test_purge_keeps_labelled_flows(client):
     out = client.post("/sensor/flows", json={"site": "lab", "flows": _flows(client, 10), "detail": True}).json()
     client.post("/live/label", json={"label": "Benign", "flow_ids": out["flow_ids"][:3]})
@@ -299,6 +314,20 @@ def test_gate_rolls_back_on_false_alarms_and_holds_out_site_traffic(client):
     assert not res["accepted"] and "false alarms" in res["reason"] and live.version == v
     assert res["site_holdout"]["n_flows"] == 10            # every 5th of 50 normal flows held back, not trained on
     assert not live.state_path.exists()                    # a rolled-back update is never saved
+
+
+def test_gate_keeps_the_last_passing_epoch(client, monkeypatch):
+    live = client.svc.live
+    client.post("/sensor/flows", json={"site": "home", "flows": _flows(client, 50)})
+    client.post("/live/label", json={"label": "Benign", "site": "home", "last_minutes": 5, "include_suspicious": True})
+    calls = {"n": 0}
+
+    def gate(*a, **k):                     # epochs 1 and 2 pass, epoch 3 fails
+        calls["n"] += 1
+        return [] if calls["n"] <= 2 else ["synthetic failure"]
+    monkeypatch.setattr(live, "_gate", gate)
+    res = client.post("/live/adapt", json={"epochs": 5}).json()
+    assert res["accepted"] and res["epochs_kept"] == 2 and res["epochs_max"] == 5 and calls["n"] == 3
 
 
 def test_bulk_normal_skips_suspicious_flows_and_labels_can_be_undone(client, monkeypatch):
