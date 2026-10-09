@@ -39,7 +39,7 @@ Say: *"This is the IDS scoring real recorded attack traffic and raising an incid
 advises; a human approves."*
 
 ### Part 2 — "A real attack, and it learns" (the wow, ~2 min)
-1. Double-click the Desktop shortcut **"Run Cyber Range (demo)"**. A black window opens and shows 4 phases.
+1. Double-click the Desktop shortcut **"Run Cyber Range (demo)"**. A black window opens and works through 7 numbered steps; the four that matter are below.
 2. Watch it, and keep the console **Live sites** tab open next to it.
 3. The phases:
    - **Attack #1** — an attacker VM scans a virtual network. The model's response to a *brand-new* real
@@ -51,7 +51,7 @@ advises; a human approves."*
 
 Say: *"A real attacker scanned a network. The model trained on 2017 lab data didn't recognise this modern
 scan — that's the real-world gap my project is about. I taught it with a few labels, and now it catches
-scans it never saw, while still catching everything it already knew. That continual learning — new attacks
+scans it never saw, while still catching most of what it already knew. That continual learning — new attacks
 without forgetting old ones — is the contribution."*
 
 ---
@@ -72,6 +72,6 @@ without forgetting old ones — is the contribution."*
 
 - It **never blocks** traffic — every action is a dry-run proposal a human approves.
 - A **real modern scan is not detected out of the box** — the model learned 2017/2018 lab data, and real
-  traffic differs. This is the project's central, documented limitation (README §1, §5).
+  traffic differs. This is a documented limitation (docs/LIVE_DEMO.md, "Honest expectation"; README "Known limitations").
 - The value is the **continual-learning loop**: teach it the local attacks, and it learns them **without
   forgetting** the old ones — measured, gated, and rolled back if it would forget.

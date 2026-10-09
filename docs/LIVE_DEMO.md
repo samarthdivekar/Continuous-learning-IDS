@@ -38,7 +38,8 @@ scan** (reconnaissance only — never a DoS) against a small **virtual network**
 **IDS** captures, scores, and you teach it. It walks the whole story automatically and tears down after:
 
 1. the real scan is scored **benign** (the lab-trained model has never seen it),
-2. you **label** it PortScan and **adapt** (gated — it cannot forget),
+2. you **label** it PortScan and **adapt** (gated: rolled back if old-attack macro-F1 falls by more than 0.02, any old
+   category loses more than 5 recall points, or false alarms rise by more than 0.5 points),
 3. a **fresh** scan is now **detected**,
 4. the recorded attacks **still detect** (no forgetting).
 
@@ -139,7 +140,8 @@ A scan or flood on a shared network can disrupt other people and breaks most acc
 the kit; keep it that way.
 
 **Scene 1 — normal traffic.** Start the sensor on your PC. Browse a few sites. The console shows the site
-online, flows counting up, nothing flagged. *"This is the model watching real traffic for the first time."*
+online, flows counting up. Before teaching, expect some (possibly many) normal flows to be flagged: the model
+has never seen this network. *"This is the model watching real traffic for the first time."*
 
 **Scene 2 — teach it your network (continual learning, part 1).** After a minute of normal use, in the
 **Teach the model** panel set "last 2 min" and click **Mark normal**, then **Adapt model now**. The Live
