@@ -1,3 +1,7 @@
+> **Superseded.** This interpretation was written from the earlier single-seed CSE-CIC-IDS2018 runs and is kept
+> for history only. Several of its numbers no longer hold (ADWIN's quality win, the GNN's 0.881 mean, the binary
+> comparison, which was withdrawn). The current three-seed reading is README §1 and §6.
+
 **What 2018 confirms, and what it does not.**
 
 * **Forgetting prevention replicates.** Every replay-based model keeps retention 1.0; naive retraining,
