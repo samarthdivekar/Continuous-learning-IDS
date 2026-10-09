@@ -359,7 +359,7 @@ python scripts\ui_smoke.py                                   # browser smoke tes
 <tr><td>Learning 7 attacks in sequence, temporal split</td><td>Ours 0.915 [0.888, 0.935]; FFNN 0.870; naive 0.263</td><td>5</td><td>Works</td></tr>
 <tr><td>Same, interleaved split</td><td>Ours 0.964; FFNN 0.928; naive 0.289</td><td>3</td><td>Works (optimistic split)</td></tr>
 <tr><td>Does the graph help (seen attacks)?</td><td>+0.044 [+0.019, +0.058] temporal; +0.036 interleaved</td><td>5 / 3</td><td>Yes, modestly; indicative</td></tr>
-<tr><td>Unseen attacks (CSE-CIC-IDS2018)</td><td>Graph &gt;80&nbsp;% in 6 of 12 tests; per-flow &le;0.07&nbsp;% in all 12</td><td>2</td><td>Real, but which attacks varies by seed</td></tr>
+<tr><td>Unseen attacks (CSE-CIC-IDS2018)</td><td>Graph &gt;80&nbsp;% in 8 of 18 tests; per-flow &le;0.07&nbsp;% in all 18</td><td>3</td><td>Real, but which attacks varies by seed</td></tr>
 <tr><td>Replay budget</td><td>0.304 / 0.702 / 0.952 / 0.948 / 0.957 at 0 / 1 / 5 / 10 / 20 windows</td><td>3</td><td>Replay is what stops forgetting</td></tr>
 <tr><td>EWC on top of replay</td><td>No detectable gain interleaved; +0.067 temporal (two seeds)</td><td>3 / 5</td><td>Helps only on the harder split, indicatively</td></tr>
 <tr><td>Drift: clean attack blocks</td><td>Fixed schedule 0.980 (8 retrains) beats ADWIN 0.960 (16.7)</td><td>3</td><td>ADWIN not efficient here</td></tr>
@@ -410,7 +410,7 @@ span capture chunks are cut at chunk boundaries today.</li>
 when to retrain, detects some never-seen attacks, and reduces analyst workload, with a temporal split, seeds and statistics.
 Not a new algorithm.</td></tr>
 <tr><td>Why a graph instead of Random Forest?</td><td>Attacks have shapes between hosts that per-flow models cannot see; it
-detects never-seen attacks far better (&gt;80&nbsp;% in 6 of 12 tests vs &le;0.07&nbsp;%), and it can learn new attacks without
+detects never-seen attacks far better (&gt;80&nbsp;% in 8 of 18 tests vs &le;0.07&nbsp;%), and it can learn new attacks without
 retraining on everything (section 7).</td></tr>
 <tr><td>Your test windows are next to your training windows. Isn't that cheating?</td><td>That was the interleaved split. The
 temporal split tests on later traffic for every attack; it costs 0.049 macro-F1 and is reported alongside.</td></tr>
@@ -448,7 +448,7 @@ adapted. It wins when attacks are mixed, not when they arrive in clean blocks.</
 <tr><td>0.915 / 0.964</td><td>our macro-F1, temporal (5 seeds) / interleaved (3 seeds)</td></tr>
 <tr><td>100&nbsp;% vs 0&nbsp;%</td><td>retention: ours vs naive retraining</td></tr>
 <tr><td>+0.044</td><td>graph vs per-flow on the temporal split, CI [+0.019, +0.058]</td></tr>
-<tr><td>6 of 12 vs 0 of 12</td><td>never-seen attacks caught above 80&nbsp;%: graph vs per-flow (2018)</td></tr>
+<tr><td>8 of 18 vs 0 of 18</td><td>never-seen attacks caught above 80&nbsp;%: graph vs per-flow (2018)</td></tr>
 <tr><td>0.304 &rarr; 0.952</td><td>replay-only with 0 vs 5 stored windows per attack type</td></tr>
 <tr><td>100,000 &rarr; 50</td><td>alerts to incidents (84&nbsp;% real)</td></tr>
 <tr><td>5.5&nbsp;ms</td><td>scoring a 5,000-flow window on the GPU</td></tr>
