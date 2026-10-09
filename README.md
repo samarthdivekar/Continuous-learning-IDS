@@ -929,8 +929,9 @@ CIC-IDS2017 test windows of 5,000 flows. Laptop: GTX 1650 (4 GB), 8-core CPU, 24
   number means little.
 * **ADWIN is not cheaper on CIC-IDS2017.** Over three seeds it retrains about twice as often as a fixed
   schedule; with clean task blocks the schedule also ends higher, with mixed attacks ADWIN ends higher (§4).
-  On CSE-CIC-IDS2018 it beat the schedule on both cost and quality (24 vs 48 retrains, 0.943 vs 0.825), in one
-  run. The refractory period and adaptation window were fixed a priori, not tuned; tuning them without a
+  On CSE-CIC-IDS2018, over three seeds, it uses about half the retrains of the schedule (23 vs 48) but only ties
+  it on quality (0.836 ± 0.117 vs 0.828 ± 0.010), with a much wider spread: it won on seed 42, roughly tied on
+  seed 44 and lost on seed 43 (§6). The refractory period and adaptation window were fixed a priori, not tuned; tuning them without a
   separate validation stream would overfit the test stream.
 * **EWC alone is not reliable; EWC with replay may be.** EWC alone fails in class-incremental (multiclass)
   on both datasets. On top of replay it made no detectable difference on the interleaved split but, on the
