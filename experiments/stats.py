@@ -11,11 +11,13 @@ are paired. Reported per comparison:
   * a bootstrap 95 % CI of the mean difference (percentile, 10,000 resamples of the seed differences)
   * a verdict in words: a difference is called a difference only when the CI excludes zero
 
+  * a paired t-test 95 % CI of the mean difference (Student t with n-1 degrees of freedom)
+
 Read the limits before the numbers. With n paired seeds the exact two-sided Wilcoxon test cannot go
-below 2 / 2^n: 0.0625 for five seeds and 0.25 for three. On these designs the test can never reach
-p < 0.05 two-sided, however consistent the differences are, so it is reported for completeness and the
-verdict rests on the bootstrap interval — which, with so few seeds, is itself crude and tends to be too
-narrow. Treat every verdict here as indicative, not confirmatory.
+below 2 / 2^n: 0.0625 for five seeds and 0.25 for three, so it can never reach p < 0.05 two-sided and is
+reported for completeness. A bootstrap over three to five seed differences is close to their range and too
+narrow, so a difference is called a difference only when BOTH the bootstrap and the t interval exclude zero.
+Treat every verdict here as indicative, not confirmatory.
 
 Output: results/stats/comparisons.csv and results/stats/comparisons.md
 """
@@ -26,6 +28,7 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
+from scipy.stats import t as student_t
 from scipy.stats import wilcoxon
 
 from src.utils.config import REPO_ROOT
@@ -33,13 +36,35 @@ from src.utils.config import REPO_ROOT
 RESULTS = REPO_ROOT / "results"
 OURS = "gnn_ewc_replay"
 
-# (label, dataset, mode, results folder, other model, the question it answers)
+# (label, dataset, mode, results folder, other model, the question it answers[, folder of the OTHER run])
+# Without the last field both runs come from the same folder; with it, the same model can be compared across
+# two experiments (e.g. with and without the shortcut features), still paired by seed.
+CTX_Q = "does the graph beat a per-flow model given window host context?"
 COMPARISONS = [
     ("2017 · interleaved", "cicids2017", "multiclass", "continual", "ffnn_ewc_replay", "does the graph help?"),
     ("2017 · temporal", "cicids2017", "multiclass", "continual_temporal", "ffnn_ewc_replay", "does the graph help?"),
+    ("2017 · interleaved", "cicids2017", "multiclass", "continual", "ffnn_ctx_ewc_replay", CTX_Q),
+    ("2017 · temporal", "cicids2017", "multiclass", "continual_temporal", "ffnn_ctx_ewc_replay", CTX_Q),
+    ("2017 · interleaved", "cicids2017", "multiclass", "continual", "xgboost_replay", "does it beat XGBoost that keeps learning?"),
+    ("2017 · temporal", "cicids2017", "multiclass", "continual_temporal", "xgboost_replay", "does it beat XGBoost that keeps learning?"),
+    ("2017 · interleaved", "cicids2017", "multiclass", "continual", "xgboost_ctx_replay", "does it beat XGBoost with replay and host context?"),
+    ("2017 · temporal", "cicids2017", "multiclass", "continual_temporal", "xgboost_ctx_replay", "does it beat XGBoost with replay and host context?"),
     ("2017 · interleaved", "cicids2017", "multiclass", "continual", "gnn_replay", "does EWC add anything to replay?"),
     ("2017 · temporal", "cicids2017", "multiclass", "continual_temporal", "gnn_replay", "does EWC add anything to replay?"),
+    ("2017 · interleaved", "cicids2017", "multiclass", "continual", "gnn_derpp", "does EWC + replay beat DER++?"),
+    ("2017 · temporal", "cicids2017", "multiclass", "continual_temporal", "gnn_derpp", "does EWC + replay beat DER++?"),
+    ("2017 · interleaved", "cicids2017", "multiclass", "continual", "gnn_lwf", "does EWC + replay beat LwF?"),
+    ("2017 · temporal", "cicids2017", "multiclass", "continual_temporal", "gnn_lwf", "does EWC + replay beat LwF?"),
+    ("2017 · temporal, no shortcut features", "cicids2017", "multiclass", "continual_temporal_noshortcut",
+     "ffnn_ctx_ewc_replay", "without dst_port, protocol and init-window fields, does the graph still beat context?"),
+    ("2017 · temporal, no shortcut features", "cicids2017", "multiclass", "continual_temporal_noshortcut",
+     "ffnn_ewc_replay", "without dst_port, protocol and init-window fields, does the graph still help?"),
+    ("2017 · temporal: all features vs no shortcuts", "cicids2017", "multiclass", "continual_temporal",
+     OURS, "what does our model lose without the shortcut features? (ours = all features)", "continual_temporal_noshortcut"),
+    ("2017 · temporal: degree node features vs none", "cicids2017", "multiclass", "continual_temporal",
+     OURS, "what does our model lose without the degree node feature? (ours = with degree)", "continual_temporal_nodegree"),
     ("2018 · interleaved", "csecicids2018", "multiclass", "continual", "ffnn_ewc_replay", "does the graph help?"),
+    ("2018 · interleaved", "csecicids2018", "multiclass", "continual", "ffnn_ctx_ewc_replay", CTX_Q),
 ]
 METRICS = [("macro_f1_seen", "macro-F1", 1), ("fpr_seen", "false-positive rate", -1)]   # sign: +1 higher is better
 
@@ -62,9 +87,10 @@ def bootstrap_ci(diffs: np.ndarray, n_boot: int = 10_000, seed: int = 0) -> tupl
     return float(lo), float(hi)
 
 
-def compare(per_seed: pd.DataFrame, other: str, metric: str, sign: int) -> dict:
+def compare(per_seed: pd.DataFrame, other: str, metric: str, sign: int, other_seed: pd.DataFrame | None = None) -> dict:
     a = per_seed[per_seed["model"] == OURS].set_index("seed")[metric]
-    b = per_seed[per_seed["model"] == other].set_index("seed")[metric]
+    src = per_seed if other_seed is None else other_seed
+    b = src[src["model"] == other].set_index("seed")[metric]
     seeds = sorted(set(a.index) & set(b.index))
     if len(seeds) < 2:
         raise ValueError(f"need at least two paired seeds for {OURS} vs {other}, have {seeds}")
@@ -74,7 +100,9 @@ def compare(per_seed: pd.DataFrame, other: str, metric: str, sign: int) -> dict:
     better = "greater" if sign > 0 else "less"            # "ours is better" in the metric's own direction
     one = wilcoxon(nonzero, alternative=better).pvalue if len(nonzero) else float("nan")
     lo, hi = bootstrap_ci(diffs)
-    excludes_zero = lo > 0 or hi < 0
+    half = student_t.ppf(0.975, len(diffs) - 1) * diffs.std(ddof=1) / np.sqrt(len(diffs))
+    tlo, thi = float(diffs.mean() - half), float(diffs.mean() + half)
+    excludes_zero = (lo > 0 and tlo > 0) or (hi < 0 and thi < 0)
     if not excludes_zero:
         verdict = "no detectable difference"
     else:
@@ -85,7 +113,7 @@ def compare(per_seed: pd.DataFrame, other: str, metric: str, sign: int) -> dict:
             "mean_diff": float(diffs.mean()), "diffs": " ".join(f"{d:+.4f}" for d in diffs),
             "wilcoxon_p_two_sided": float(two), "wilcoxon_p_one_sided": float(one),
             "wilcoxon_floor_two_sided": 2.0 / 2 ** len(seeds),
-            "ci_low": lo, "ci_high": hi, "verdict": verdict}
+            "ci_low": lo, "ci_high": hi, "t_ci_low": tlo, "t_ci_high": thi, "verdict": verdict}
 
 
 def main():
@@ -93,15 +121,16 @@ def main():
     p.add_argument("--out", default=str(RESULTS / "stats"))
     args = p.parse_args()
     rows, missing = [], []
-    for label, ds, mode, folder, other, question in COMPARISONS:
+    for label, ds, mode, folder, other, question, *other_folder in COMPARISONS:
         try:
             per_seed = final_per_seed(ds, mode, folder)
+            other_seed = final_per_seed(ds, mode, other_folder[0]) if other_folder else None
         except FileNotFoundError as exc:
             missing.append(f"{label} vs {other}: {exc}")
             continue
         for metric, name, sign in METRICS:
             try:
-                r = compare(per_seed, other, metric, sign)
+                r = compare(per_seed, other, metric, sign, other_seed)
             except ValueError as exc:
                 missing.append(f"{label} vs {other} ({name}): {exc}")
                 continue
@@ -111,14 +140,15 @@ def main():
     df = pd.DataFrame(rows)
     df.to_csv(out / "comparisons.csv", index=False)
 
-    lines = ["| Comparison | Question | Metric | Seeds | Ours | Other | Mean diff | Bootstrap 95 % CI | Wilcoxon p (2-sided / 1-sided) | Verdict |",
-             "|---|---|---|---|---|---|---|---|---|---|"]
+    lines = ["| Comparison | Question | Metric | Seeds | Ours | Other | Mean diff | Bootstrap 95 % CI | t 95 % CI | Wilcoxon p (2-sided / 1-sided) | Verdict |",
+             "|---|---|---|---|---|---|---|---|---|---|---|"]
     for r in rows:
         pct = r["metric"] == "false-positive rate"
         f = (lambda v: f"{v * 100:.3f} %") if pct else (lambda v: f"{v:.3f}")
         fd = (lambda v: f"{v * 100:+.3f} pp") if pct else (lambda v: f"{v:+.3f}")
         lines.append(f"| {r['comparison']} | {r['question']} | {r['metric']} | {r['n']} | {f(r['ours_mean'])} | "
                      f"{f(r['other_mean'])} ({r['other']}) | {fd(r['mean_diff'])} | [{fd(r['ci_low'])}, {fd(r['ci_high'])}] | "
+                     f"[{fd(r['t_ci_low'])}, {fd(r['t_ci_high'])}] | "
                      f"{r['wilcoxon_p_two_sided']:.3f} / {r['wilcoxon_p_one_sided']:.3f} | {r['verdict']} |")
     (out / "comparisons.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
     print("\n".join(lines))
