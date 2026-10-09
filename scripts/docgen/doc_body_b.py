@@ -351,16 +351,17 @@ add("""
 
 <h3>8.1 Attacks never seen in training (CSE-CIC-IDS2018, leave-one-attack-out)</h3>
 <table>
-<thead><tr><th>Held-out attack</th><th>GNN, seed 42</th><th>GNN, seed 43</th><th>FFNN (per-flow)</th><th>XGBoost</th></tr></thead>
+<thead><tr><th>Held-out attack</th><th>GNN, seed 42</th><th>GNN, seed 43</th><th>GNN, seed 44</th><th>FFNN (per-flow), seed 42</th><th>XGBoost, seed 42</th></tr></thead>
 <tbody>
-<tr><td>DoS</td><td><b>98.6 %</b></td><td><b>98.6 %</b></td><td>0.1 %</td><td>90.1 %</td></tr>
-<tr><td>DDoS</td><td><b>99.4 %</b></td><td><b>82.6 %</b></td><td>0 %</td><td>0 %</td></tr>
-<tr><td>BruteForce</td><td>99.7 %</td><td><b>0.1 %</b></td><td>0 %</td><td>0 %</td></tr>
-<tr><td>Botnet</td><td>8.5 %</td><td><b>84.9 %</b></td><td>0 %</td><td>0 %</td></tr>
-<tr><td>Infiltration</td><td>0 %</td><td>0 %</td><td>0 %</td><td>0 %</td></tr>
+<tr><td>DoS</td><td><b>98.6 %</b></td><td><b>98.6 %</b></td><td><b>98.6 %</b></td><td>0.1 %</td><td>90.1 %</td></tr>
+<tr><td>DDoS</td><td><b>99.4 %</b></td><td><b>82.6 %</b></td><td>67.5 %</td><td>0 %</td><td>0 %</td></tr>
+<tr><td>BruteForce</td><td>99.7 %</td><td><b>0.1 %</b></td><td>100 %</td><td>0 %</td><td>0 %</td></tr>
+<tr><td>Botnet</td><td>8.5 %</td><td><b>84.9 %</b></td><td>11.0 %</td><td>0 %</td><td>0 %</td></tr>
+<tr><td>Infiltration</td><td>0 %</td><td>0 %</td><td>0.3 %</td><td>0 %</td><td>0 %</td></tr>
 </tbody></table>
-<p class="muted">In 6 of 12 held-out runs the graph model catches over 80 % of an attack it never saw; the per-flow
-model catches at most 0.07 % in all 12. DoS and DDoS replicate across seeds; BruteForce and Botnet swap, so the
+<p class="muted">In 8 of 18 held-out runs (six attacks, three seeds) the graph model catches over 80 % of an attack it never
+saw; the per-flow model catches at most 0.07 % in all 18. DoS replicates on all three seeds and DDoS is caught on
+all three but declining; BruteForce and Botnet swap, so the
 effect is real but which attacks it covers depends on the training run.</p>
 
 <h3>8.2 CIC-IDS2017 &mdash; seven attack types learned in sequence</h3>

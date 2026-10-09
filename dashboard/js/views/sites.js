@@ -2,7 +2,7 @@
 // the server converts them with the pinned CICFlowMeter, scores them with the live model and files them
 // per site. Here you watch per-site traffic, triage incidents (dry-run rules), label flows and adapt the
 // model without forgetting. Distinct from "Drift replay", which replays the recorded dataset.
-import { catColor, esc, get, int, openApi, pct, post, toast } from "../lib/core.js";
+import { catColor, esc, get, int, pct, post, toast } from "../lib/core.js";
 import { GraphView } from "../lib/graphview.js";
 import { withBusy } from "../lib/ui.js";
 
@@ -54,9 +54,9 @@ export async function mount(el) {
       <div class="card" id="st-model" style="margin-bottom:16px"></div>
       <div class="grid g-8-4">
         <div class="card"><div class="card-head"><div><h3>Incidents <span id="st-scope" class="muted"></span></h3>
-          <p class="sub">confident attack verdicts of the last 15 minutes, grouped by attacker/victim within each site; each carries a dry-run rule.
-          Approvals and rejections go to the decision log in the <a href="#soc">Incident queue</a>.</p></div>
-          <div class="toolbar"><button class="icon-btn small" id="st-cef" title="Download these incidents for a SIEM (ArcSight CEF)">⤓ CEF</button></div></div>
+          <p class="sub">confident alarms of the last 15 minutes, grouped by attacker/victim. <b>Triage →</b> opens one in the
+          <a href="#soc">Incident queue</a> (why it was flagged, the dry-run rule, approve / reject, status); <b>Confirm</b> and
+          <b>Normal</b> label its flows for teaching.</p></div></div>
           <div id="st-incidents"></div></div>
         <div class="grid" style="gap:16px">
           <div class="card"><h3>Unsure — needs an analyst</h3><p class="sub">the model could not tell attack from normal (its calibrated prediction set held both), so no alarm was raised</p>
@@ -80,9 +80,6 @@ export async function mount(el) {
       sel = "sandbox"; gWindow = null; await tick();
     } catch (err) { toast(err.message); }
   }));
-  root.querySelector("#st-cef").addEventListener("click", () =>
-    openApi(`/live/incidents/cef?minutes=15${sel ? `&site=${encodeURIComponent(sel)}` : ""}`,
-            { filename: `live_incidents_${sel || "all"}.cef` }));
   gview = new GraphView(root.querySelector("#st-gstage"));
   root.querySelector("#st-gfit").addEventListener("click", () => gview.fit());
   await tick();
@@ -175,21 +172,22 @@ async function renderModel() {
   const m = await get("/live/model").catch(() => null);
   const el = root.querySelector("#st-model");
   if (!m) { el.innerHTML = `<div class="empty">Live model unavailable (is the model service up?).</div>`; return; }
-  const hist = (m.history || []).slice().reverse();
+  // the newest few events since the last reset: older history is noise on a working screen
+  const all = (m.history || []).slice().reverse();
+  const cut = all.findIndex((h) => h.reset);
+  const hist = (cut === -1 ? all : all.slice(0, cut + 1)).slice(0, 4);
   el.innerHTML = `<div class="card-head"><div><h3>Live model · v${int(m.version)}</h3>
-    <p class="sub">${esc(m.model)} · novelty threshold ${m.novelty_threshold == null ? "–" : m.novelty_threshold.toFixed(2)} ·
-    teaching is rolled back if it forgets (old-attack macro-F1 −${pct(m.max_drop, 0)}, any category −${pct(m.max_recall_drop ?? 0.05, 0)})
-    or adds false alarms (+${pct(m.max_fpr_rise ?? 0.005, 1)}); it keeps the last epoch that passes</p></div></div>
-    ${hist.length ? `<div class="feed" style="max-height:150px">${hist.map((h) => {
-      if (h.reset) return `<div class="ev"><span class="tag">reset</span> back to the trained model (v${int(h.version)})</div>`;
+    <p class="sub">teaching keeps the last epoch that passes the gate: it is rolled back if it forgets (old-attack macro-F1
+    −${pct(m.max_drop, 0)}, any category −${pct(m.max_recall_drop ?? 0.05, 0)}) or adds false alarms (+${pct(m.max_fpr_rise ?? 0.005, 1)})</p></div></div>
+    ${hist.length ? hist.map((h) => {
+      if (h.reset) return `<div class="note" style="padding:4px 0"><span class="tag">reset</span> back to the trained model</div>`;
       const ok = h.accepted;
-      return `<div class="ev"><span class="num muted">v${int(h.version)}</span>
-        <span>${ok ? '<span class="tag good">adapted</span>' : '<span class="tag warn">rolled back</span>'}
-        ${int(h.labelled_flows)} labelled flows · old-attack F1 ${f3(h.old_attacks_before?.macro_f1)} → ${f3(h.old_attacks_after?.macro_f1)}${
-          h.site_holdout ? ` · site false alarms ${pct(h.site_holdout.fpr_before)} → ${pct(h.site_holdout.fpr_after)}` : ""}${
-          ok && h.epochs_kept ? ` · ${int(h.epochs_kept)} epoch${h.epochs_kept > 1 ? "s" : ""}` : ""}
-        ${ok ? "" : `<span class="muted">(${esc(h.reason || "")})</span>`}</span></div>`;
-    }).join("")}</div>` : `<p class="note">No live adaptations yet — the model is exactly as trained.</p>`}`;
+      return `<div class="note" style="padding:4px 0">${ok ? '<span class="tag good">adapted</span>' : '<span class="tag warn">rolled back</span>'}
+        v${int(h.version)} · ${int(h.labelled_flows)} labels · old-attack F1 ${f3(h.old_attacks_before?.macro_f1)} → ${f3(h.old_attacks_after?.macro_f1)}${
+        h.site_holdout ? ` · site false alarms ${pct(h.site_holdout.fpr_before)} → ${pct(h.site_holdout.fpr_after)}` : ""}${
+        ok && h.epochs_kept ? ` · ${int(h.epochs_kept)} epoch${h.epochs_kept > 1 ? "s" : ""}` : ""}${
+        ok ? "" : `<div class="muted">${esc(h.reason || "")}</div>`}</div>`;
+    }).join("") : `<p class="note">No live adaptations yet — the model is exactly as trained.</p>`}`;
 }
 
 async function renderDrift() {
@@ -204,100 +202,80 @@ async function renderDrift() {
     : `Drift: ${rate} — below the ${pct(d.threshold, 0)} threshold.`;
 }
 
+// flow ids of the rows on screen, by key: an incident can hold thousands, so they stay out of the DOM
+let rowFlows = {};
+
+/** Compact incident summary. Triage (why, rule, approve / reject, status) happens in the Incident queue. */
 function renderIncidents(inc) {
   const el = root.querySelector("#st-incidents");
   if (!inc.incidents.length) {
-    el.innerHTML = `<div class="empty">No flagged flows in the last 15 minutes${sel ? ` from ${esc(sel)}` : ""}. ${int(inc.n_flows)} flows seen.</div>`;
+    el.innerHTML = `<div class="empty">No confident alarm in the last 15 minutes${sel ? ` from ${esc(sel)}` : ""}. ${int(inc.n_flows)} flows seen.</div>`;
     return;
   }
   const STATUS_TAG = { open: "warn", reopened: "bad", acknowledged: "", closed: "good" };
-  el.innerHTML = inc.incidents.map((i) => {
-    const p = i.proposed || {};
+  inc.incidents.forEach((i, k) => { rowFlows[`inc${k}`] = i.flow_ids || []; });
+  el.innerHTML = inc.incidents.map((i, k) => {
     const r = i.record || {};
-    const since = r.first_seen ? new Date(r.first_seen).toLocaleTimeString() : "";
-    return `<div class="incident" style="border:1px solid var(--grid);border-radius:10px;padding:12px;margin-bottom:10px">
-      ${r.id ? `<div class="note" style="display:flex;gap:8px;align-items:center;margin-bottom:6px">
-        <b>Incident #${int(r.id)}</b><span class="tag ${STATUS_TAG[r.status] ?? ""}">${esc(r.status)}</span>
-        <span>since ${esc(since)}${r.status_by ? ` · ${esc(r.status)} by ${esc(r.status_by)}` : ""}</span>
-        <span style="margin-left:auto;display:flex;gap:6px">
-          ${r.status !== "acknowledged" ? `<button class="btn small ghost" data-status="acknowledged" data-rec="${int(r.id)}">Acknowledge</button>` : ""}
-          ${r.status !== "closed" ? `<button class="btn small ghost" data-status="closed" data-rec="${int(r.id)}">Close</button>`
-            : `<button class="btn small ghost" data-status="open" data-rec="${int(r.id)}">Reopen</button>`}
-        </span></div>` : ""}
-      <div style="display:flex;justify-content:space-between;gap:10px;align-items:baseline">
-        <div><span class="tag" style="background:${catColor(i.category)};color:#fff">${esc(i.category)}</span>
-          <b>${esc(i.key_host)}</b> <span class="muted">(${esc(i.key_role)}, ${int(i.key_host_flows)} flows)</span></div>
-        <span class="num muted">${int(i.n_flows)} flows · conf ${pct(i.mean_confidence)}${i.category_uncertain_share >= 0.5
-          ? ` · <span style="color:var(--warn)" title="the model is sure this is an attack, less sure which kind">kind uncertain</span>` : ""}</span></div>
-      <div class="note" style="margin-top:6px">${int(i.n_sources)} sources → ${int(i.n_destinations)} destinations${i.top_ports?.length ? ` · ports ${i.top_ports.map((x) => esc(x)).join(", ")}` : ""}${i.sites?.length ? ` · ${i.sites.map((x) => esc(x)).join(", ")}` : ""}</div>
-      <div class="note" style="margin-top:6px"><b>Proposed (dry run):</b> ${esc(p.action || "investigate")} ${esc(p.target || "")} — ${esc(p.rationale || "")}</div>
-      <div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap;align-items:center">
-        <button class="btn small ghost" data-why="${esc(String((i.flow_ids || [])[0] ?? ""))}" title="Why did the model flag this? (evidence for one of its flows)">Why?</button>
-        <button class="btn small" data-label-ids="${esc(JSON.stringify(i.flow_ids || []))}" data-cat="${esc(i.category)}" title="Label these flows for teaching">Confirm as ${esc(i.category)}</button>
-        <button class="btn small ghost" data-label-ids="${esc(JSON.stringify(i.flow_ids || []))}" data-cat="Benign">Mark normal (false alarm)</button>
-        <span class="muted" style="margin-left:auto">action:</span>
-        <button class="btn small" data-decide="approve" data-site="${esc(i.site)}" data-cat="${esc(i.category)}" data-target="${esc(p.target || "")}" title="Record approval — dry run, nothing is executed">Approve (dry run)</button>
-        <button class="btn small ghost" data-decide="reject" data-site="${esc(i.site)}" data-cat="${esc(i.category)}" data-target="${esc(p.target || "")}">Reject</button>
-      </div><div class="why-box"></div></div>`;
+    return `<div class="incident" style="display:grid;grid-template-columns:1fr auto;gap:6px 12px;align-items:center;padding:10px 0;border-bottom:1px solid var(--grid)">
+      <div><span class="tag" style="background:${catColor(i.category)};color:#fff">${esc(i.category)}</span>
+        <b class="mono">${esc(i.key_host)}</b> <span class="muted">${i.key_role === "source" ? "attacking" : "attacked"}</span>
+        ${r.id ? `<span class="muted">· #${int(r.id)}</span> <span class="tag ${STATUS_TAG[r.status] ?? ""}">${esc(r.status)}</span>` : ""}
+        <div class="note">${int(i.n_flows)} flows · ${int(i.n_sources)} → ${int(i.n_destinations)} hosts · conf ${pct(i.mean_confidence, 0)}${
+          i.category_uncertain_share >= 0.5 ? ` · <span style="color:var(--warn)" title="sure it is an attack, less sure which kind">kind uncertain</span>` : ""}${
+          i.top_ports?.length ? ` · ports ${i.top_ports.slice(0, 4).map((x) => esc(x)).join(", ")}` : ""}</div></div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end">
+        ${r.id ? `<button class="btn small primary" data-triage="${int(r.id)}" title="Open in the Incident queue: why it was flagged, the rule, approve or reject">Triage →</button>` : ""}
+        <button class="btn small" data-rows="inc${k}" data-cat="${esc(i.category)}" title="Teach: these flows are ${esc(i.category)}">Confirm</button>
+        <button class="btn small ghost" data-rows="inc${k}" data-cat="Benign" title="Teach: these flows are normal (a false alarm)">Normal</button>
+      </div></div>`;
   }).join("");
-  el.querySelectorAll("[data-label-ids]").forEach((b) => b.addEventListener("click", () =>
-    withBusy(b, () => labelIds(JSON.parse(b.dataset.labelIds), b.dataset.cat))));
-  el.querySelectorAll("[data-status]").forEach((b) => b.addEventListener("click", () => withBusy(b, async () => {
-    try {
-      const r = await post(`/live/incident_records/${b.dataset.rec}/status`, { status: b.dataset.status, analyst: "analyst" });
-      toast(`incident #${r.id} ${r.status}`); incSig = ""; await tick();
-    } catch (e) { toast(e.message); }
-  })));
-  el.querySelectorAll("[data-why]").forEach((b) => b.addEventListener("click", () => withBusy(b, async () => {
-    const box = b.closest(".incident").querySelector(".why-box");
-    if (!b.dataset.why) { box.innerHTML = `<p class="note">No flow to explain.</p>`; return; }
-    try {
-      const e = await get(`/live/explain/${encodeURIComponent(b.dataset.why)}`);
-      const feats = (e.features || []).filter((f) => f.direction === "towards").slice(0, 5)
-        .map((f) => `<li>${esc(f.label)}${f.value != null ? ` = <span class="num">${esc(Number(f.value).toPrecision(4))}</span>` : ""}</li>`).join("");
-      box.innerHTML = `<div class="callout" style="margin-top:10px">
-        <p style="margin:0 0 6px"><b>Why (flow ${int(e.flow_id)}, ${esc(e.src_ip)} → ${esc(e.dst_ip)}):</b> ${esc(e.summary)}</p>
-        ${feats ? `<p class="note" style="margin:0">Evidence pushing towards ${esc(e.predicted_label)}:</p><ul class="note" style="margin:4px 0 0 18px">${feats}</ul>` : ""}
-        <p class="note" style="margin:6px 0 0">${pct(e.context_share)} of the evidence came from neighbouring flows (${int(e.context_flows)} flows of context) ·
-        live model v${int(e.version)}${e.predicted_label !== e.predicted_when_scored ? ` · when scored it said ${esc(e.predicted_when_scored)}; the model has been taught since` : ""}</p></div>`;
-    } catch (err) { box.innerHTML = `<p class="note">${esc(err.message)}</p>`; }
-  })));
-  el.querySelectorAll("[data-decide]").forEach((b) => b.addEventListener("click", () => withBusy(b, async () => {
-    try {
-      const a = await post("/live/actions", { site: b.dataset.site, category: b.dataset.cat, target: b.dataset.target });
-      const d = await post(`/actions/${a.id}/decision`, { decision: b.dataset.decide, analyst: "analyst" });
-      toast(`${d.status} (dry run): ${d.action} ${d.target} — recorded in the decision log, nothing executed`);
-    } catch (e) { toast(e.message); }
-  })));
+  el.querySelectorAll("[data-triage]").forEach((b) => b.addEventListener("click", () => {
+    try { sessionStorage.setItem("gnnids.openIncident", b.dataset.triage); } catch { /* ignore */ }
+    location.hash = "soc";
+  }));
+  bindLabelButtons(el);
+}
+
+/** One host's flows with a compact label picker (instead of a button per category). */
+function picker(key, options, title) {
+  return `<div style="display:flex;gap:6px;margin-top:6px">
+    <select data-pick="${key}" aria-label="${esc(title)}" style="flex:1">${options.map((c) => `<option value="${c}">${c === "Benign" ? "Normal" : c}</option>`).join("")}</select>
+    <button class="btn small" data-pick-go="${key}">Label</button></div>`;
 }
 
 function renderUnsure(list) {
   const el = root.querySelector("#st-unsure");
   if (!list.length) { el.innerHTML = `<div class="empty">The model was sure about every recent flow.</div>`; return; }
-  el.innerHTML = list.map((u) => {
-    const lean = Object.entries(u.leaning || {}).sort((a, b) => b[1] - a[1]).map(([k, v]) => `${esc(k)} ${int(v)}`).join(", ");
+  el.innerHTML = list.slice(0, 8).map((u, k) => {
+    rowFlows[`uns${k}`] = u.flow_ids || [];
+    const lean = Object.entries(u.leaning || {}).sort((a, b) => b[1] - a[1]).map(([c, v]) => `${esc(c)} ${int(v)}`).join(", ");
     return `<div style="padding:8px 0;border-bottom:1px solid var(--grid)">
-      <div style="display:flex;justify-content:space-between"><b>${esc(u.host)}</b><span class="num">${int(u.flows)} flows</span></div>
-      <div class="note">${esc(u.site)} · leaning ${lean}</div>
-      <div style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap">
-        ${CLASSES.map((c) => `<button class="btn small ghost" data-uids="${esc(JSON.stringify(u.flow_ids || []))}" data-cat="${c}">${c === "Benign" ? "Normal" : c}</button>`).join("")}
-      </div></div>`;
-  }).join("");
-  el.querySelectorAll("[data-uids]").forEach((b) => b.addEventListener("click", () =>
-    withBusy(b, () => labelIds(JSON.parse(b.dataset.uids), b.dataset.cat))));
+      <div style="display:flex;justify-content:space-between"><b class="mono">${esc(u.host)}</b><span class="num">${int(u.flows)} flows</span></div>
+      <div class="note">${esc(u.site)} · leaning ${lean}</div>${picker(`uns${k}`, CLASSES, `label ${u.host}'s flows`)}</div>`;
+  }).join("") + (list.length > 8 ? `<p class="note">+ ${int(list.length - 8)} more hosts</p>` : "");
+  bindLabelButtons(el);
 }
 
 function renderUnfamiliar(unf) {
   const el = root.querySelector("#st-unfamiliar");
   if (!unf || !unf.length) { el.innerHTML = `<div class="empty">Nothing unfamiliar.</div>`; return; }
-  el.innerHTML = unf.map((u) => `<div style="padding:8px 0;border-bottom:1px solid var(--grid)">
-    <div style="display:flex;justify-content:space-between"><b>${esc(u.host)}</b><span class="num">${int(u.flows)} flows</span></div>
-    <div class="note">${esc(u.site)} · ${int(u.destinations)} destinations${u.ports?.length ? ` · ports ${u.ports.slice(0, 6).map((x) => esc(x)).join(", ")}` : ""}</div>
-    <div style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap">
-      ${CLASSES.filter((c) => c !== "Benign").map((c) => `<button class="btn small ghost" data-ids="${esc(JSON.stringify(u.flow_ids || []))}" data-cat="${c}">${c}</button>`).join("")}
-    </div></div>`).join("");
-  el.querySelectorAll("[data-ids]").forEach((b) => b.addEventListener("click", () =>
-    withBusy(b, () => labelIds(JSON.parse(b.dataset.ids), b.dataset.cat))));
+  el.innerHTML = unf.slice(0, 8).map((u, k) => {
+    rowFlows[`unf${k}`] = u.flow_ids || [];
+    return `<div style="padding:8px 0;border-bottom:1px solid var(--grid)">
+      <div style="display:flex;justify-content:space-between"><b class="mono">${esc(u.host)}</b><span class="num">${int(u.flows)} flows</span></div>
+      <div class="note">${esc(u.site)} · ${int(u.destinations)} destinations${u.ports?.length ? ` · ports ${u.ports.slice(0, 6).map((x) => esc(x)).join(", ")}` : ""}</div>
+      ${picker(`unf${k}`, CLASSES, `label ${u.host}'s flows`)}</div>`;
+  }).join("") + (unf.length > 8 ? `<p class="note">+ ${int(unf.length - 8)} more hosts</p>` : "");
+  bindLabelButtons(el);
+}
+
+function bindLabelButtons(el) {
+  el.querySelectorAll("[data-rows]").forEach((b) => b.addEventListener("click", () =>
+    withBusy(b, () => labelIds(rowFlows[b.dataset.rows] || [], b.dataset.cat))));
+  el.querySelectorAll("[data-pick-go]").forEach((b) => b.addEventListener("click", () => withBusy(b, () => {
+    const cat = el.querySelector(`[data-pick="${b.dataset.pickGo}"]`).value;
+    return labelIds(rowFlows[b.dataset.pickGo] || [], cat);
+  })));
 }
 
 function renderTeach(site) {

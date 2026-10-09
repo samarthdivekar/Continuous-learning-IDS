@@ -49,7 +49,7 @@ category *Infiltration*, not PortScan — say so.) Nothing real is attacked; the
 ### The simplest "watch it detect" moment — sandbox replay
 
 In the console's **Live sites** tab (or the desktop app), pick an attack (DoS / PortScan / DDoS / …) and
-press **Replay recorded attack**. This takes a *real recorded window* of that attack from the dataset's
+press **▶ Replay into the live view** (desktop app: **Replay into live view**). This takes a *real recorded window* of that attack from the dataset's
 held-out test set and runs it through the live scorer, so you see it detected live — the graph lights up
 red, incidents appear with the attacker IP and a dry-run rule — **without launching anything**. Nothing is
 generated and nothing is sent to any host. This is the reliable centrepiece; the live attack in §3 is the

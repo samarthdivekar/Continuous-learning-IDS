@@ -38,7 +38,8 @@ function Stop-Stack {
         foreach ($line in Get-Content $pidFile) {
             $id = [int]($line -split '\s+')[0]
             $p = Get-Process -Id $id -ErrorAction SilentlyContinue
-            if ($p) { Write-Host "stopping $($line)"; Stop-Process -Id $id -Force -ErrorAction SilentlyContinue }
+            # /T: a venv's python.exe is a launcher, the server itself runs as its child process
+            if ($p) { Write-Host "stopping $($line)"; & taskkill.exe /PID $id /T /F 2>&1 | Out-Null }
         }
         Remove-Item $pidFile -Force
     }
@@ -88,7 +89,7 @@ $api = Start-Process -FilePath $py -PassThru -WindowStyle Hidden `
 # ---- presentation layer: static dashboard + /api proxy to the API process
 $proxy = Join-Path $root "scripts\dashboard_server.py"
 $dash = Start-Process -FilePath $py -PassThru -WindowStyle Hidden `
-    -ArgumentList $proxy, "--port", "$DashboardPort", "--api", "http://$($BindHost -replace '^localhost$','127.0.0.1'):$ApiPort" `
+    -ArgumentList "`"$proxy`"", "--port", "$DashboardPort", "--api", "http://$($BindHost -replace '^localhost$','127.0.0.1'):$ApiPort" `
     -RedirectStandardOutput "logs\stack_dashboard.log" -RedirectStandardError "logs\stack_dashboard.err.log"
 
 "$($ml.Id) ml", "$($api.Id) api", "$($dash.Id) dashboard" | Set-Content -Encoding ascii $pidFile

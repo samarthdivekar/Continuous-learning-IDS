@@ -16,7 +16,11 @@ export class GraphView {
     this.hover = null;
     this.selected = null;        // the clicked edge
     this.onEdge = null;          // callback(edge) when an edge is clicked
-    d3.select(this.canvas).call(d3.zoom().scaleExtent([0.2, 8]).on("zoom", (e) => { this.transform = e.transform; this.draw(); }));
+    this.userMoved = false;      // once the person zooms or pans, stop fitting automatically
+    d3.select(this.canvas).call(d3.zoom().scaleExtent([0.2, 8]).on("zoom", (e) => {
+      if (e.sourceEvent) this.userMoved = true;
+      this.transform = e.transform; this.draw();
+    }));
     this.canvas.addEventListener("mousemove", (e) => this.onMove(e));
     this.canvas.addEventListener("click", (e) => this.onClick(e));
     this.canvas.addEventListener("mouseleave", () => { this.hover = null; this.tip.classList.add("hidden"); this.draw(); });
@@ -30,6 +34,12 @@ export class GraphView {
     this.canvas.width = this.W * dpr; this.canvas.height = this.H * dpr;
     this.ctx = this.canvas.getContext("2d");
     this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    // The stage may have been hidden (0 x 0) when the layout started: move the centre to the real middle
+    // and re-settle, otherwise the graph stays piled in the top-left corner.
+    if (this.sim && this.W && this.H) {
+      this.sim.force("center", d3.forceCenter(this.W / 2, this.H / 2));
+      if (!this.userMoved) this.sim.alpha(Math.max(this.sim.alpha(), 0.3)).restart();
+    }
     this.draw();
   }
 
@@ -47,8 +57,10 @@ export class GraphView {
       .force("center", d3.forceCenter(this.W / 2, this.H / 2))
       .force("collide", d3.forceCollide().radius((d) => this.radius(d) + 2))
       .alpha(1).alphaDecay(0.035)
-      .on("tick", () => this.draw());
+      .on("tick", () => this.draw())
+      .on("end", () => { if (!this.userMoved) this.fit(); });   // whole graph in view once it has settled
     this.selected = null;
+    this.userMoved = false;
     this.transform = d3.zoomIdentity;
     d3.select(this.canvas).call(d3.zoom().transform, d3.zoomIdentity);
   }
@@ -98,7 +110,7 @@ export class GraphView {
     const cx = (Math.min(...xs) + Math.max(...xs)) / 2, cy = (Math.min(...ys) + Math.max(...ys)) / 2;
     const t = d3.zoomIdentity.translate(this.W / 2 - k * cx, this.H / 2 - k * cy).scale(k);
     this.transform = t;
-    d3.select(this.canvas).call(d3.zoom().transform, t);
+    d3.select(this.canvas).property("__zoom", t);       // keep d3's zoom state in step without a zoom event
     this.draw();
   }
 

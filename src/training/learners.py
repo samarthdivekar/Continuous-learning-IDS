@@ -57,6 +57,22 @@ MODEL_SPECS = {
     "ffnn_replay":      {"family": "ffnn", "ewc": False, "replay": True},
     "ffnn_ewc_replay":  {"family": "ffnn", "ewc": True,  "replay": True},
     "ffnn_joint":       {"family": "ffnn", "ewc": False, "replay": False, "joint": True},
+    # Review baselines. "ctx": the per-flow input also carries per-window host aggregates (src/graph/host_context.py):
+    # if these match the GNN, the graph's advantage is "window context", not message passing.
+    "ffnn_ctx_ewc_replay": {"family": "ffnn", "ewc": True, "replay": True, "ctx": True},
+    "ffnn_ctx_naive":      {"family": "ffnn", "ewc": False, "replay": False, "ctx": True},   # leave-one-attack-out
+    "xgboost_ctx_static":  {"family": "xgb", "ctx": True},                                   # leave-one-attack-out
+    "ffnn_ctx_joint":      {"family": "ffnn", "ewc": False, "replay": False, "joint": True, "ctx": True},
+    # XGBoost that keeps learning (the frozen-after-task-1 model is a strawman on its own): refit on the new task
+    # plus a class-balanced reservoir of earlier flows (replay), or on everything seen so far (joint).
+    # Standard continual-learning baselines on the same graph network (review point 3): distillation from the
+    # previous model (LwF), and replay that also matches stored outputs (DER++). Hyper-parameters are the papers'
+    # defaults (configs/default.yaml: cl), not tuned here.
+    "gnn_lwf":             {"family": "gnn", "ewc": False, "replay": False, "lwf": True},
+    "gnn_derpp":           {"family": "gnn", "ewc": False, "replay": True, "der": True},
+    "xgboost_replay":      {"family": "xgb", "xgb_mode": "replay"},
+    "xgboost_joint":       {"family": "xgb", "xgb_mode": "joint"},
+    "xgboost_ctx_replay":  {"family": "xgb", "xgb_mode": "replay", "ctx": True},
 }
 
 
@@ -111,32 +127,64 @@ class BaseLearner:
     def adapts(self) -> bool:
         return self.family != "xgb"
 
+    @staticmethod
+    def _n_context() -> int:
+        from src.graph.host_context import N_CONTEXT
+        return N_CONTEXT
+
+    def _x(self, g) -> torch.Tensor:
+        """The per-flow input: the flow's own features, plus host context for the "ctx" baselines."""
+        if self.spec.get("ctx"):
+            from src.graph.host_context import flow_inputs
+            return flow_inputs(g)
+        return g.edge_attr
+
 
 # ---------------------------------------------------------------------------
 class XGBLearner(BaseLearner):
     def __init__(self, *a, **kw):
         super().__init__(*a, **kw)
+        self.mode = self.spec.get("xgb_mode", "static")
         self.model = StaticXGBoost(self.num_classes, self.cfg["xgboost"], seed=self.cfg["seed"],
-                                   device="cuda" if self.device.type == "cuda" else "cpu")
+                                   device="cuda" if self.device.type == "cuda" else "cpu",
+                                   frozen=self.mode == "static")
+        rcfg = self.cfg["replay"]
+        self.buffer = TabularReplayBuffer(rcfg["flows_per_class"], rcfg["flows_per_step"], seed=self.cfg["seed"]) \
+            if self.mode == "replay" else None
+        self.joint_X: list[np.ndarray] = []
+        self.joint_y: list[np.ndarray] = []
 
     def learn(self, graphs, tag="", epochs=None):
         t0 = time.time()
-        if self.model.trained:
+        if self.mode == "static" and self.model.trained:
             return LearnStats(tag, 0.0, 0, float("nan"), {"frozen": True})
-        X = torch.cat([g.edge_attr for g in graphs]).numpy()
-        y = torch.cat([edge_labels(g, self.label_mode) for g in graphs]).numpy()
+        X_new = torch.cat([self._x(g) for g in graphs]).numpy()
+        ycat_new = torch.cat([g.y for g in graphs]).numpy()
+        if self.mode == "joint":                       # refit on everything seen so far
+            self.joint_X.append(X_new)
+            self.joint_y.append(ycat_new)
+            X, ycat = np.concatenate(self.joint_X), np.concatenate(self.joint_y)
+        elif self.mode == "replay" and self.buffer.categories:   # refit on the new task + stored earlier flows
+            rX = np.concatenate([self.buffer.X[c] for c in self.buffer.categories])
+            ry = np.concatenate([self.buffer.y_cat[c] for c in self.buffer.categories])
+            X, ycat = np.concatenate([X_new, rX]), np.concatenate([ycat_new, ry])
+        else:
+            X, ycat = X_new, ycat_new
+        y = (ycat > 0).astype(np.int64) if self.label_mode == "binary" else ycat.astype(np.int64)
         tcfg = self.cfg["train"]
         w = class_weights(y, self.num_classes, tcfg["class_weight_power"], tcfg["class_weight_clip"]).numpy()
         self.model.fit(X, y, sample_weight=w[y])
+        if self.buffer is not None:
+            self.buffer.add(X_new, ycat_new)
         self.n_learn_calls += 1
         return LearnStats(tag, time.time() - t0, 1, float("nan"), {"n_train": len(y)})
 
     def predict_proba(self, g):
-        return self.model.predict_proba(g.edge_attr.numpy())
+        return self.model.predict_proba(self._x(g).numpy())
 
     @property
     def adapts(self) -> bool:
-        return False
+        return self.mode != "static"
 
 
 # ---------------------------------------------------------------------------
@@ -213,6 +261,29 @@ class GNNLearner(_TorchLearner):
         self.buffer = GraphReplayBuffer(rcfg["graphs_per_class"], rcfg["graphs_per_step"],
                                         rcfg["min_class_edges"], seed=self.cfg["seed"]) \
             if self.spec.get("replay") else None
+        self.der_logits: dict[int, torch.Tensor] = {}     # DER++: window id -> outputs when it was stored
+
+    def _distill(self, sub: Data, teacher, T: float) -> torch.Tensor:
+        """LwF (Li & Hoiem, 2017): keep the outputs on the new task's flows close to the previous model's."""
+        sub = sub.to(self.device)
+        m = sub.target_mask
+        new = self.model(sub.x, sub.edge_index, sub.edge_attr)[m]
+        with torch.no_grad():
+            old = teacher(sub.x, sub.edge_index, sub.edge_attr)[m]
+        return F.kl_div(F.log_softmax(new / T, dim=-1), F.softmax(old / T, dim=-1), reduction="batchmean") * T * T
+
+    def _der_loss(self, stored: list, replayed: list) -> torch.Tensor:
+        """DER++ (Buzzega et al., 2020): MSE between the outputs on replayed flows now and when they were stored."""
+        losses = []
+        for g, sub in zip(stored, replayed):
+            target = self.der_logits.get(int(g.window_id))
+            if target is None:
+                continue
+            sub = sub.to(self.device)
+            m = sub.target_mask
+            out = self.model(sub.x, sub.edge_index, sub.edge_attr)[m]
+            losses.append(F.mse_loss(out, target[sub.e_id.cpu()[m.cpu()]].to(self.device)))
+        return torch.stack(losses).mean() if losses else torch.zeros((), device=self.device)
 
     # -- loss helpers --------------------------------------------------------
     def _labels(self, g) -> torch.Tensor:
@@ -278,22 +349,35 @@ class GNNLearner(_TorchLearner):
                             for g in train_graphs]).numpy()
         weight = class_weights(labels, self.num_classes, tcfg["class_weight_power"],
                                tcfg["class_weight_clip"]).to(self.device)
+        # LwF: the model as it was before this task is the teacher for the outputs on the new data
+        teacher = None
+        if self.spec.get("lwf") and self.n_learn_calls > 0:
+            teacher = copy.deepcopy(self.model).eval()
+            for p_ in teacher.parameters():
+                p_.requires_grad_(False)
+        ccfg = self.cfg.get("cl") or {}
         self.model.train()
         steps, last = 0, float("nan")
         for _ in range(epochs):
             for gi in self.rng.permutation(len(train_graphs)):
                 for sub in iter_training_subgraphs(self._augment(train_graphs[gi]), ns, self.rng):
                     loss = self._loss_on(sub, weight)
+                    if teacher is not None:
+                        loss = loss + float(ccfg.get("lwf_lambda", 1.0)) * self._distill(sub, teacher,
+                                                                                      float(ccfg.get("lwf_T", 2.0)))
                     replay_loss = torch.zeros((), device=self.device)
                     if self.buffer is not None and self.buffer.categories:
                         # Fixed replay budget per step (see replay_buffer.py). Stored
                         # windows are batched into one disjoint-union graph.
-                        replayed = [next(iter_training_subgraphs(self._augment(r), ns, self.rng))
-                                    for r in self.buffer.sample()]
+                        stored = self.buffer.sample()
+                        replayed = [next(iter_training_subgraphs(self._augment(r), ns, self.rng)) for r in stored]
                         if replayed:
                             rb = Batch.from_data_list(replayed)
                             replay_loss = self._loss_on(rb, weight,
                                                         category_balanced=rcfg.get("category_balanced_loss", False))
+                            if self.spec.get("der"):     # DER++: also match the outputs recorded at storage time
+                                replay_loss = replay_loss + float(ccfg.get("der_alpha", 0.5)) * self._der_loss(
+                                    stored, replayed)
                     penalty = self.ewc.penalty() if self.ewc is not None else 0.0
                     total = loss + rcfg["replay_weight"] * replay_loss + penalty
                     self._check_finite(total, tag)
@@ -313,6 +397,13 @@ class GNNLearner(_TorchLearner):
             idx = self.rng.permutation(len(graphs))[: self.cfg["ewc"]["fisher_batches"]]
             extra["ewc"] = self.ewc.consolidate((graphs[i] for i in idx), self._raw_task_loss, lr=self.lr, tag=tag)
         if self.buffer is not None:
+            if self.spec.get("der"):                  # DER++ stores each window's outputs as they are now
+                self.model.eval()
+                with torch.no_grad():
+                    for g in graphs:
+                        self.der_logits[int(g.window_id)] = self.model(
+                            g.x.to(self.device), g.edge_index.to(self.device), g.edge_attr.to(self.device)).cpu()
+                self.model.train()
             self.buffer.add_many(graphs)
             extra["buffer"] = self.buffer.summary()
         self.n_learn_calls += 1
@@ -339,7 +430,8 @@ class FFNNLearner(_TorchLearner):
     def __init__(self, *a, **kw):
         super().__init__(*a, **kw)
         fcfg = self.cfg["ffnn"]
-        self._post_init(FFNN(self.n_features, self.num_classes, tuple(fcfg["hidden"]), fcfg["dropout"]))
+        n_in = self.n_features + (self._n_context() if self.spec.get("ctx") else 0)
+        self._post_init(FFNN(n_in, self.num_classes, tuple(fcfg["hidden"]), fcfg["dropout"]))
         rcfg = self.cfg["replay"]
         self.buffer = TabularReplayBuffer(rcfg["flows_per_class"], rcfg["flows_per_step"], seed=self.cfg["seed"]) \
             if self.spec.get("replay") else None
@@ -361,7 +453,7 @@ class FFNNLearner(_TorchLearner):
         tcfg, rcfg = self.cfg["train"], self.cfg["replay"]
         epochs = epochs or tcfg["ffnn_epochs"]
         # only LABELLED flows train the per-flow model (active learning labels a few per window)
-        X_new = torch.cat([g.edge_attr[g.label_mask] if "label_mask" in g else g.edge_attr for g in graphs]).numpy()
+        X_new = torch.cat([self._x(g)[g.label_mask] if "label_mask" in g else self._x(g) for g in graphs]).numpy()
         ycat_new = torch.cat([g.y[g.label_mask] if "label_mask" in g else g.y for g in graphs]).numpy()
         if len(ycat_new) == 0:
             return LearnStats(tag, 0.0, 0, float("nan"), {"skipped": "no labelled flows"})
@@ -417,7 +509,7 @@ class FFNNLearner(_TorchLearner):
             fresh = [g for g in graphs if int(g.window_id) not in self.buffered_windows]
             if fresh:
                 sel = lambda g, t: t[g.label_mask] if "label_mask" in g else t  # noqa: E731
-                self.buffer.add(torch.cat([sel(g, g.edge_attr) for g in fresh]).numpy(),
+                self.buffer.add(torch.cat([sel(g, self._x(g)) for g in fresh]).numpy(),
                                 torch.cat([sel(g, g.y) for g in fresh]).numpy())
                 self.buffered_windows.update(int(g.window_id) for g in fresh)
             extra["buffer"] = self.buffer.summary()
@@ -430,7 +522,7 @@ class FFNNLearner(_TorchLearner):
     def predict_proba(self, g: Data) -> np.ndarray:
         self.model.eval()
         out = []
-        X = g.edge_attr
+        X = self._x(g)
         for s in range(0, len(X), 65536):
             out.append(torch.softmax(self.model(X[s:s + 65536].to(self.device)), dim=-1).cpu())
         return torch.cat(out).numpy()
@@ -440,7 +532,7 @@ class FFNNLearner(_TorchLearner):
         """(logits, embeddings) per flow — for novelty scoring and embedding drift."""
         self.model.eval()
         L, Z = [], []
-        X = g.edge_attr
+        X = self._x(g)
         for s in range(0, len(X), 65536):
             lo, z = self.model.forward_with_embedding(X[s:s + 65536].to(self.device))
             L.append(lo.cpu()); Z.append(z.cpu())

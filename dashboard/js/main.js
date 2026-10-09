@@ -16,6 +16,7 @@ const VIEWS = {
   repro: () => import("./views/repro.js"),
 };
 const loaded = {};
+const retryCount = {};
 
 async function show(name) {
   if (LEGACY[name]) name = LEGACY[name];          // old bookmarks keep working
@@ -35,7 +36,19 @@ async function show(name) {
   const el = $(`#view-${name}`);
   if (!loaded[name]) {
     el.innerHTML = `<div class="empty pulse">Loading…</div>`;
-    const mod = await VIEWS[name]();
+    let mod;
+    try {
+      // a cache-busting query on retry: a browser remembers a failed module import for the page's lifetime
+      mod = await (retryCount[name] ? import(`./views/${name}.js?retry=${retryCount[name]}`) : VIEWS[name]());
+    } catch (e) {
+      // the console was open while the server restarted: say so and offer a retry instead of "Loading…" forever
+      retryCount[name] = (retryCount[name] || 0) + 1;
+      el.innerHTML = `<div class="empty"><span class="title">This page could not load</span>
+        The console server did not answer (${esc(e.message || "network error")}). Is the stack running?
+        <div style="margin-top:12px"><button class="btn primary" id="view-retry">Retry</button></div></div>`;
+      el.querySelector("#view-retry").addEventListener("click", () => show(name));
+      return;
+    }
     loaded[name] = mod;
     await mod.mount(el);
   } else if (loaded[name].activate) {

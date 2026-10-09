@@ -81,8 +81,8 @@ it completely (0&nbsp;%).</td><td>5 seeds and 3 seeds</td></tr>
 <tr><td>Does the graph help on attacks it has seen?</td><td>A little: +0.036 to +0.044 macro-F1 over an identical
 per-flow model.</td><td>Indicative (bootstrap interval excludes zero, too few seeds for a significance test)</td></tr>
 <tr><td>Does the graph help on attacks it has <b>never</b> seen?</td><td>Clearly but unevenly: on CSE-CIC-IDS2018 it
-caught more than 80&nbsp;% of a never-seen attack in 6 of 12 tests; the per-flow model caught at most 0.07&nbsp;% in all
-12. Which attacks it catches changes between training runs, except DoS and DDoS.</td><td>2 seeds</td></tr>
+caught more than 80&nbsp;% of a never-seen attack in 8 of 18 tests; the per-flow model caught at most 0.07&nbsp;% in all
+18. Which attacks it catches changes between training runs, except DoS (all three seeds) and DDoS (all three, declining).</td><td>3 seeds</td></tr>
 <tr><td>Is replay what stops forgetting?</td><td>Yes. Replay alone goes from 0.304 (nothing stored) to 0.952 with
 five stored windows per attack type. EWC alone fails (0.300).</td><td>3 seeds</td></tr>
 <tr><td>Does ADWIN retrain at the right time?</td><td>It finds the changes, but it is not cheaper than a fixed schedule.

@@ -29,15 +29,15 @@ The grey line of text under the title says this in plain English; the verdict ta
 
 > "A detector that outputs 100,000 alerts is useless. This is the queue a person actually works."
 
-* Press **Load incidents**: ~5,000 flows in the window, **4,986 flagged**, folded into **1 incident**.
-* Switch the scope to **Recent windows** → scans 20 windows (~98,000 flows) into **14 incidents**.
+* Set **Source → Recorded** and scope **One window**, then press **Load incidents**: ~5,000 flows in the window, **4,986 flagged**, folded into **1 incident**.
+* Switch the scope to **Recent** → scans 20 windows (~98,000 flows) into **14 incidents**.
 * Click an incident: the **plain-English explanation** ("probed 996 different destination ports — a
   port-scan pattern"), the evidence bars, and the network context.
 * The **proposed containment** with the exact iptables rule. Say clearly: *nothing is executed; the
   analyst approves and the decision is recorded as a dry run.*
 * **Open report** → a printable one-pager (Print → Save as PDF) to attach to a ticket.
 
-## 3 · It keeps learning (Live stream, 2 min)
+## 3 · It keeps learning (Drift replay, under Evaluate, 2 min)
 
 > "Traffic changes. The system notices and retrains itself."
 
@@ -45,17 +45,19 @@ The grey line of text under the title says this in plain English; the verdict ta
   adapt mid-stream (the feed prints `error 4.7 % → 65.6 % adapted`).
 * Headline comparison (2017, 3 seeds): never adapting ends at **0.230**; adapting at about **0.96**. With clean
   task blocks a fixed schedule is better than ADWIN (0.980 vs 0.960, half the retrains). With two attacks mixed
-  per period ADWIN is better (0.968 vs 0.926) but still retrains twice as often. On 2018 (one run) it wins
-  clearly (24 vs 48 retrains).
+  per period ADWIN is better (0.968 vs 0.926) but still retrains twice as often. On 2018 (3 seeds) it uses
+  about half the retrains (23 vs 48) but only ties the schedule on quality (0.836 ± 0.117 vs 0.828 ± 0.010):
+  won on one seed, lost on another.
 
 ## 4 · Why a graph (Graph explorer, 1 min)
 
 > "A port scan fans out from one host; a flood fans in to one victim. A per-flow model cannot see that."
 
 * Pick an attack window and show the shape. The **model-error overlay** marks the mistakes.
-* The evidence: on 2018, across 12 held-out runs (six attacks, two seeds) the graph model catches over 80 %
-  of an unseen attack in 6, the per-flow model at most 0.07 % in all 12. DoS (98.6 % both seeds) and DDoS
-  (99.4 %, 82.6 %) replicate. Say the other half too: BruteForce and Botnet swap between seeds.
+* The evidence: on 2018, across 18 held-out runs (six attacks, three seeds) the graph model catches over 80 %
+  of an unseen attack in 8, the per-flow model at most 0.07 % in all 18. DoS replicates (98.6 % on all three
+  seeds); DDoS is caught on all three but declining (99.4 / 82.6 / 67.5 %). Say the other half too:
+  BruteForce (99.7 / 0.07 / 100 %) and Botnet (8.5 / 84.9 / 11.0 %) swap between seeds.
 
 ## 5 · The honest part (Models → Unseen attacks, Adaptation & trust, 1.5 min)
 
@@ -81,8 +83,8 @@ Examiners reward measured limitations:
 | Question | Answer |
 |---|---|
 | "Is it better than a commercial NDR?" | Not comparable — this is an evaluated research prototype with dry-run response only. The README says so. |
-| "Why not just XGBoost?" | It cannot learn new attack types: 0.231 macro-F1 and it detects 1.3 % of attacks it never saw. |
-| "Does the graph really help?" | In distribution, modestly: +0.036 (interleaved, 3 seeds) and +0.044 (temporal, 5 seeds), indicative only. On attacks never seen in training, clearly but unevenly: over 80 % in 6 of 12 held-out runs vs ≤ 0.07 % for the per-flow model; DoS and DDoS replicate, BruteForce and Botnet swap between seeds. |
+| "Why not just XGBoost?" | It cannot learn new attack types: 0.231 macro-F1 (multiclass), and in binary mode it detects none of the DoS, WebAttack, Botnet, PortScan or DDoS flows and 0.13 % of Infiltration. |
+| "Does the graph really help?" | In distribution, modestly: +0.036 (interleaved, 3 seeds) and +0.044 (temporal, 5 seeds), indicative only. On attacks never seen in training, clearly but unevenly: over 80 % in 8 of 18 held-out runs (2018, 3 seeds) vs ≤ 0.07 % for the per-flow model; DoS replicates on all three seeds, DDoS is caught on all three but declining, BruteForce and Botnet swap between seeds. |
 | "What about false alarms?" | 0.07 % at flow level; abstention removes them entirely at the right α, and incident grouping leaves 50 items with 84 % precision. |
 | "Can it run live?" | Scoring a 5,000-flow window takes 5.5 ms on the laptop GPU and 10.5 ms on the CPU (p50), about 630,000 and 460,000 flows per second (README §8). That excludes flow export and graph building from raw traffic. |
 | "What is new here?" | The combination: continual learning + drift-triggered retraining + an operator-facing layer, evaluated on error-corrected data with negative results reported. |

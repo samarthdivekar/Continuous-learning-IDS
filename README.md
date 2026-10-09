@@ -217,15 +217,16 @@ does this unless `-SkipSeed`). A single-process variant is `python -m uvicorn sr
 
 ![The console: sidebar navigation with service status, and a top bar holding the dataset, label mode and Compare-models switch](docs/screens/redesign-overview.png)
 
-The console has eight pages in two groups in the sidebar, *Operate* (what a security team uses) and *Evaluate* (the evidence
-behind it). Every panel is fed by result files or live API data, and a missing experiment shows "not run yet",
+The console has nine pages in the sidebar: *Operate* (what a security team uses), *Evaluate* (the evidence behind it) and
+*More* (graph explorer, classify). Every panel is fed by result files or live API data, and a missing experiment shows "not run yet",
 never a number.
 
 | Page | What it shows |
 |---|---|
 | Overview | the result in plain words, headline KPIs, the "adapts / remembers" verdict table, attack timeline, architecture |
 | Incident queue | one window **or the last N windows** (a shift's queue); alerts grouped into incidents; per-incident explanation (feature attribution, network context, plain-English summary); proposed containment rule; approve / reject with a decision log (dry run); filters, a printable report and a CEF download |
-| Live stream | replays the stream through four models; ADWIN flags, adaptations, per-window counts, drift feed, speed control, forced retrain |
+| Live sites | live traffic from sensors, the cyber range or the sandbox replay of a recorded attack, scored as it arrives; incidents, unsure and unfamiliar flows, gated teaching |
+| Drift replay | replays the recorded stream through four models; ADWIN flags, adaptations, per-window counts, drift feed, speed control, forced retrain |
 | Graph explorer | any window graph as an interactive force layout (zoom, hover, category filters) with a per-flow **model-error overlay** |
 | Classify | run the models on a held-out window or on an uploaded CSV with the full feature set (incomplete files are rejected, never imputed) |
 | Models | *Accuracy & forgetting* (metric over tasks with ±1 std bands, recall heatmaps, BWT, confusion matrix) and *Unseen attacks & IP leakage* (leave-one-attack-out, IP-remap) |
@@ -640,9 +641,11 @@ this size.
 
 Binary is domain-incremental (the "attack" class persists across tasks), and the picture changes:
 ours 0.9993 macro-F1, FFNN + EWC + replay 0.9991, and **GNN + EWC only reaches 0.9945 with retention 1.0**
-— on CIC-IDS2017, EWC alone works in the setting it was designed for (this did **not** replicate on
-CSE-CIC-IDS2018). GNN naive keeps 0.76 retention; FFNN naive collapses
-to 0.003. The static XGBoost detects only **1.3 %** of attack flows from categories it never saw.
+— on CIC-IDS2017, EWC alone works in the setting it was designed for. Whether this generalises is open: the
+only CSE-CIC-IDS2018 binary run (one seed, since withdrawn, §6) had EWC-only at 0.539 with retention 0. GNN naive keeps 0.76 retention; FFNN naive collapses
+to 0.003. The static XGBoost (trained on task 1 only) detects **none** of the DoS, WebAttack, Botnet,
+PortScan or DDoS test flows and 0.13 % of Infiltration; its overall attack detection rate of 1.3 % is almost
+entirely the BruteForce it was trained on.
 
 ### 4. Drift-triggered adaptation (stream of tasks 2–7, seeds 42/43/44)
 
@@ -929,8 +932,9 @@ CIC-IDS2017 test windows of 5,000 flows. Laptop: GTX 1650 (4 GB), 8-core CPU, 24
   number means little.
 * **ADWIN is not cheaper on CIC-IDS2017.** Over three seeds it retrains about twice as often as a fixed
   schedule; with clean task blocks the schedule also ends higher, with mixed attacks ADWIN ends higher (§4).
-  On CSE-CIC-IDS2018 it beat the schedule on both cost and quality (24 vs 48 retrains, 0.943 vs 0.825), in one
-  run. The refractory period and adaptation window were fixed a priori, not tuned; tuning them without a
+  On CSE-CIC-IDS2018, over three seeds, it uses about half the retrains of the schedule (23 vs 48) but only ties
+  it on quality (0.836 ± 0.117 vs 0.828 ± 0.010), with a much wider spread: it won on seed 42, roughly tied on
+  seed 44 and lost on seed 43 (§6). The refractory period and adaptation window were fixed a priori, not tuned; tuning them without a
   separate validation stream would overfit the test stream.
 * **EWC alone is not reliable; EWC with replay may be.** EWC alone fails in class-incremental (multiclass)
   on both datasets. On top of replay it made no detectable difference on the interleaved split but, on the

@@ -69,14 +69,14 @@ def index():
             base = RESULTS / ds / mode
             if not base.exists():
                 continue
-            out.setdefault(ds, {})[mode] = {
-                exp: (base / exp / marker).exists()
-                for exp, marker in [("continual", "summary.csv"), ("continual_temporal", "summary.csv"),
-                                    ("drift", "summary.csv"), ("loao", "loao.csv"), ("loao_seeds", "summary.csv"),
-                                    ("ip_remap", "summary.csv"), ("ewc_lambda_sweep", "sweep.csv"),
-                                    ("tuning", "tuning.csv"), ("open_set", "open_set.csv"),
-                                    ("conformal", "conformal.csv"), ("incidents", "incidents.csv")]
-            }
+            # experiment name -> the file that proves it was run (the console asks only for these)
+            markers = {"continual": "continual/summary.csv", "continual_temporal": "continual_temporal/summary.csv",
+                       "drift": "drift/summary.csv", "loao": "loao/loao.csv", "loao_seeds": "loao_seeds/summary.csv",
+                       "ip_remap": "ip_remap/summary.csv", "ewc_lambda_sweep": "ewc_lambda_sweep/sweep.csv",
+                       "tuning": "tuning/tuning.csv", "open_set": "open_set/open_set.csv",
+                       "conformal": "conformal/conformal.csv", "incidents": "incidents/incidents.csv",
+                       "adaptation": "drift_gate/summary.csv"}
+            out.setdefault(ds, {})[mode] = {exp: (base / rel).exists() for exp, rel in markers.items()}
     return out
 
 

@@ -35,7 +35,13 @@ async function render() {
   $("#rp-tuning", root).innerHTML = skeleton("table");
   $("#rp-info", root).innerHTML = skeleton("lines");
   let t, reusedFrom = null;
-  try { t = await get(`/results/tuning?dataset=${dataset}`); }
+  // CSE-CIC-IDS2018 has no tuning run of its own (it reuses CIC-IDS2017's): check before asking
+  const have = await get("/results/index").catch(() => null);
+  const own = !have || have?.[dataset]?.multiclass?.tuning || have?.[dataset]?.multiclass?.ewc_lambda_sweep;
+  try {
+    if (!own) throw Object.assign(new Error("not run for this dataset"), { status: 404 });
+    t = await get(`/results/tuning?dataset=${dataset}`);
+  }
   catch (e) {
     // CSE-CIC-IDS2018 has no tuning run of its own: it reuses CIC-IDS2017's validation selections
     // (tuning_from). Show those, clearly labelled, rather than an error.

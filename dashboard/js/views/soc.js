@@ -17,6 +17,7 @@ const fmtValue = (v) => (v == null ? "–"
   : Math.abs(v - Math.round(v)) < 1e-9 ? Math.round(v).toLocaleString()
   : Math.abs(v) >= 1e-4 ? Number(v.toPrecision(4)).toLocaleString() : v.toExponential(2));
 const NEURAL = ["gnn_ewc_replay", "ffnn_ewc_replay", "gnn_naive"];
+const STATUS_TAG = { open: "warn", reopened: "bad", acknowledged: "", closed: "good" };
 const ACTION_TEXT = {
   block_source: "Block the attacking host",
   rate_limit_to_victim: "Rate-limit traffic to the victim",
@@ -28,19 +29,33 @@ export async function mount_(el) {
   root = el;
   root.innerHTML = `
     <div class="view-head"><div><h2>Incident queue</h2>
-      <p>Thousands of flagged flows become a handful of <b>incidents</b> — one per attacker/victim cluster. Open one to see
-      <b>why</b> it was flagged and the <b>containment we would propose</b>. You approve or reject; nothing is ever executed.
-      This queue works on the <b>recorded dataset's held-out test windows</b> (so every incident can be checked against ground
-      truth); incidents from real sensor traffic are on <a href="#sites">Live sites</a>.</p></div>
-      <span class="tag" id="soc-svc" title="The model service serves one dataset, independent of the switch above"></span></div>
+      <p>Where every incident is triaged. Thousands of flagged flows become a handful of <b>incidents</b>, one per
+      attacker/victim cluster. Open one to see <b>why</b> it was flagged and the <b>containment we would propose</b>; you
+      approve or reject, and nothing is ever executed. <b>Live traffic</b> shows incidents from the sites on
+      <a href="#sites">Live sites</a> (sensors, the cyber range, the sandbox). <b>Recorded test data</b> is a practice queue
+      on the dataset's held-out windows, where every incident can be checked against ground truth.</p></div>
+      <span class="tag" id="soc-svc"></span></div>
 
     <div class="grid g4" id="soc-kpis"></div>
 
     <div class="triage" style="margin-top:16px">
       <div class="card" id="soc-controls">
+        <h3>Source</h3>
+        <div class="seg" id="soc-source" role="group" aria-label="incident source" style="width:100%;margin-bottom:14px">
+          <button data-v="live" title="Incidents from real traffic: sensors, the cyber range and the sandbox replay" style="flex:1">Live</button>
+          <button data-v="recorded" title="The dataset's held-out test windows, with ground truth" style="flex:1">Recorded</button>
+        </div>
+        <div id="soc-live-ctl">
+          <label class="stacked">Site
+            <select id="soc-site"><option value="">All sites</option></select></label>
+          <label class="stacked">Time span
+            <select id="soc-minutes"><option value="15">last 15 minutes</option><option value="60" selected>last hour</option>
+              <option value="1440">last 24 hours</option></select></label>
+        </div>
+        <div id="soc-rec-ctl" class="hidden">
         <h3>What to review</h3>
         <div class="seg" id="soc-scope" role="group" aria-label="scope" style="width:100%;margin-bottom:12px">
-          <button data-v="scan" class="on" title="Incidents across the most recent windows, like a shift's queue" style="flex:1">Recent (shift queue)</button>
+          <button data-v="scan" class="on" title="Incidents across the most recent windows, like a shift's queue" style="flex:1">Recent</button>
           <button data-v="window" title="Incidents in one traffic window" style="flex:1">One window</button>
         </div>
         <label class="stacked hidden" id="soc-win-wrap">Traffic window
@@ -49,10 +64,11 @@ export async function mount_(el) {
           <select id="soc-limit"><option>10</option><option selected>20</option><option>50</option></select></label>
         <label class="stacked">Detector
           <select id="soc-model">${NEURAL.map((m) => `<option value="${m}">${esc(label(m))}</option>`).join("")}</select></label>
+        </div>
         <label class="stacked" title="Hide alerts the model is less sure about than this">
           Minimum confidence <span id="soc-th-v" class="num muted">0%</span>
           <input type="range" id="soc-th" min="0" max="0.99" step="0.01" value="0" style="width:100%"></label>
-        <button class="btn primary" id="soc-go" style="width:100%;margin-top:4px">Scan windows</button>
+        <button class="btn primary" id="soc-go" style="width:100%;margin-top:4px">Refresh</button>
 
         <h3 style="margin-top:18px">Filter the queue</h3>
         <label class="stacked">Category
@@ -76,7 +92,7 @@ export async function mount_(el) {
         <div class="card-head"><div><h3>Queue <span class="tag" id="soc-count">—</span></h3>
           <p class="sub">most severe first · severity = size × confidence</p></div></div>
         <div id="soc-list" class="window-list" role="listbox" aria-label="incidents" tabindex="0" style="max-height:680px">
-          <div class="empty"><span class="title">Nothing loaded yet</span>Choose a window on the left and press <b>Load incidents</b>.</div>
+          <div class="empty"><span class="title">Nothing loaded yet</span>Choose a source on the left.</div>
         </div>
       </div>
 
@@ -91,8 +107,6 @@ export async function mount_(el) {
         <button data-v="approved">Approved</button><button data-v="rejected">Rejected</button></div></div>
       <div id="soc-log"></div></div>`;
 
-  get("/health").then((h) => { $("#soc-svc", root).textContent = `recorded test windows: ${h.ml?.dataset || "?"} · ${h.ml?.label_mode || ""}`; })
-    .catch(() => {});
   try { catalog = (await get("/windows/catalog")).filter((w) => w.split === "test" && w.n_attack > 0); }
   catch (e) { catalog = []; showError($("#soc-list", root), e, { what: "the window catalogue" }); }
   catalog.sort((a, b) => b.n_attack - a.n_attack);
@@ -109,6 +123,8 @@ export async function mount_(el) {
     $("#soc-scan-wrap", root).classList.toggle("hidden", !scan);
     $("#soc-go", root).textContent = scan ? "Scan windows" : "Load incidents";
   }));
+  $$("#soc-source button", root).forEach((b) => b.addEventListener("click", () => setSource(b.dataset.v, true)));
+  $$("#soc-site, #soc-minutes", root).forEach((el) => el.addEventListener("change", () => withBusy($("#soc-go", root), load)));
   $("#soc-go", root).addEventListener("click", () => withBusy($("#soc-go", root), load));
   $$("#soc-filter button", root).forEach((b) => b.addEventListener("click", () => {
     $$("#soc-filter button", root).forEach((x) => x.classList.toggle("on", x === b)); log(b.dataset.v);
@@ -121,6 +137,12 @@ export async function mount_(el) {
   });
   $("#soc-cef", root).addEventListener("click", () => {
     if (!current) { toast("load a window first"); return; }
+    if (current.live) {
+      const site = $("#soc-site", root).value;
+      openApi(`/live/incidents/cef?minutes=${$("#soc-minutes", root).value}${site ? `&site=${encodeURIComponent(site)}` : ""}`,
+              { filename: `live_incidents_${site || "all"}.cef` });
+      return;
+    }
     if (current.window_id == null) { toast("CEF export covers one window — switch to One window"); return; }
     openApi(`/incidents/${current.window_id}/cef?model=${current.model}&threshold=${current.threshold || 0}`,
             { filename: `incidents_w${current.window_id}.cef` });
@@ -128,15 +150,42 @@ export async function mount_(el) {
   $("#soc-model", root).value = prefs.get("soc.model", "gnn_ewc_replay");
   window.addEventListener("keydown", onKey);
   log("");
-  if (catalog.length) withBusy($("#soc-go", root), load);
+  // Live traffic by default once any site has reported in the last hour; otherwise the practice queue.
+  let sites = [];
+  try { sites = (await get("/live/sites")).sites || []; } catch { /* model service down: recorded still works */ }
+  $("#soc-site", root).innerHTML = `<option value="">All sites</option>` + sites.map((s) => `<option>${esc(s.site)}</option>`).join("");
+  const recent = sites.some((s) => s.seconds_since < 3600);
+  await setSource(pendingOpen() ? "live" : prefs.get("soc.source", recent ? "live" : "recorded"), false);
+  liveTimer = setInterval(() => {                    // keep the live queue current without losing the selection
+    if (current?.live && root?.closest(".view")?.classList.contains("on")) load(true);
+  }, 10000);
 }
 export { mount_ as mount };
-export const activate = () => log(currentFilter());
+export const activate = () => {
+  log(currentFilter());
+  if (pendingOpen()) setSource("live", false);
+};
 export const refresh = () => { if (current) renderList(); };
+
+let liveTimer = null;
+// Live sites hands an incident over with "Triage →": the record id waits in sessionStorage until this page opens it
+const pendingOpen = () => { try { return sessionStorage.getItem("gnnids.openIncident"); } catch { return null; } };
+
+async function setSource(src, remember) {
+  if (remember) prefs.set("soc.source", src);
+  $$("#soc-source button", root).forEach((x) => x.classList.toggle("on", x.dataset.v === src));
+  const live = src === "live";
+  $("#soc-live-ctl", root).classList.toggle("hidden", !live);
+  $("#soc-rec-ctl", root).classList.toggle("hidden", live);
+  const scan = $("#soc-scope button.on", root)?.dataset.v === "scan";
+  $("#soc-go", root).textContent = live ? "Refresh" : scan ? "Scan windows" : "Load incidents";
+  $("#soc-svc", root).textContent = live ? "live traffic · live model" : "recorded test windows · ground truth available";
+  await withBusy($("#soc-go", root), () => load());
+}
 
 /** Called by the command palette ("open incident 7"). True when the incident exists here. */
 export function openIncident(id) {
-  const match = current?.incidents?.find((i) => (i.rank ?? i.incident_id) === id);
+  const match = current?.incidents?.find((i) => numberOf(i) === id);
   if (!match) return false;
   pick(uidOf(match));
   $("#soc-detail", root)?.scrollIntoView({ behavior: "smooth", block: "nearest" });
@@ -146,7 +195,9 @@ export function openIncident(id) {
 const currentFilter = () => $("#soc-filter button.on", root)?.dataset.v || "";
 // a scan mixes windows, so each incident carries its own window id
 const windowOf = (i) => i?.window_id ?? current?.window_id;
-const uidOf = (i) => `${windowOf(i)}-${i.incident_id}`;
+// live incidents are stored records with a stable id; recorded ones are ranks within a window
+const uidOf = (i) => (i.record ? `live-${i.record.id}` : `${windowOf(i)}-${i.incident_id}`);
+const numberOf = (i) => (i.record ? i.record.id : i.rank ?? i.incident_id);
 const selectedIncident = () => current?.incidents?.find((x) => uidOf(x) === selected);
 
 /* ------------------------------------------------------------------ keyboard triage */
@@ -179,25 +230,52 @@ function onKey(e) {
 }
 
 /* ------------------------------------------------------------------ loading */
-async function load() {
+async function load(quiet = false) {
+  const live = $("#soc-source button.on", root)?.dataset.v === "live";
   const scan = $("#soc-scope button.on", root).dataset.v === "scan";
   const wid = $("#soc-win", root).value, model = $("#soc-model", root).value, th = $("#soc-th", root).value;
-  if (!scan && !wid) return;
-  prefs.set("soc.model", model);
-  $("#soc-list", root).innerHTML = skeleton("table");
-  $("#soc-detail", root).innerHTML = skeleton("lines", 2);
+  if (!live && !scan && !wid) return;
+  if (!live) prefs.set("soc.model", model);
+  if (!quiet) {
+    $("#soc-list", root).innerHTML = skeleton("table");
+    $("#soc-detail", root).innerHTML = skeleton("lines", 2);
+  }
+  let next;
   try {
-    current = scan
-      ? await get(`/incidents/scan?limit=${$("#soc-limit", root).value}&model=${model}&threshold=${th}`)
-      : await get(`/incidents/${wid}?model=${model}&threshold=${th}`);
+    if (live) {
+      const site = $("#soc-site", root).value;
+      next = await get(`/live/incidents?windows=500&minutes=${$("#soc-minutes", root).value}&min_confidence=${th}`
+                       + (site ? `&site=${encodeURIComponent(site)}` : ""));
+      next.live = true;
+      next.model = "live model";
+      next.threshold = Number(th);
+    } else {
+      next = scan
+        ? await get(`/incidents/scan?limit=${$("#soc-limit", root).value}&model=${model}&threshold=${th}`)
+        : await get(`/incidents/${wid}?model=${model}&threshold=${th}`);
+    }
   } catch (e) {
+    if (quiet) return;
     showError($("#soc-list", root), e, { what: "the incident queue" });
     $("#soc-detail", root).innerHTML = `<div class="empty"><span class="title">No incident selected</span></div>`;
     return;
   }
-  selected = null;
+  // a quiet refresh keeps the incident under review open if it is still in the queue
+  const keep = quiet && selected && next.incidents.some((i) => uidOf(i) === selected) ? selected : null;
+  current = next;
   renderKpis(); renderList();
+  const want = pendingOpen();
+  if (want && current.live) {
+    try { sessionStorage.removeItem("gnnids.openIncident"); } catch { /* ignore */ }
+    const hit = current.incidents.find((i) => String(i.record?.id) === want);
+    if (hit) { pick(uidOf(hit)); return; }
+    toast(`incident #${want} is not in this time span`);
+  }
+  if (keep) { selected = keep; renderList(); return; }
+  selected = null;
   if (current.incidents.length) pick(uidOf(current.incidents[0]));
+  else $("#soc-detail", root).innerHTML = `<div class="empty"><span class="title">No incident</span>${
+    current.live ? "No site raised a confident alarm in this time span. Send traffic from Live sites (the sandbox replay is quickest)." : ""}</div>`;
 }
 
 function kpi(title, value, detail) {
@@ -206,6 +284,17 @@ function kpi(title, value, detail) {
 
 function renderKpis() {
   const c = current, m = c.metrics || {};
+  if (c.live) {
+    const unsure = (c.unsure || []).reduce((s, u) => s + u.flows, 0);
+    const open = c.incidents.filter((i) => ["open", "reopened"].includes(i.record?.status)).length;
+    $("#soc-kpis", root).innerHTML = [
+      kpi("Flows seen", int(c.n_flows), `live traffic, last ${c.minutes >= 60 ? `${c.minutes / 60} h` : `${c.minutes} min`}`),
+      kpi("Confident alarms", int(c.flagged_flows), `${pct(c.flagged_flows / Math.max(1, c.n_flows))} of the traffic`),
+      kpi("Incidents", int(c.incidents.length), `${int(open)} open or reopened`),
+      kpi("Unsure (no alarm)", int(unsure), unsure ? `flows sent to an analyst on <a href="#sites">Live sites</a>` : "the model was sure about every flow"),
+    ].join("");
+    return;
+  }
   const scan = c.windows_scanned != null;
   const ratio = c.incidents.length ? c.flagged_flows / c.incidents.length : 0;
   $("#soc-kpis", root).innerHTML = [
@@ -241,7 +330,9 @@ function renderList() {
   const count = $("#soc-count", root);
   if (!current.incidents.length) {
     count.textContent = "0";
-    list.innerHTML = `<div class="empty"><span class="title">Nothing flagged</span>No flow passed the confidence threshold in this window.</div>`;
+    list.innerHTML = current.live
+      ? `<div class="empty"><span class="title">No live incidents</span>No confident alarm in this time span. Get traffic in on <a href="#sites">Live sites</a>.</div>`
+      : `<div class="empty"><span class="title">Nothing flagged</span>No flow passed the confidence threshold in this window.</div>`;
     return;
   }
   const cats = [...new Set(current.incidents.map((i) => i.category))].sort();
@@ -261,9 +352,10 @@ function renderList() {
   list.innerHTML = shown.map((i) => `
     <button data-id="${esc(uidOf(i))}" role="option" aria-selected="${selected === uidOf(i)}"
             class="${selected === uidOf(i) ? "on" : ""}" style="grid-template-columns:44px 1fr auto">
-      <span class="num muted">#${i.rank ?? i.incident_id}</span>
+      <span class="num muted">#${numberOf(i)}</span>
       <span><span class="swatch" style="background:${catColor(i.category)}"></span><b>${esc(i.category)}</b>
         · ${i.key_role === "source" ? "from" : "against"} <span class="mono">${esc(i.key_host)}</span>
+        ${i.record ? ` <span class="tag ${STATUS_TAG[i.record.status] ?? ""}">${esc(i.record.status)}</span> <span class="tag">${esc(i.site)}</span>` : ""}
         <div class="muted" style="font-size:13px">${int(i.n_flows)} flows · ${int(i.n_sources)} source(s) → ${int(i.n_destinations)} destination(s) · ${pct(i.mean_confidence, 0)} confident
           ${i.true_attack_share != null ? (i.true_attack_share > 0.5 ? ` · <span style="color:var(--good)">real attack</span>` : ` · <span style="color:var(--critical)">false alarm</span>`) : ""}</div>
         <div class="bar-mini"><i style="width:${(100 * i.severity / maxSev).toFixed(1)}%"></i></div></span>
@@ -286,10 +378,16 @@ async function pick(uid) {
   const det = $("#soc-detail", root);
   det.innerHTML = `
     <div class="card-head"><div>
-      <h3>Incident #${i.rank ?? i.incident_id} · ${esc(i.category)} ${sevTag(i)}
-        ${i.window_id != null ? `<span class="tag">window ${i.window_id}</span>` : ""}</h3>
-      <p class="sub">${i.start ? `${esc(i.start.replace("T", " ").slice(0, 19))} → ${esc(i.end.replace("T", " ").slice(11, 19))} · ` : ""}key host <span class="mono">${esc(i.key_host)}</span> (${esc(i.key_role)}, ${int(i.key_host_flows)} flows)</p>
-    </div></div>
+      <h3>Incident #${numberOf(i)} · ${esc(i.category)} ${sevTag(i)}
+        ${i.window_id != null ? `<span class="tag">window ${i.window_id}</span>` : ""}
+        ${i.record ? `<span class="tag">${esc(i.site)}</span> <span class="tag ${STATUS_TAG[i.record.status] ?? ""}">${esc(i.record.status)}</span>` : ""}</h3>
+      <p class="sub">${i.record ? `first seen ${esc(localTime(i.record.first_seen))} · last active ${esc(localTime(i.record.last_seen))} · `
+        : i.start ? `${esc(i.start.replace("T", " ").slice(0, 19))} → ${esc(i.end.replace("T", " ").slice(11, 19))} · ` : ""}key host <span class="mono">${esc(i.key_host)}</span> (${esc(i.key_role)}, ${int(i.key_host_flows)} flows)</p>
+    </div>
+    ${i.record ? `<div class="toolbar">
+      ${i.record.status !== "acknowledged" ? `<button class="btn small" id="soc-ack">Acknowledge</button>` : ""}
+      ${i.record.status !== "closed" ? `<button class="btn small" id="soc-close">Close</button>` : `<button class="btn small" id="soc-reopen">Reopen</button>`}
+    </div>` : ""}</div>
 
     <h4 class="section">Why was this flagged?</h4>
     <div id="soc-why">${skeleton("lines")}</div>
@@ -302,7 +400,7 @@ async function pick(uid) {
       <pre class="rule mono" id="soc-rule">${esc(p.rules.linux || "")}</pre>` : ""}
     <div class="toolbar" style="margin-top:10px">
       <button class="btn" id="soc-copy" title="Copy the rule shown above (c)">Copy rule</button>
-      <button class="btn" id="soc-report" title="Open a printable report (Print → Save as PDF)">Open report</button>
+      ${i.record ? "" : `<button class="btn" id="soc-report" title="Open a printable report (Print → Save as PDF)">Open report</button>`}
     </div>
 
     <h4 class="section">Decision</h4>
@@ -324,9 +422,19 @@ async function pick(uid) {
     $("#soc-rule", det).textContent = p.rules[b.dataset.v] || "";
   }));
   $("#soc-copy", det).addEventListener("click", copyRule);
-  $("#soc-report", det).addEventListener("click", () => openApi(
+  $("#soc-report", det)?.addEventListener("click", () => openApi(
     `/incidents/${windowOf(i)}/report?incident_id=${i.incident_id}&model=${current.model}`
     + `&threshold=${current.threshold || 0}`));
+  for (const [id, status] of [["#soc-ack", "acknowledged"], ["#soc-close", "closed"], ["#soc-reopen", "open"]]) {
+    $(id, det)?.addEventListener("click", (e) => withBusy(e.target, async () => {
+      try {
+        const analyst = $("#soc-analyst", root)?.value.trim() || prefs.get("analyst", "") || "analyst";
+        const r = await post(`/live/incident_records/${i.record.id}/status`, { status, analyst });
+        toast(`incident #${r.id} ${r.status}`);
+        await load(true); pick(uidOf(i));
+      } catch (err) { toast(err.message); }
+    }));
+  }
   $("#soc-approve", det).addEventListener("click", () => decide(i, "approve"));
   $("#soc-reject", det).addEventListener("click", () => decide(i, "reject"));
   explain(i);
@@ -341,11 +449,13 @@ async function copyRule() {
 
 async function explain(i) {
   const why = $("#soc-why", root);
-  const edge = (i.sample_edges || [])[0];
+  const edge = i.record ? (i.flow_ids || [])[0] : (i.sample_edges || [])[0];
   if (edge == null) { why.innerHTML = `<div class="empty">No sample flow available for this incident.</div>`; return; }
   let ex;
-  try { ex = await get(`/explain/${windowOf(i)}/${edge}?model=${current.model}`); }
-  catch (e) { showError(why, e, { what: "the explanation" }); return; }
+  try {
+    // a live flow is explained inside the context it was scored in (its chunk plus the site's last two minutes)
+    ex = i.record ? await get(`/live/explain/${edge}`) : await get(`/explain/${windowOf(i)}/${edge}?model=${current.model}`);
+  } catch (e) { showError(why, e, { what: "the explanation" }); return; }
   if (selected !== uidOf(i)) return;               // the analyst moved on while this was loading
   const st = ex.structure;
   why.innerHTML = `
@@ -365,7 +475,10 @@ async function explain(i) {
         { k: "Evidence from neighbouring flows", v: pct(ex.context_share, 0) },
       ])}
       <p class="note">Example flow <span class="mono">${esc(ex.src_ip)} → ${esc(ex.dst_ip)}</span> · model says
-        <b>${esc(ex.predicted_label)}</b> (${pct(ex.confidence, 0)}) · ground truth <b>${esc(ex.true_label)}</b></p>
+        <b>${esc(ex.predicted_label)}</b> (${pct(ex.confidence, 0)}) · ${ex.true_label != null
+          ? `ground truth <b>${esc(ex.true_label)}</b>`
+          : `live traffic: no ground truth${ex.predicted_when_scored && ex.predicted_when_scored !== ex.predicted_label
+              ? ` · when scored it said ${esc(ex.predicted_when_scored)}; the model has been taught since` : ""}`}</p>
     </div>`;
   const f = ex.features;
   const css = (v) => getComputedStyle(document.documentElement).getPropertyValue(v);
@@ -403,7 +516,7 @@ async function decide(i, decision) {
     body: decision === "approve"
       ? `This records approval of “${ACTION_TEXT[p.action] || p.action}” for ${p.target}. `
         + "The rule below is NOT sent to any firewall — the decision is stored as a dry run."
-      : `This records that incident #${i.rank ?? i.incident_id} was rejected. Nothing was executed either way.`,
+      : `This records that incident #${numberOf(i)} was rejected. Nothing was executed either way.`,
     detail: decision === "approve" ? rule : "",
     confirmLabel: decision === "approve" ? "Record approval" : "Record rejection",
     danger: decision === "reject",
@@ -415,13 +528,16 @@ async function decide(i, decision) {
   const analyst = $("#soc-analyst", root).value.trim() || "analyst";
   prefs.set("analyst", analyst);
   try {
-    const a = await post("/actions", { window_id: windowOf(i), incident_id: i.incident_id, model: current.model,
-                                       threshold: current.threshold, category: i.category, target: p.target });
+    const a = i.record
+      ? await post("/live/actions", { site: i.site, category: i.category, target: p.target,
+                                      minutes: Number($("#soc-minutes", root).value) })
+      : await post("/actions", { window_id: windowOf(i), incident_id: i.incident_id, model: current.model,
+                                 threshold: current.threshold, category: i.category, target: p.target });
     const d = a.status === "proposed"
       ? await post(`/actions/${a.id}/decision`, { decision, analyst, note: $("#soc-note", root).value.trim() || null })
       : a;                                 // already decided earlier: show that decision instead of a second one
-    if (a.status === "proposed") toast(`Incident #${i.rank ?? i.incident_id}: ${ACTION_TEXT[d.action] || d.action} ${d.status} (dry run)`);
-    else toast(`Incident #${i.rank ?? i.incident_id} was already ${d.status} by ${d.decided_by || "an analyst"}`);
+    if (a.status === "proposed") toast(`Incident #${numberOf(i)}: ${ACTION_TEXT[d.action] || d.action} ${d.status} (dry run)`);
+    else toast(`Incident #${numberOf(i)} was already ${d.status} by ${d.decided_by || "an analyst"}`);
     $("#soc-decide", root).innerHTML = `<span class="tag ${d.status === "approved" ? "good" : "bad"}">${esc(d.status)}</span>
       <span class="muted">by ${esc(d.decided_by || "—")} · ${esc(localTime(d.decided_at))} · recorded in the decision log
       <span class="tag dry">dry run</span></span>`;

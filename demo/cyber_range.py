@@ -222,11 +222,19 @@ class Streamer(threading.Thread):
             self.ship()
             self.stop_event.wait(1.0)
 
-    def flush(self, timeout: float = 60.0):
-        """Wait until every chunk captured up to now has been converted, scored and stored by the console."""
+    def flush(self, timeout: float = 600.0) -> bool:
+        """Wait until every chunk captured up to now has been converted, scored and stored by the console.
+        A phase must never be counted before its traffic has arrived (a 60 s limit once counted a scan as
+        0 flows while it was still queued). Returns False, and records an error, if it could not catch up."""
         target, t0 = time.time(), time.time()
         while self.shipped_until < target and time.time() - t0 < timeout:
             time.sleep(0.5)
+        if self.shipped_until < target:
+            msg = f"the pipeline was still {target - self.shipped_until:.0f}s behind after {timeout:.0f}s; numbers incomplete"
+            self.errors.append(msg)
+            print("  WARNING:", msg, flush=True)
+            return False
+        return True
 
     def stats(self, phase: str) -> dict:
         with self.lock:

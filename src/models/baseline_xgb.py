@@ -15,17 +15,18 @@ import xgboost as xgb
 class StaticXGBoost:
     name = "xgboost_static"
 
-    def __init__(self, num_classes: int, params: dict, seed: int = 0, device: str = "cpu"):
+    def __init__(self, num_classes: int, params: dict, seed: int = 0, device: str = "cpu", frozen: bool = True):
         self.num_classes = num_classes
         self.params = dict(params)
         self.seed = seed
         self.device = device
+        self.frozen = frozen      # True: the static baseline, fitted once; False: refitted from scratch on each call
         self.model: xgb.XGBClassifier | None = None
         self.classes_: np.ndarray | None = None
         self.trained = False
 
     def fit(self, X: np.ndarray, y: np.ndarray, sample_weight: np.ndarray | None = None) -> None:
-        if self.trained:
+        if self.trained and self.frozen:
             return  # frozen after the first task by design
         self.classes_ = np.unique(y)  # XGBoost needs contiguous labels 0..k-1
         remap = {c: i for i, c in enumerate(self.classes_)}
