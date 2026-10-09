@@ -58,7 +58,7 @@ def walk_python(rel_dirs):
 def routes():
     """FastAPI routes with their handler signature and docstring."""
     out = []
-    for rel in ("src/api/app.py", "src/api/ml_app.py", "src/api/results.py"):
+    for rel in ("src/api/app.py", "src/api/ml_app.py", "src/api/results.py", "src/live/routes.py"):
         src = (ROOT / rel).read_text(encoding="utf-8")
         tree = ast.parse(src)
         prefix = "/results" if rel.endswith("results.py") else ""

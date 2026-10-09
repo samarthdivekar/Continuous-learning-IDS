@@ -267,7 +267,7 @@ class App:
     def run_cyber_range(self):
         server = self.api_url            # plain string, safe to pass into the worker thread
         self.btn_range.configure(state=DISABLED, text="Running cyber range...")
-        self._log("starting the cyber range (isolated attacker + IDS). This takes a couple of minutes...")
+        self._log("starting the cyber range (isolated containers: office traffic + attacker). This takes about 6-10 minutes...")
 
         script = ROOT / "demo" / "cyber_range.py"
         self._log(f"launching: {PY} {script} --server {server}")
@@ -280,9 +280,14 @@ class App:
                     [str(PY), "-u", str(script), "--server", server],
                     cwd=str(ROOT), stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1,
                     env=env, creationflags=0x08000000 if os.name == "nt" else 0)
+                import re
                 for line in proc.stdout:
                     if line.strip():
                         self._log(line.rstrip())
+                    m = re.match(r"\s+(\d)\. (.+)", line)          # the range's phase banners: "  3. Attack #1 - ..."
+                    if m:
+                        label = f"Phase {m.group(1)} of 7: {m.group(2).split(' - ')[0][:40]}"
+                        self.ui.put(lambda t=label: self.btn_range.configure(text=t))
                 proc.wait()
                 self._log(f"cyber range finished (exit code {proc.returncode}).")
             except Exception as e:

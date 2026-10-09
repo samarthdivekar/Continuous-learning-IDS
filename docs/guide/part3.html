@@ -1,21 +1,22 @@
 <!-- ======================================================================================= 10 -->
 <section class="page-break">
 <h2>10 &middot; Every page and every feature of the console</h2>
-<p>The console is a website that runs in the browser at <span class="mono">http://localhost:8080</span>. It has eight
-pages in two groups: <b>Operate</b> (what a security team uses day to day) and <b>Evaluate</b> (the evidence that the
-model works). Every number on screen is read from a result file or from the live model; nothing is typed in by hand.
+<p>The console is a website that runs in the browser at <span class="mono">http://localhost:8080</span>. It has nine
+pages in three groups: <b>Operate</b> (what a security team uses day to day), <b>Evaluate</b> (the evidence that the
+model works) and <b>More</b> (exploration tools). Every number on screen is read from a result file or from the live model; nothing is typed in by hand.
 Screenshots were taken from the running system with the model service up, in the dark theme at 1440&times;900.</p>
 
 <h3>10.1 The frame around every page</h3>
-<figure><img src="img/03_sidebar.png" class="narrow"><figcaption>The sidebar: brand, the eight pages, service
+<figure><img src="img/03_sidebar.png" class="narrow"><figcaption>The sidebar: brand, the nine pages, service
 status, and four utility buttons.</figcaption></figure>
 <table class="kv">
 <tr><td>Navigation</td><td>One item per page with an icon. The current page is highlighted with an accent bar. Hovering an
-item shows its keyboard number (1&ndash;8). A red <b>LIVE</b> badge appears on Live stream while a replay runs.</td></tr>
+item shows its keyboard number (1&ndash;9). A <b>LIVE</b> badge appears on Live sites while a site is sending traffic, and a
+<b>DEMO</b> badge on Drift replay while a replay runs.</td></tr>
 <tr><td>Service status</td><td>Four rows checked every 4 seconds: <b>API</b> (port 8000), <b>Model service</b> (port 8001,
 the GPU), <b>Database</b>, and <b>Stream</b> (idle, finished, or progress such as 120/200). Green dot = online, red =
 offline. Hovering Model service shows the device (cuda + GPU name) and the models loaded.</td></tr>
-<tr><td>&#9654; Tour</td><td>A five-step guided walk: Overview &rarr; Incident queue &rarr; Live stream &rarr; Graph explorer
+<tr><td>&#9654; Tour</td><td>A five-step guided walk: Overview &rarr; Incident queue &rarr; Live sites &rarr; Graph explorer
 &rarr; Models, one sentence each.</td></tr>
 <tr><td>? Help</td><td>Opens a drawer with "where to start", keyboard shortcuts and a glossary. It opens by itself on a first
 visit.</td></tr>
@@ -23,17 +24,15 @@ visit.</td></tr>
 <tr><td>Theme</td><td>Switches dark and light. Charts redraw in the new colours.</td></tr>
 </table>
 
-<figure><img src="img/04_topbar.png"><figcaption>The top bar: where you are, and the three settings shared by every
+<figure><img src="img/04_topbar.png"><figcaption>The top bar: where you are, and the settings shared by every
 page.</figcaption></figure>
 <table class="kv">
 <tr><td>Breadcrumb</td><td>The group and page name, e.g. "Operate &rsaquo; Overview".</td></tr>
 <tr><td>Dataset</td><td>CIC-IDS2017 or CSE-CIC-IDS2018. Every open page re-reads its data.</td></tr>
-<tr><td>Labels</td><td><b>Multiclass</b> names each attack type; <b>Binary</b> is only attack vs benign. Binary is disabled
-for CSE-CIC-IDS2018, because that experiment had only one seed and was withdrawn (hover explains why).</td></tr>
 <tr><td>Compare models</td><td>Off: charts show our model and two reference points (naive retraining, XGBoost). On: every
 baseline and ablation appears.</td></tr>
-<tr><td>Jump to&hellip; (Ctrl K)</td><td>The command palette: type to jump to a page, switch dataset or labels, start or stop the
-stream, switch theme, or type a number to open that incident.</td></tr>
+<tr><td>Jump to&hellip; (Ctrl K)</td><td>The command palette: type to jump to a page, switch dataset, start or stop the drift
+replay, switch theme, or type a number to open that incident.</td></tr>
 </table>
 
 <div class="two">
@@ -44,11 +43,11 @@ stream, switch theme, or type a number to open that incident.</td></tr>
 <figure><img src="img/82_tour.png"><figcaption>The guided tour card (bottom right).</figcaption></figure>
 <figure><img src="img/83_presentation_mode.png"><figcaption>Presentation mode: bigger type for a projector.</figcaption></figure>
 </div>
-<p><b>Keyboard:</b> 1&ndash;8 switch pages, ? opens help, Esc closes panels, Ctrl+K opens the palette. In the Incident
+<p><b>Keyboard:</b> 1&ndash;9 switch pages, ? opens help, Esc closes panels, Ctrl+K opens the palette. In the Incident
 queue: j / k move, Enter opens, a approves, r rejects, c copies the rule.</p>
 <p><b>Other details:</b> a yellow <b>banner</b> appears under the top bar when the model service is down, naming the pages that
 still work; <b>&#10515; export buttons</b> on panels download the data as CSV (and charts as PNG); preferences (theme,
-dataset, labels, compare, chosen sub-page) are remembered by the browser; if the server requires an API key the console
+dataset, compare, chosen sub-page) are remembered by the browser; if the server requires an API key the console
 asks once and sends it in a header, never in the address.</p>
 </section>
 
@@ -58,10 +57,12 @@ asks once and sends it in a header, never in the address.</p>
 <ul>
 <li><b>In plain words</b>: a sentence generated from the result files, e.g. "the model learned 7 attack types one after
 another&hellip; after the last one it still catches 100&nbsp;% of the first attack type, while a normally retrained model
-catches 0&nbsp;%. It wrongly flags about 66 of every 100,000 normal flows."</li>
-<li><b>Four KPI tiles</b>: our macro-F1 (0.964 &plusmn; 0.020 over 3 seeds, versus 0.928 for the per-flow FFNN), retention of the
-first attack (100&nbsp;%, versus 0&nbsp;% for naive retraining), false-positive rate (0.07&nbsp;%), drift-triggered retrains (16,
-where the oracle needed 6).</li>
+catches 0&nbsp;%. It wrongly flags about 42 of every 100,000 normal flows. Figures are from the temporal split."</li>
+<li><b>Four KPI tiles</b>, leading with the result that differentiates the work: an <b>attack never seen in training</b>
+(CIC-IDS2017: held-out DoS 66&nbsp;% over 3 seeds, worst 63&nbsp;%, against 1.8&nbsp;% for the per-flow model; CSE-CIC-IDS2018:
+98.6&nbsp;% against 0.06&nbsp;%), then macro-F1 on the <b>temporal split</b> (0.915 &plusmn; 0.031 over 5 seeds; the optimistic
+interleaved 0.964 shown underneath), retention of the first attack (100&nbsp;% versus 0&nbsp;% for naive retraining) and the
+false-positive rate (0.042&nbsp;%).</li>
 <li><b>The core claim, measured</b>: per model, does it <i>adapt</i> (recall on each new category) and does it
 <i>remember</i> (recall on the first category at the end)? A tick appears at 80&nbsp;% or more; the rule is written on the
 panel.</li>
@@ -107,10 +108,46 @@ DROP</span>. The analyst types their name and presses Approve; the log records i
 </section>
 
 <section class="page-break">
-<h3>10.4 Live stream: watch it detect drift and adapt</h3>
-<figure><img src="img/71_live_running.png" class="crop-top"><figcaption>A recorded 200-window replay of tasks 2&ndash;7 through
-four models. (The status line at the top read "failed" when this was captured because of an unrelated GPU fault during
-the screenshot session; the charts are the completed run.)</figcaption></figure>
+<h3>10.4 Live sites: real traffic, scored within seconds</h3>
+<figure><img src="img/72_sites_overview.png"><figcaption>Live sites after a recorded DoS window was replayed into the
+<i>sandbox</i> site: site tiles, the site's last two minutes as a graph, and the review panels below.</figcaption></figure>
+<p><b>Why it exists:</b> this is the product working on traffic it has never seen. Three sources feed it, each shown as a
+<i>site</i>: a <b>sensor</b> on a real machine (<span class="mono">sensor/agent.py</span>, captures in short chunks), the
+<b>cyber range</b> (isolated Docker containers: six servers, six workstations making normal web, shell and mail sessions,
+and an attacker that runs a port scan), and the <b>sandbox replay</b> (a real recorded attack window from the test set, so
+detection can be shown without attacking anything).</p>
+<table class="kv">
+<tr><td>Site tiles</td><td>Per site: confident alarms, flows, unsure and unfamiliar flows in the last 5 minutes, and whether it
+reported in the last minute. A red number means attacks were flagged.</td></tr>
+<tr><td>Live graph</td><td>The selected site's last two minutes as hosts and flows, coloured by the model's prediction. Each
+few-second chunk is scored inside exactly this context (up to 5,000 flows, the training window size).</td></tr>
+<tr><td>Incidents</td><td>Confident attack verdicts of the last 15 minutes, grouped per site. Each is a stored record
+(<i>open, acknowledged, closed, reopened</i>), carries a dry-run rule, a <b>Why?</b> explanation, <b>Approve / Reject</b>
+into the decision log, and CEF export.</td></tr>
+<tr><td>Unsure</td><td>Flows the model could not call attack or normal (its calibrated conformal prediction set held both):
+no alarm is raised and an analyst decides.</td></tr>
+<tr><td>Unfamiliar</td><td>Called normal, but unlike anything seen in training: candidates for a new attack.</td></tr>
+<tr><td>Teach the model</td><td>Label flows (who and when are recorded; bulk "mark normal" skips flagged, unsure and unfamiliar
+flows; unlearned labels can be undone) and press <b>Adapt</b>.</td></tr>
+</table>
+<figure><img src="img/73_sites_incident.png" class="half"><figcaption>One live incident with its record, the proposed
+dry-run rule and the <i>Why?</i> explanation.</figcaption></figure>
+<p><b>The safety gate.</b> Teaching fine-tunes a copy of the model at a tenth of the training learning rate, one epoch at a
+time, while the live model keeps scoring. After each epoch the copy is checked on data it never trained on, and the last
+epoch that passes is kept: old-attack macro-F1 may not fall more than 0.02, no old attack may lose more than 5 points of
+recall, and false alarms may not rise more than 0.5 points on recorded normal traffic or on the site's own normal traffic
+held back from training. If even the first epoch fails, nothing changes and the reason is shown. Accepted updates are
+saved and survive a restart; <b>Reset model</b> returns to the trained model.</p>
+<figure><img src="img/74_sites_teach.png" class="half"><figcaption>The review area: live model history, incidents, the
+unsure and unfamiliar lists, and the teach panel.</figcaption></figure>
+<figure><img src="img/75_range_report.png" class="half"><figcaption>The report the cyber range writes after each run, with
+every phase measured against exact ground truth.</figcaption></figure>
+</section>
+
+<section class="page-break">
+<h3>10.5 Drift replay: watch it detect drift and adapt</h3>
+<figure><img src="img/71_live_running.png" class="crop-top"><figcaption>Drift replay (under Evaluate): a recorded 200-window
+replay of tasks 2&ndash;7 through four models; the charts show the most recent run.</figcaption></figure>
 <table class="kv">
 <tr><td>Speed / Start / Retrain now / Stop</td><td>Delay between windows; start the replay; force an adaptation (operator
 override); stop.</td></tr>
@@ -131,7 +168,7 @@ and the error falls back over the next windows.</p>
 </section>
 
 <section class="page-break">
-<h3>10.5 Graph explorer: an attack has a shape</h3>
+<h3>10.6 Graph explorer: an attack has a shape</h3>
 <figure><img src="img/20_explorer_graph.png"><figcaption>Window #359 (PortScan): 5,000 flows between 11 hosts; two hosts carry
 4,967 attack flows between them.</figcaption></figure>
 <table class="kv">
@@ -149,7 +186,7 @@ task, category and attack-flow count with a bar.</td></tr>
 </section>
 
 <section class="page-break">
-<h3>10.6 Classify: run the models on demand</h3>
+<h3>10.7 Classify: run the models on demand</h3>
 <figure><img src="img/30_classify_window.png"><figcaption>Held-out window #82 (BruteForce): every model's verdict
 compared with the truth.</figcaption></figure>
 <ul>
@@ -164,7 +201,7 @@ missing names listed, because a verdict computed on made-up zeros would look aut
 </section>
 
 <section class="page-break">
-<h3>10.7 Models: the evidence about quality</h3>
+<h3>10.8 Models: the evidence about quality</h3>
 <figure><img src="img/40_models_accuracy.png"><figcaption>Accuracy &amp; forgetting: macro-F1 after each task, with a band of
 &plusmn;1 standard deviation across seeds.</figcaption></figure>
 <ul>
@@ -188,7 +225,7 @@ does not), and with every flow's source randomised (<i>random_src</i>: the attac
 </section>
 
 <section class="page-break">
-<h3>10.8 Adaptation &amp; trust</h3>
+<h3>10.9 Adaptation &amp; trust</h3>
 <figure><img src="img/50_adapt_drift.png"><figcaption>Drift &amp; retraining.</figcaption></figure>
 <ul>
 <li><b>Retrains vs final macro-F1</b>: bars are retrain cycles, the line is final quality, for ADWIN, a fixed schedule, the
@@ -201,7 +238,9 @@ summarised.</li>
 <ol>
 <li><b>Does it notice an attack it was never taught?</b> AUROC per unseen category for three novelty scores (choose energy,
 max softmax or prototype distance), plus clustering of novel flows into candidate new categories.</li>
-<li><b>Does it know when not to decide?</b> Conformal abstention: false alarms before and after, share handed to an analyst.</li>
+<li><b>Does it know when not to decide?</b> Conformal abstention: false alarms before and after, share handed to an analyst.
+(This experiment abstains whenever the set is not one class; the live system abstains only when it holds both normal and an
+attack, which keeps 96&nbsp;% of attack flows as alarms instead of 71&nbsp;%.)</li>
 <li><b>Will analysts drown in alerts?</b> Flow alerts vs incidents at different false-alarm budgets.</li>
 <li><b>Can it adapt safely without labelling everything?</b> All labels vs 100 labels per update (half least certain, half
 random) vs the safety gate that rolls back a bad update. Labelled single run, indicative only.</li>
@@ -209,7 +248,7 @@ random) vs the safety gate that rolls back a bad update. Labelled single run, in
 </section>
 
 <section class="page-break">
-<h3>10.9 Reproducibility: check, don't trust</h3>
+<h3>10.10 Reproducibility: check, don't trust</h3>
 <figure><img src="img/60_repro.png"><figcaption>Reproducibility page.</figcaption></figure>
 <ul>
 <li><b>Reproduce everything</b>: the single command (<span class="mono">python -m experiments.reproduce_all --dataset
@@ -220,10 +259,10 @@ cicids2017</span>) with a Copy button.</li>
 <li><b>EWC stability</b>: a check that the penalty never became large enough to destabilise training.</li>
 </ul>
 
-<h3>10.10 Light theme, the second dataset, and the phone</h3>
+<h3>10.11 Light theme, the second dataset, and the phone</h3>
 <div class="two">
 <figure><img src="img/84_light_theme.png"><figcaption>Light theme.</figcaption></figure>
-<figure><img src="img/85_dataset_2018.png"><figcaption>CSE-CIC-IDS2018 selected (Binary disabled).</figcaption></figure>
+<figure><img src="img/85_dataset_2018.png"><figcaption>CSE-CIC-IDS2018 selected.</figcaption></figure>
 </div>
 <div class="two phone">
 <figure><img src="img/90_phone_overview.png"><figcaption>Phone: page name next to the menu button.</figcaption></figure>
@@ -353,7 +392,8 @@ are being run (status in the README).</li>
 </ul>
 <h3>Future work</h3>
 <ul>
-<li>Validate on newer and real traffic; ingest Zeek or Suricata output directly.</li>
+<li>Validate on newer and real traffic (the false-alarm rate on a real network has not been measured yet); flows that
+span capture chunks are cut at chunk boundaries today.</li>
 <li>Reduce topology dependence without losing accuracy (better augmentation, host-agnostic features).</li>
 <li>Learn from fewer labels; test label-free drift signals that work.</li>
 <li>Authentication, TLS and roles for a real deployment.</li>
@@ -396,12 +436,12 @@ adapted. It wins when attacks are mixed, not when they arrive in clean blocks.</
 <li>Overview (1 min): the plain-words sentence, retention 100&nbsp;% vs 0&nbsp;%.</li>
 <li>Incident queue (2 min): window #363, one incident, why it was flagged, the dry-run rule, approve.</li>
 <li>Graph explorer (1 min): a scan or flood as a shape.</li>
-<li>Live stream (2 min): start, point at a drift flag and the retrain.</li>
+<li>Live sites (3 min): sandbox replay for a reliable detection, then the cyber range: scan, teach, gate, scan again.</li>
 <li>Models (2 min): forgetting chart, then unseen attacks and the IP-leakage limitation.</li>
 <li>Reproducibility (1 min): one command reproduces every number.</li>
-<li>Close (1 min): what it is (a triage layer), what it is not (a SOC platform).</li>
+<li>Close (1 min): what it is (a standalone flow-based detector that learns under a safety gate), what it is not (a SOC platform).</li>
 </ol>
-<p class="note">Do not start the Live stream while long experiments are training on the same 4 GB GPU.</p>
+<p class="note">Do not start the Drift replay or the cyber range while long experiments are training on the same 4 GB GPU.</p>
 
 <h3>14.3 Numbers worth memorising</h3>
 <table class="kv">

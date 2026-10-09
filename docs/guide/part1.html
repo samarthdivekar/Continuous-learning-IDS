@@ -63,10 +63,11 @@ only when traffic really changes.</td></tr>
 <tr><td>Usable output</td><td>Alerts are grouped into <b>incidents</b>, each with an <b>explanation</b>, an
 <b>"I'm not sure" abstention</b>, a <b>novelty flag</b> for unfamiliar traffic, and a <b>proposed firewall rule that
 is never executed</b> (dry run only).</td></tr>
-<tr><td>Console</td><td>An eight-page web console (Overview, Incident queue, Live stream, Graph explorer, Classify, Models,
-Adaptation &amp; trust, Reproducibility) served by a FastAPI backend.</td></tr>
+<tr><td>Console</td><td>A nine-page web console (Overview, Incident queue, Live sites, Models, Adaptation &amp; trust,
+Drift replay, Reproducibility, Graph explorer, Classify) served by a FastAPI backend, with sensors, a live model that
+learns under a safety gate, and a self-contained cyber range.</td></tr>
 <tr><td>Proof</td><td>Every number comes from scripts in <span class="mono">experiments/</span>, run on two public
-datasets, with multiple random seeds, a realistic time-ordered test split, statistics, 92 automated tests and a
+datasets, with multiple random seeds, a realistic time-ordered test split, statistics, 120 automated tests and a
 browser smoke test.</td></tr>
 </table>
 
@@ -98,8 +99,9 @@ attacks.</td><td>Single run</td></tr>
 <h2>2 &middot; Scope: what it is, what it is not, and who it is for</h2>
 
 <h3>What it is</h3>
-<p>A <b>research prototype of a triage layer</b>: software that sits beside an organisation's existing intrusion
-detection system, reads the network flows, and helps a small security team decide what to look at first. It is
+<p>A <b>research prototype of a standalone, flow-based intrusion detector with an analyst console</b>: sensors capture
+traffic, a graph model scores it, groups alerts into incidents, abstains when unsure, and learns new attacks and the local
+network from analyst labels under a safety gate, helping a small security team decide what to look at first. It is
 built so that every claim can be checked: the experiments, the console and the documentation all read the same
 result files.</p>
 
@@ -120,8 +122,8 @@ result files.</p>
 <li><b>Replacing a SOC platform.</b> There is no case management, no correlation across log sources, no TLS, no user
 roles. The README and the positioning note say so plainly.</li>
 <li><b>Reading packet contents.</b> Only flow statistics (sizes, timings, flags) are used, never payloads.</li>
-<li><b>Capturing traffic.</b> Flows arrive as CSV in the CICFlowMeter format; a production system would ingest Zeek or
-Suricata output directly.</li>
+<li><b>Integrating with other security tools.</b> It does not read other IDSs' alerts (Suricata, Snort, Zeek); it only
+exports incidents as CEF text for a SIEM.</li>
 <li><b>Production validation.</b> All results come from two public laboratory datasets.</li>
 </ul>
 
@@ -129,8 +131,8 @@ Suricata output directly.</li>
 <table>
 <thead><tr><th>Who</th><th>What they get from it</th></tr></thead>
 <tbody>
-<tr><td><b>Primary user: a small security team</b> (2&ndash;5 analysts) that already runs a signature IDS such as Suricata,
-Snort or Zeek and has more alerts than it can read.</td><td>Incidents instead of raw alerts, a reason for each one, an
+<tr><td><b>Primary user: a small security team</b> (2&ndash;5 analysts) that can place a sensor on its network and wants a
+behaviour-based second opinion beside its existing defences.</td><td>Incidents instead of raw alerts, a reason for each one, an
 "unsure" bucket, a flag for unfamiliar traffic, and a model that keeps up with new attacks.</td></tr>
 <tr><td><b>Examiners and reviewers</b></td><td>A system whose every number can be regenerated with one command, with
 the negative results reported next to the positive ones.</td></tr>
@@ -138,8 +140,8 @@ the negative results reported next to the positive ones.</td></tr>
 tested pipeline (data &rarr; graphs &rarr; continual training &rarr; drift &rarr; evaluation &rarr; API &rarr; UI) to
 build on.</td></tr>
 </tbody></table>
-<p class="note">Positioning in one line (from <span class="mono">docs/positioning.md</span>): <i>a continual-learning
-triage layer on an existing IDS's alert stream, not a SOC platform.</i></p>
+<p class="note">Positioning in one line (from <span class="mono">docs/positioning.md</span>): <i>a standalone, flow-based
+detector with an analyst console that learns new attacks under a safety gate; not a SOC platform.</i></p>
 </section>
 
 <!-- ======================================================================================= 3 -->

@@ -92,7 +92,6 @@ module on first use, so nothing is fetched for a page nobody opens.</p>
 {table(["Control", "Widget", "What it does"],
        [["Breadcrumb", "text", "the current group and page"],
         ["CIC-IDS2017 / CSE-CIC-IDS2018", "segmented control", "switches dataset; every open page re-reads its data"],
-        ["Multiclass / Binary", "segmented control", "named attack types or attack-vs-benign; Binary is disabled for CSE-CIC-IDS2018, whose binary task sequence was withdrawn"],
         ["Compare models", "toggle switch", "off shows the deployed model and two reference points; on shows every baseline and ablation"],
         ["Jump to&hellip; (Ctrl&nbsp;K)", "button", "opens the command palette"],
         ["&#9776;", "icon button", "on a phone: opens the sidebar as a drawer"]])}
@@ -103,7 +102,7 @@ module on first use, so nothing is fetched for a page nobody opens.</p>
 
 <h4>Keyboard</h4>
 <ul>
-<li><span class="mono">1</span>&ndash;<span class="mono">8</span> &mdash; switch page</li>
+<li><span class="mono">1</span>&ndash;<span class="mono">9</span> &mdash; switch page</li>
 <li><span class="mono">?</span> &mdash; open or close the Help drawer &nbsp;&middot;&nbsp;
     <span class="mono">Esc</span> &mdash; close it</li>
 </ul>
@@ -116,7 +115,7 @@ service cannot slow the page down.</li>
 work. Dismissing it hides that message only; a different problem shows again.</li>
 <li><b>API key</b> &mdash; if the server requires one, the console asks for it once and remembers it in the
 browser. Downloads fetch with the key as a header, so it never appears in a URL.</li>
-<li><b>Preferences</b> &mdash; theme, dataset, label mode, compare toggle, chosen model and sub-tab are
+<li><b>Preferences</b> &mdash; theme, dataset, compare toggle, chosen model and sub-tab are
 remembered per browser.</li>
 </ul>
 </section>
@@ -170,9 +169,36 @@ TABS = [
       "Windows Firewall": "shows the PowerShell form of the same rule",
       "All": "decision log filter: everything", "Pending": "decision log filter: awaiting a decision",
       "Approved": "decision log filter: approved", "Rejected": "decision log filter: rejected"}),
-    ("6.5", "Live stream", "dashboard/js/views/live.js", ["dashboard/js/views/live.js"],
-     "Replays the traffic stream through four models at once and shows drift detection and self-retraining "
-     "as they happen.",
+    ("6.5", "Live sites", "dashboard/js/views/sites.js", ["dashboard/js/views/sites.js"],
+     "Real traffic: sensors, the cyber range and the sandbox replay, each a site, scored within seconds; the "
+     "analyst triages, labels and teaches here.",
+     ["<b>Sites</b> &mdash; one tile per site: flows, confident alarms, unsure and unfamiliar flows in the last 5 "
+      "minutes, and whether it reported in the last minute.",
+      "<b>Live graph</b> &mdash; the selected site's last two minutes as a host/flow graph coloured by the model's "
+      "prediction (live traffic has no ground truth).",
+      "<b>Incidents</b> &mdash; confident attack verdicts of the last 15 minutes grouped per site; each is a stored "
+      "record (open, acknowledged, closed, reopened) with a dry-run rule, a <i>Why?</i> explanation rebuilt in the "
+      "context the flow was scored in, approve / reject into the decision log, and CEF export.",
+      "<b>Unsure</b> &mdash; flows where the conformal prediction set held both normal and an attack: no alarm, an "
+      "analyst decides. <b>Unfamiliar</b> &mdash; called normal but unlike anything seen in training.",
+      "<b>Teach</b> &mdash; label flows (who and when are kept; bulk 'normal' skips suspicious flows; unlearned labels "
+      "can be undone) and adapt. Training runs on a copy at 0.1&times; the training learning rate, one epoch at a "
+      "time, keeping the last epoch that passes the gate: old-attack macro-F1 may not fall more than 0.02, no "
+      "category's recall more than 5 points, and false alarms on recorded benign traffic or on the site's held-back "
+      "normal traffic may not rise more than 0.5 points. Accepted updates are saved and survive a restart.",
+      "<b>Drift</b> &mdash; the model's disagreement with new analyst labels per site; above 10 % (50+ labels) "
+      "adapting is recommended."],
+     {"st-reset": "returns the live model to the trained checkpoint, deletes the saved live state and frees used labels",
+      "st-replay-cat": "which recorded attack the sandbox replays",
+      "st-replay": "feeds a real recorded test window of that attack through the live scorer (<span class='mono'>POST /sensor/replay_recorded</span>)",
+      "st-gfit": "fits the graph to the view",
+      "st-cef": "downloads the live incidents as CEF lines (<span class='mono'>/live/incidents/cef</span>)",
+      "st-min": "how many minutes 'Mark normal' covers",
+      "st-normal": "labels the site's recent unflagged, sure, familiar flows as normal",
+      "st-adapt": "teaches the live model from every label not yet used (<span class='mono'>POST /live/adapt</span>)"}),
+    ("6.6", "Drift replay", "dashboard/js/views/live.js", ["dashboard/js/views/live.js"],
+     "Replays the recorded dataset's stream through four models at once and shows drift detection and "
+     "self-retraining as they happen (a demonstration on the training data, not live traffic).",
      ["<b>Progress and KPIs</b> &mdash; position in the stream, and per-window counts of benign, known-attack and "
       "novel/drifted predictions.",
       "<b>Live charts</b> &mdash; error rate over the stream with vertical markers where each model adapted.",
@@ -184,7 +210,7 @@ TABS = [
       "lv-retrain": "forces an adaptation now (<span class='mono'>POST /retrain</span>), the operator override",
       "lv-stop": "stops the replay (<span class='mono'>POST /demo/stop</span>)",
       "lv-speed": "delay between windows, from fast to slow enough to narrate"}),
-    ("6.6", "Graph explorer", "dashboard/js/views/explorer.js", ["dashboard/js/views/explorer.js"],
+    ("6.7", "Graph explorer", "dashboard/js/views/explorer.js", ["dashboard/js/views/explorer.js"],
      "One window as a picture: hosts as dots, flows as lines, laid out by d3-force on a canvas.",
      ["<b>Why it exists</b> &mdash; attacks have shapes. A port scan fans out from one host; a flood fans in to one "
       "victim. That shape is exactly what the graph model can use and a per-flow model cannot.",
@@ -198,7 +224,7 @@ TABS = [
       "ex-attack": "show only edges that are attacks",
       "Ground truth": "colour edges by their true category",
       "Model errors": "colour edges by whether the model got them right"}),
-    ("6.7", "Classify", "dashboard/js/views/classify.js", ["dashboard/js/views/classify.js"],
+    ("6.8", "Classify", "dashboard/js/views/classify.js", ["dashboard/js/views/classify.js"],
      "Run the models on demand: either a held-out window with ground truth, or your own flows.",
      ["<b>Window mode</b> &mdash; pick a test window; every loaded model classifies it and the counts are compared "
       "with the truth.",
@@ -213,7 +239,7 @@ TABS = [
       "cl-run-f": "classifies the uploaded file (parsed in the browser, then <span class='mono'>POST /predict</span>); "
                   "disabled until a file with address columns is loaded",
       "cl-file": "loads a CSV file and previews its rows and columns (5 MB limit, stated in the interface)"}),
-    ("6.8", "Models", "dashboard/js/views/models.js (compare.js + general.js)",
+    ("6.9", "Models", "dashboard/js/views/models.js (compare.js + general.js)",
      ["dashboard/js/views/compare.js", "dashboard/js/views/general.js"],
      "The evidence about model quality, in two sub-sections: <i>Accuracy &amp; forgetting</i> and "
      "<i>Unseen attacks &amp; IP leakage</i>.",
@@ -232,7 +258,7 @@ TABS = [
       "cmp-cm-task": "after which task the confusion matrix is taken",
       "Binary": "scores the unseen-attack test in attack-vs-benign mode",
       "Multiclass": "scores it with named categories"}),
-    ("6.9", "Adaptation &amp; trust", "dashboard/js/views/adapt.js (drift.js + trust.js)",
+    ("6.10", "Adaptation &amp; trust", "dashboard/js/views/adapt.js (drift.js + trust.js)",
      ["dashboard/js/views/drift.js", "dashboard/js/views/trust.js"],
      "When the system noticed traffic had changed and what it did, plus how far its decisions can be trusted. "
      "Two sub-sections: <i>Drift &amp; retraining</i> and <i>Trust</i>.",
@@ -247,7 +273,7 @@ TABS = [
       "safety gate (single runs, labelled as indicative). The failed budget variants are one sentence of prose."],
      {"dr-run": "which stream run to display",
       "tr-method": "which novelty score to chart (energy, max softmax, prototype distance)"}),
-    ("6.10", "Reproducibility", "dashboard/js/views/repro.js", ["dashboard/js/views/repro.js"],
+    ("6.11", "Reproducibility", "dashboard/js/views/repro.js", ["dashboard/js/views/repro.js"],
      "How every number was produced, so a reader can check rather than trust.",
      ["<b>EWC &lambda; sweep</b> &mdash; validation score against the penalty strength, on a logarithmic axis, with "
       "the selected value marked.",
@@ -293,7 +319,7 @@ attribution chart.</li>
 <p class="muted">Measured: about 0.24 s per call once the window has been scored once; 3.5 s for a cold scan of
 ten windows.</p>
 
-<h3>7.2 Pressing "Start stream"</h3>
+<h3>7.2 Pressing "Start stream" on Drift replay</h3>
 <ol>
 <li><span class="mono">POST /demo/start</span> creates a <span class="mono">DemoRunner</span> thread holding four
 <span class="mono">StreamRunner</span>s, one per model, warm-started from the task-1 checkpoints.</li>
@@ -417,8 +443,10 @@ powershell -ExecutionPolicy Bypass -File scripts\\run_stack.ps1 -Stop     # stop
 <tr><td>Public API</td><td>8000</td><td class="mono">uvicorn src.api.app:app</td><td>results, database, forwards model calls</td></tr>
 <tr><td>Model service</td><td>8001</td><td class="mono">uvicorn src.api.ml_app:app</td><td>loads four checkpoints onto the GPU</td></tr>
 </tbody></table>
-<p>All three bind to <span class="mono">127.0.0.1</span>, so nothing is exposed to the network by default.
-Logs are written to <span class="mono">logs/stack_*.log</span>.</p>
+<p>All three bind to <span class="mono">127.0.0.1</span>, so nothing is exposed to the network by default. For
+sensors on other machines, <span class="mono">-BindHost &lt;LAN or Tailscale IP&gt;</span> exposes the public API only,
+and the script refuses unless <span class="mono">GNNIDS_API_KEY</span> is set, or if the port is already taken by
+another program. Logs are written to <span class="mono">logs/stack_*.log</span>.</p>
 
 <h3>9.2 Environment variables</h3>
 {}
@@ -435,15 +463,20 @@ leave-one-attack-out, the IP-remap test, the figures, the report and the databas
 appears on the Live sites tab. A CSV with the full feature set can be scored on the Classify tab.</p>
 
 <h3>9.5 Tests and continuous integration</h3>
-<p>74 tests (<span class="mono">python -m pytest</span>) covering preprocessing, graph building, the learners, the
-replay buffer, drift detection, the product layer, exports and all API routes, using small synthetic fixtures so
-they need no dataset. GitHub Actions runs them on every push.</p>
+<p>120 tests (<span class="mono">python -m pytest</span>) covering preprocessing, graph building, the learners, the
+replay buffer, drift detection, the product layer, exports, all API routes and the live path (scoring in context,
+abstention, the teaching gate, persistence, labels, incidents, explanations, retention), using small synthetic
+fixtures so they need no dataset. GitHub Actions runs them on every push. <span class="mono">scripts/ui_smoke.py</span>
+loads every console page in 84 combinations (desktop and phone, dark and light, both datasets, compare on and off)
+and fails on any console error.</p>
 
 <h3>9.6 Security posture</h3>
 <ul>
 <li>Checkpoints are read with PyTorch's restricted loader; the permissive one is used only as a fallback for files
 inside the project's own directories.</li>
-<li>Optional API key; security headers on every response; a content-security policy on the console.</li>
+<li>Optional API key, sent only in a header and compared in constant time; security headers on every response;
+a content-security policy on the console.</li>
+<li>Unlabelled live flows are deleted after <span class="mono">GNNIDS_LIVE_RETENTION_DAYS</span> (7) days.</li>
 <li>Request bodies are size-limited and every value rendered in the browser is escaped.</li>
 <li>Proposed firewall rules are never executed. Approval records a decision, nothing more.</li>
 <li>Not solved on purpose, and written down as such: TLS, user accounts and roles, rate limiting, and encryption
@@ -455,7 +488,8 @@ of the stored flow records.</li>
                   ['<span class="mono">ML_SERVICE_URL</span>', "where the public API forwards model calls; unset means run the model in-process"],
                   ['<span class="mono">DATABASE_URL</span>', "PostgreSQL/TimescaleDB instead of the local SQLite file"],
                   ['<span class="mono">DATASET</span>, <span class="mono">LABEL_MODE</span>', "which dataset and label mode the model service serves"],
-                  ['<span class="mono">CICFLOWMETER_JAR</span>', "path to CICFlowMeter for the pcap script"]])))
+                  ['<span class="mono">GNNIDS_LIVE_RETENTION_DAYS</span>', "days unlabelled live flows are kept (default 7)"],
+                  ['<span class="mono">GNNIDS_FLOWMETER_IMAGE</span>', "the pinned CICFlowMeter Docker image (default gnnids-cicflowmeter)"]])))
 
 # ------------------------------------------------------------------ 10. glossary
 add("""

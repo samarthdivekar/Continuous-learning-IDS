@@ -212,13 +212,21 @@ action.</li>
 note. Nothing is executed.</li>
 </ol>
 
-<h3>9.3 The live loop (Live stream page)</h3>
-<p>The same steps run continuously during a replay. For each new window, each of four models predicts first. Then the
+<h3>9.3 Live traffic (Live sites page)</h3>
+<p>A sensor (or the cyber range) captures a few seconds of packets at a time; the pinned CICFlowMeter turns them into
+flows with exactly the training features; non-IP records are dropped. Each chunk is scored inside its site's last two
+minutes of flows, so the graph is comparable in size to the 5,000-flow training windows. Confident attack verdicts are
+grouped per site into incidents; flows the model cannot call attack or normal go to an <i>Unsure</i> list; traffic unlike
+anything in training is listed as <i>Unfamiliar</i>. An analyst's labels teach the live model, one epoch at a time on a
+copy, and an epoch is kept only if the model did not forget old attacks or raise false alarms (section 10.4).</p>
+
+<h3>9.4 The drift loop (Drift replay page)</h3>
+<p>The same steps run continuously during a replay of the recorded dataset. For each new window, each of four models predicts first. Then the
 true labels are revealed (the "delayed labels" an analyst would provide), the error goes to ADWIN, and if ADWIN confirms a
 rise in error the model adapts on the last 20 windows using its continual-learning strategy. Everything is written to the
 database and shown live.</p>
 
-<h3>9.4 Why it is split into separate services</h3>
+<h3>9.5 Why it is split into separate services</h3>
 <ul>
 <li>The heavy model work (GPU, PyTorch) runs in its own process, so the public API stays responsive.</li>
 <li>If the model service is down, the pages that read saved results still work, and a banner names the pages that

@@ -96,7 +96,7 @@ model service is down: the results tabs read files and keep working, and a banne
     <polygon points="0 0, 9 3.5, 0 7" fill="#2a6fb5"/></marker></defs>
   <rect x="8" y="112" width="120" height="62" rx="7" fill="#eef4fa" stroke="#9fb9d4"/>
   <text x="68" y="137" text-anchor="middle" font-weight="600">Browser</text>
-  <text x="68" y="153" text-anchor="middle" fill="#5d6e80" font-size="9.5">8 tabs, ES modules</text>
+  <text x="68" y="153" text-anchor="middle" fill="#5d6e80" font-size="9.5">9 tabs, ES modules</text>
   <rect x="176" y="112" width="128" height="62" rx="7" fill="#eef4fa" stroke="#9fb9d4"/>
   <text x="240" y="132" text-anchor="middle" font-weight="600">Static server</text>
   <text x="240" y="147" text-anchor="middle" fill="#5d6e80" font-size="9.5">port 8080</text>
@@ -229,11 +229,17 @@ also answers at <span class="mono">/api/predict</span>.</p>
 the interface can say "not run yet".</p>
 {routes_table(["src/api/results.py"])}
 
-<h3>5.3 Model service <span class="mono muted">src/api/ml_app.py &middot; port 8001, internal</span></h3>
+<h3>5.3 Live traffic API <span class="mono muted">src/live/routes.py &middot; mounted on the public API</span></h3>
+<p>Sensors, the cyber range and the sandbox replay send flows here; the Live sites tab reads, labels, teaches and
+decides through these routes. Every chunk is scored inside the site's last two minutes of flows; teaching is gated
+(see 6.5).</p>
+{routes_table(["src/live/routes.py"])}
+
+<h3>5.4 Model service <span class="mono muted">src/api/ml_app.py &middot; port 8001, internal</span></h3>
 <p>Not exposed to the browser; the public API forwards to it over a pooled connection.</p>
 {routes_table(["src/api/ml_app.py"])}
 
-<h3>5.4 Conventions</h3>
+<h3>5.5 Conventions</h3>
 <ul>
 <li><b>Errors</b> &mdash; 404 for a window, model or experiment that does not exist; 422 for a value outside its
 allowed range; 409 when an action was already decided or the incident changed since it was displayed; 503 when
