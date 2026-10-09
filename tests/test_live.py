@@ -158,6 +158,27 @@ def test_label_then_adapt_is_gated_and_learns_once(client):
     assert client.post("/live/reset").json()["reset"] is True
 
 
+def test_learning_survives_a_restart_and_reset_deletes_it(client):
+    from src.live.engine import LiveEngine
+    live = client.svc.live
+    live.max_drop = 1.0                                   # force acceptance: this test is about persistence
+    client.post("/sensor/flows", json={"site": "home", "flows": _flows(client, 40)})
+    client.post("/live/label", json={"label": "Benign", "site": "home", "last_minutes": 5})
+    res = client.post("/live/adapt", json={"epochs": 1}).json()
+    assert res["accepted"] and res["saved"] and live.state_path.exists()
+    weights = {k: v.clone() for k, v in live.learner.model.state_dict().items()}
+
+    fresh = LiveEngine(client.svc)                        # what a restarted service builds
+    d = fresh.describe()
+    assert d["restored_from_disk"] and d["version"] == res["version"] and d["learned_windows"] == 1
+    for k, v in fresh.learner.model.state_dict().items():
+        assert (v.cpu() == weights[k].cpu()).all()
+
+    r = client.post("/live/reset").json()
+    assert r["reset"] and r["labels_released"] == 40 and not live.state_path.exists()
+    assert client.post("/live/adapt", json={"epochs": 1}).status_code == 200   # labels can be re-taught
+
+
 def test_fpr_study_measures_and_restores(client):
     before = client.get("/live/model").json()["version"]
     flows = _flows(client, 20)

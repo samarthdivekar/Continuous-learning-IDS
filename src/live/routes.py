@@ -414,7 +414,14 @@ def live_fpr_study(body: FprStudyIn):
 
 @router.post("/live/reset")
 def live_reset():
-    return _ml("POST", "/live/reset")
+    """Back to the trained model. Labels are kept, but marked not yet learned, so the analyst can
+    re-teach them (otherwise a reset would leave them unlearnable)."""
+    res = _ml("POST", "/live/reset")
+    with _app().state.Session() as s:
+        n = s.execute(update(LiveFlow).where(LiveFlow.used_for_learning.is_(True))
+                      .values(used_for_learning=False)).rowcount
+        s.commit()
+    return {**res, "labels_released": int(n)}
 
 
 @router.get("/live/model")

@@ -10,20 +10,27 @@ Every adaptation is a candidate. Before and after it, the model is scored on hel
 training data (two per task); if old-attack macro-F1 drops by more than `max_drop`, the update is rolled
 back and the response says why. That is what "learns your network without forgetting old attacks" means
 here, measured each time rather than asserted.
+
+Every accepted adaptation is saved to `<cache>/live/<dataset>/<label_mode>/live_state.pt` (weights,
+optimiser, EWC state and the labelled live windows, as plain tensors so it loads in PyTorch's safe mode),
+and restored when the service starts, so what the model learned survives a restart. /live/reset deletes it.
 """
 from __future__ import annotations
 
+import json
 import time
+from pathlib import Path
 
 import numpy as np
 import torch
 from sklearn.metrics import f1_score
+from torch_geometric.data import Data
 
-from src.graph.window_builder import build_window_graph
 from src.ingestion.columns import canonical_name
 from src.training.learners import load_learner_checkpoint, make_learner
-from src.utils.config import class_names, num_classes
+from src.utils.config import REPO_ROOT, class_names, num_classes
 from src.utils.logging import get_logger
+from src.utils.safe_load import load_checkpoint
 
 log = get_logger(__name__)
 
@@ -41,6 +48,8 @@ class LiveEngine:
         self.version = 0                     # bumped on every accepted adaptation and on reset
         self.threshold: float | None = None  # novelty (energy) above this = unfamiliar
         self.history: list[dict] = []
+        self.live_graphs: list[Data] = []    # every labelled live window an accepted update learned from
+        self.restored_from: str | None = None
         self._eval_set = None
 
     # ------------------------------------------------------------------ setup
@@ -48,15 +57,21 @@ class LiveEngine:
     def names(self) -> list[str]:
         return class_names(self.svc.cfg)
 
+    @property
+    def state_path(self) -> Path:
+        cfg = self.svc.cfg
+        base = Path(cfg["paths"]["cache"])
+        base = base if base.is_absolute() else REPO_ROOT / base
+        return base / "live" / cfg["dataset"] / cfg["label_mode"] / "live_state.pt"
+
     def ensure(self):
         if self.learner is None:
             self._build()
         return self.learner
 
-    def _build(self) -> None:
+    def _fresh_learner(self):
+        """The final task-sequence checkpoint, replay buffer refilled from every task's training windows."""
         svc = self.svc
-        if not svc.data_available:
-            raise FileNotFoundError("processed data missing (run experiments.prepare_data)")
         data, cfg = svc.data, svc.cfg
         node_in = 3 if cfg["graph"]["node_features"] == "degree" else 1
         learner = make_learner(self.model_name, cfg, data.meta["n_features"], num_classes(cfg), svc.device,
@@ -65,9 +80,82 @@ class LiveEngine:
         if getattr(learner, "buffer", None) is not None:
             for t in range(data.n_tasks):
                 learner.buffer.add_many(data.graphs(t, "train"))
-        self.learner = learner
+        return learner
+
+    def _build(self, restore: bool = True) -> None:
+        if not self.svc.data_available:
+            raise FileNotFoundError("processed data missing (run experiments.prepare_data)")
+        self.learner = self._fresh_learner()
+        self.live_graphs = []
+        if restore:
+            self._restore_saved()
         self.threshold = self._calibrate_threshold()
-        log.info("live model ready: %s, novelty threshold %.3f", self.model_name, self.threshold)
+        log.info("live model ready: %s v%d, novelty threshold %.3f", self.model_name, self.version, self.threshold)
+
+    # ------------------------------------------------------------ persistence
+    @staticmethod
+    def _plain(obj):
+        """JSON-safe copy (numpy scalars -> floats) so the state file loads with weights_only=True."""
+        return json.loads(json.dumps(obj, default=lambda o: o.item() if hasattr(o, "item") else str(o)))
+
+    @staticmethod
+    def _graph_to_dict(g: Data) -> dict:
+        d = {k: g[k].detach().cpu() for k in ("x", "edge_index", "edge_attr", "y") if k in g}
+        if "label_mask" in g:
+            d["label_mask"] = g.label_mask.detach().cpu()
+        d["window_id"] = int(g.window_id)
+        return d
+
+    @staticmethod
+    def _dict_to_graph(d: dict) -> Data:
+        g = Data(x=d["x"], edge_index=d["edge_index"], edge_attr=d["edge_attr"], y=d["y"])
+        if "label_mask" in d:
+            g.label_mask = d["label_mask"]
+        g.window_id = int(d["window_id"])
+        return g
+
+    def _save(self) -> None:
+        learner = self.learner
+        state = {"format": 1, "model_name": self.model_name, "version": self.version,
+                 "model": {k: v.detach().cpu() for k, v in learner.model.state_dict().items()},
+                 "optimizer": learner.optimizer.state_dict(),
+                 "ewc": None, "live_graphs": [self._graph_to_dict(g) for g in self.live_graphs],
+                 "history": self._plain(self.history[-50:])}
+        if getattr(learner, "ewc", None) is not None:
+            ewc = learner.ewc.state_dict()
+            ewc["history"] = self._plain(ewc.get("history", []))
+            state["ewc"] = ewc
+        path = self.state_path
+        path.parent.mkdir(parents=True, exist_ok=True)
+        tmp = path.with_suffix(".tmp")
+        torch.save(state, tmp)
+        tmp.replace(path)                    # atomic: a crash mid-save never leaves a half-written state
+
+    def _restore_saved(self) -> None:
+        path = self.state_path
+        if not path.exists():
+            return
+        try:
+            st = load_checkpoint(path, map_location=self.svc.device)
+            if st.get("model_name") != self.model_name:
+                raise ValueError(f"state is for {st.get('model_name')}")
+            learner = self.learner
+            learner.model.load_state_dict(st["model"])
+            learner.optimizer.load_state_dict(st["optimizer"])
+            if st.get("ewc") is not None and getattr(learner, "ewc", None) is not None:
+                learner.ewc.load_state_dict(st["ewc"], self.svc.device)
+            self.live_graphs = [self._dict_to_graph(d) for d in st.get("live_graphs", [])]
+            if getattr(learner, "buffer", None) is not None:
+                learner.buffer.add_many(self.live_graphs)
+            self.version = max(self.version, int(st["version"]))
+            self.history = list(st.get("history", []))
+            self.restored_from = str(path)
+            log.info("live model restored from %s (v%d, %d learned windows)", path, self.version,
+                     len(self.live_graphs))
+        except Exception as exc:                     # a bad state file must not take the service down
+            log.warning("could not restore live state %s (%s); starting from the trained model", path, exc)
+            self.restored_from = None
+            self.learner, self.live_graphs = self._fresh_learner(), []   # undo a partial restore
 
     def _calibrate_threshold(self, target_fpr: float = 0.05, max_windows: int = 24) -> float:
         """Energy score that 95 % of held-out validation flows (benign and known attacks) stay below."""
@@ -154,6 +242,7 @@ class LiveEngine:
             accepted = drop <= self.max_drop
             if accepted:
                 self.version += 1
+                self.live_graphs.extend(graphs)
             else:
                 learner.restore_state(snap)
         rec = {"accepted": accepted, "version": self.version, "windows": len(graphs), "labelled_flows": n_labelled,
@@ -161,6 +250,10 @@ class LiveEngine:
                "reason": None if accepted else
                f"rolled back: macro-F1 on old attacks fell by {drop:.3f} (limit {self.max_drop:.3f})"}
         self.history.append(rec)
+        if accepted:
+            with self.svc.lock:
+                self._save()
+            rec["saved"] = True
         return rec
 
     def fpr_study(self, flows: list[dict], teach_fraction: float = 0.5, epochs: int | None = None) -> dict:
@@ -197,17 +290,25 @@ class LiveEngine:
                 "old_attack_recall_after": old_after["attack_recall"], "model_unchanged": True}
 
     def reset(self) -> dict:
+        """Back to the trained model: the saved live state is deleted, not just ignored."""
         with self.svc.lock:
+            self.state_path.unlink(missing_ok=True)
+            self.restored_from = None
             self.learner = None
-            self._build()
+            self._build(restore=False)
             self.version += 1
         self.history.append({"reset": True, "version": self.version})
         return {"reset": True, "version": self.version}
 
     def describe(self) -> dict:
+        if self.learner is None and self.state_path.exists():
+            with self.svc.lock:              # a saved state exists: load it so the version shown is real
+                self.ensure()
         return {"model": self.model_name, "loaded": self.learner is not None, "version": self.version,
                 "novelty_threshold": self.threshold, "max_drop": self.max_drop,
-                "classes": self.names, "history": self.history[-10:]}
+                "classes": self.names, "history": self.history[-10:],
+                "learned_windows": len(self.live_graphs), "saved": self.state_path.exists(),
+                "restored_from_disk": self.restored_from is not None}
 
 
 def label_id(names: list[str], label: str | None) -> int | None:
