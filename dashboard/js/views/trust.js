@@ -38,7 +38,11 @@ async function render() {
     <div class="grid g2" style="margin-top:16px">
       <div class="card"><h3>2 · Does it know when not to decide?</h3>
         <p class="sub">conformal prediction: when the model is unsure it abstains and hands the flow to a human instead of raising an alarm</p>
-        <div class="chart short"><canvas id="tr-cf"></canvas></div><div id="tr-cf-t"></div></div>
+        <div class="chart short"><canvas id="tr-cf"></canvas></div><div id="tr-cf-t"></div>
+        <p class="note" style="margin-top:10px">This experiment abstains whenever the prediction set is not exactly one class.
+        The live system (Live sites) abstains only when the set holds <b>both normal and an attack</b>: on the 2017 test windows
+        at α = 0.05 the strict rule raised alarms on 71 % of attack flows (and on 14 % of one recorded DoS window), the live
+        rule on 96 % — at the cost of keeping the model's confident false alarms.</p></div>
       <div class="card"><h3>3 · Will analysts drown in alerts?</h3>
         <p class="sub">flagged flows grouped into incidents (connected attacker/victim clusters), at different false-alarm budgets</p><div id="tr-inc"></div></div>
     </div>

@@ -1,7 +1,7 @@
 // Live sites: real traffic from sensor machines (src/live). Each sensor uploads short capture chunks;
 // the server converts them with the pinned CICFlowMeter, scores them with the live model and files them
 // per site. Here you watch per-site traffic, triage incidents (dry-run rules), label flows and adapt the
-// model without forgetting. Distinct from "Live stream", which replays the recorded dataset.
+// model without forgetting. Distinct from "Drift replay", which replays the recorded dataset.
 import { catColor, esc, get, int, openApi, pct, post, toast } from "../lib/core.js";
 import { GraphView } from "../lib/graphview.js";
 import { withBusy } from "../lib/ui.js";
@@ -54,7 +54,8 @@ export async function mount(el) {
       <div class="card" id="st-model" style="margin-bottom:16px"></div>
       <div class="grid g-8-4">
         <div class="card"><div class="card-head"><div><h3>Incidents <span id="st-scope" class="muted"></span></h3>
-          <p class="sub">confident attack verdicts of the last 15 minutes, grouped by attacker/victim within each site; each carries a dry-run rule</p></div>
+          <p class="sub">confident attack verdicts of the last 15 minutes, grouped by attacker/victim within each site; each carries a dry-run rule.
+          Approvals and rejections go to the decision log in the <a href="#soc">Incident queue</a>.</p></div>
           <div class="toolbar"><button class="icon-btn small" id="st-cef" title="Download these incidents for a SIEM (ArcSight CEF)">⤓ CEF</button></div></div>
           <div id="st-incidents"></div></div>
         <div class="grid" style="gap:16px">
@@ -116,7 +117,7 @@ async function tick() {
   const inc = await get(`/live/incidents?${q}`).catch(() => null);
   if (inc) {
     // re-render the incident list only when it actually changed, so clicks/scroll are not interrupted
-    const sig = JSON.stringify([sel, inc.n_flows, inc.incidents.map((i) => [i.category, i.key_host, i.n_flows]),
+    const sig = JSON.stringify([sel, inc.n_flows, inc.incidents.map((i) => [i.category, i.key_host, i.n_flows, i.record?.status]),
       inc.unfamiliar.map((u) => [u.host, u.flows]), (inc.unsure || []).map((u) => [u.host, u.flows])]);
     if (sig !== incSig) { incSig = sig; renderIncidents(inc); renderUnfamiliar(inc.unfamiliar); renderUnsure(inc.unsure || []); }
   }
@@ -209,9 +210,20 @@ function renderIncidents(inc) {
     el.innerHTML = `<div class="empty">No flagged flows in the last 15 minutes${sel ? ` from ${esc(sel)}` : ""}. ${int(inc.n_flows)} flows seen.</div>`;
     return;
   }
+  const STATUS_TAG = { open: "warn", reopened: "bad", acknowledged: "", closed: "good" };
   el.innerHTML = inc.incidents.map((i) => {
     const p = i.proposed || {};
+    const r = i.record || {};
+    const since = r.first_seen ? new Date(r.first_seen).toLocaleTimeString() : "";
     return `<div class="incident" style="border:1px solid var(--grid);border-radius:10px;padding:12px;margin-bottom:10px">
+      ${r.id ? `<div class="note" style="display:flex;gap:8px;align-items:center;margin-bottom:6px">
+        <b>Incident #${int(r.id)}</b><span class="tag ${STATUS_TAG[r.status] ?? ""}">${esc(r.status)}</span>
+        <span>since ${esc(since)}${r.status_by ? ` · ${esc(r.status)} by ${esc(r.status_by)}` : ""}</span>
+        <span style="margin-left:auto;display:flex;gap:6px">
+          ${r.status !== "acknowledged" ? `<button class="btn small ghost" data-status="acknowledged" data-rec="${int(r.id)}">Acknowledge</button>` : ""}
+          ${r.status !== "closed" ? `<button class="btn small ghost" data-status="closed" data-rec="${int(r.id)}">Close</button>`
+            : `<button class="btn small ghost" data-status="open" data-rec="${int(r.id)}">Reopen</button>`}
+        </span></div>` : ""}
       <div style="display:flex;justify-content:space-between;gap:10px;align-items:baseline">
         <div><span class="tag" style="background:${catColor(i.category)};color:#fff">${esc(i.category)}</span>
           <b>${esc(i.key_host)}</b> <span class="muted">(${esc(i.key_role)}, ${int(i.key_host_flows)} flows)</span></div>
@@ -220,15 +232,36 @@ function renderIncidents(inc) {
       <div class="note" style="margin-top:6px">${int(i.n_sources)} sources → ${int(i.n_destinations)} destinations${i.top_ports?.length ? ` · ports ${i.top_ports.map((x) => esc(x)).join(", ")}` : ""}${i.sites?.length ? ` · ${i.sites.map((x) => esc(x)).join(", ")}` : ""}</div>
       <div class="note" style="margin-top:6px"><b>Proposed (dry run):</b> ${esc(p.action || "investigate")} ${esc(p.target || "")} — ${esc(p.rationale || "")}</div>
       <div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+        <button class="btn small ghost" data-why="${esc(String((i.flow_ids || [])[0] ?? ""))}" title="Why did the model flag this? (evidence for one of its flows)">Why?</button>
         <button class="btn small" data-label-ids="${esc(JSON.stringify(i.flow_ids || []))}" data-cat="${esc(i.category)}" title="Label these flows for teaching">Confirm as ${esc(i.category)}</button>
         <button class="btn small ghost" data-label-ids="${esc(JSON.stringify(i.flow_ids || []))}" data-cat="Benign">Mark normal (false alarm)</button>
         <span class="muted" style="margin-left:auto">action:</span>
         <button class="btn small" data-decide="approve" data-site="${esc(i.site)}" data-cat="${esc(i.category)}" data-target="${esc(p.target || "")}" title="Record approval — dry run, nothing is executed">Approve (dry run)</button>
         <button class="btn small ghost" data-decide="reject" data-site="${esc(i.site)}" data-cat="${esc(i.category)}" data-target="${esc(p.target || "")}">Reject</button>
-      </div></div>`;
+      </div><div class="why-box"></div></div>`;
   }).join("");
   el.querySelectorAll("[data-label-ids]").forEach((b) => b.addEventListener("click", () =>
     withBusy(b, () => labelIds(JSON.parse(b.dataset.labelIds), b.dataset.cat))));
+  el.querySelectorAll("[data-status]").forEach((b) => b.addEventListener("click", () => withBusy(b, async () => {
+    try {
+      const r = await post(`/live/incident_records/${b.dataset.rec}/status`, { status: b.dataset.status, analyst: "analyst" });
+      toast(`incident #${r.id} ${r.status}`); incSig = ""; await tick();
+    } catch (e) { toast(e.message); }
+  })));
+  el.querySelectorAll("[data-why]").forEach((b) => b.addEventListener("click", () => withBusy(b, async () => {
+    const box = b.closest(".incident").querySelector(".why-box");
+    if (!b.dataset.why) { box.innerHTML = `<p class="note">No flow to explain.</p>`; return; }
+    try {
+      const e = await get(`/live/explain/${encodeURIComponent(b.dataset.why)}`);
+      const feats = (e.features || []).filter((f) => f.direction === "towards").slice(0, 5)
+        .map((f) => `<li>${esc(f.label)}${f.value != null ? ` = <span class="num">${esc(Number(f.value).toPrecision(4))}</span>` : ""}</li>`).join("");
+      box.innerHTML = `<div class="callout" style="margin-top:10px">
+        <p style="margin:0 0 6px"><b>Why (flow ${int(e.flow_id)}, ${esc(e.src_ip)} → ${esc(e.dst_ip)}):</b> ${esc(e.summary)}</p>
+        ${feats ? `<p class="note" style="margin:0">Evidence pushing towards ${esc(e.predicted_label)}:</p><ul class="note" style="margin:4px 0 0 18px">${feats}</ul>` : ""}
+        <p class="note" style="margin:6px 0 0">${pct(e.context_share)} of the evidence came from neighbouring flows (${int(e.context_flows)} flows of context) ·
+        live model v${int(e.version)}${e.predicted_label !== e.predicted_when_scored ? ` · when scored it said ${esc(e.predicted_when_scored)}; the model has been taught since` : ""}</p></div>`;
+    } catch (err) { box.innerHTML = `<p class="note">${esc(err.message)}</p>`; }
+  })));
   el.querySelectorAll("[data-decide]").forEach((b) => b.addEventListener("click", () => withBusy(b, async () => {
     try {
       const a = await post("/live/actions", { site: b.dataset.site, category: b.dataset.cat, target: b.dataset.target });

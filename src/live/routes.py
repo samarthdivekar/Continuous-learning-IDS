@@ -69,6 +69,8 @@ def _ml(method: str, path: str, body: dict | None = None, params: dict | None = 
                               epochs=body.get("epochs"), holdout=body.get("holdout"))
         if path == "/live/reset":
             return live.reset()
+        if path == "/live/explain":
+            return live.explain(body["flows"], body["edge"])
         if path == "/live/fpr_study":
             return live.fpr_study(body["flows"], teach_fraction=body.get("teach_fraction", 0.5),
                                   epochs=body.get("epochs"))
@@ -77,6 +79,12 @@ def _ml(method: str, path: str, body: dict | None = None, params: dict | None = 
         raise HTTPException(422, str(exc))
     except FileNotFoundError as exc:
         raise HTTPException(503, str(exc))
+
+
+def _chunks(ids: list, size: int = 500):
+    """SQLite caps the variables in one statement; large id lists go in slices."""
+    for i in range(0, len(ids), size):
+        yield ids[i:i + size]
 
 
 def _site(value: str | None) -> str:
@@ -412,7 +420,8 @@ def live_incidents(site: str | None = None, windows: int = Query(30, ge=1, le=50
             incidents.append(inc)
     incidents.sort(key=lambda d: -d["severity"])
     for k, inc in enumerate(incidents):
-        inc["incident_id"] = k + 1
+        inc["incident_id"] = k + 1                     # rank in this view (kept for compatibility)
+    _attach_records(incidents)
     # unfamiliar traffic the model calls benign: grouped by source host, for the analyst to look at
     unf = {}
     for r in rows:
@@ -440,6 +449,104 @@ def live_incidents(site: str | None = None, windows: int = Query(30, ge=1, le=50
     unsure = sorted(uns.values(), key=lambda d: -d["flows"])[:50]
     return {"site": site, "windows": windows, "minutes": minutes, "n_flows": len(rows), "flagged_flows": len(flagged),
             "incidents": incidents[:100], "unfamiliar": unfamiliar, "unsure": unsure, "dry_run": True}
+
+
+def _attach_records(incidents: list[dict]) -> None:
+    """Give every grouped incident its stored record (created on first sight), keyed by site, category and
+    key host, and update when it was last active. A closed incident with activity after it was closed is
+    marked 'reopened'."""
+    from src.db.models import LiveIncident
+    if not incidents:
+        return
+    now = datetime.now(timezone.utc)
+    with _app().state.Session() as s:
+        for inc in incidents:
+            rec = s.scalars(select(LiveIncident).where(LiveIncident.site == inc["site"],
+                                                       LiveIncident.category == inc["category"],
+                                                       LiveIncident.key_host == inc["key_host"])).first()
+            end = _ts(inc.get("end")) or now
+            if rec is None:
+                rec = LiveIncident(site=inc["site"], category=inc["category"], key_host=inc["key_host"],
+                                   first_seen=_ts(inc.get("start")) or now, last_seen=end, max_flows=inc["n_flows"])
+                s.add(rec)
+            else:
+                last = rec.last_seen if rec.last_seen.tzinfo else rec.last_seen.replace(tzinfo=timezone.utc)
+                if end > last:
+                    rec.last_seen = end
+                    closed_at = rec.status_at.replace(tzinfo=timezone.utc) if rec.status_at and not rec.status_at.tzinfo \
+                        else rec.status_at
+                    if rec.status == "closed" and closed_at and end > closed_at:
+                        rec.status = "reopened"
+                rec.max_flows = max(rec.max_flows or 0, inc["n_flows"])
+            s.flush()
+            inc["record"] = _incident_dict(rec)
+        s.commit()
+
+
+def _incident_dict(r) -> dict:
+    return {"id": r.id, "site": r.site, "category": r.category, "key_host": r.key_host,
+            "first_seen": _iso(r.first_seen), "last_seen": _iso(r.last_seen), "max_flows": r.max_flows,
+            "status": r.status, "status_at": _iso(r.status_at), "status_by": r.status_by, "note": r.note}
+
+
+class IncidentStatusIn(BaseModel):
+    status: str = Field(pattern="^(open|acknowledged|closed)$")
+    analyst: str = Field(default="analyst", max_length=64)
+    note: str | None = Field(default=None, max_length=1000)
+
+
+@router.post("/live/incident_records/{record_id}/status")
+def live_incident_status(record_id: int, body: IncidentStatusIn):
+    """Acknowledge, close or reopen a live incident record (who and when are kept)."""
+    from src.db.models import LiveIncident
+    with _app().state.Session() as s:
+        r = s.get(LiveIncident, record_id)
+        if r is None:
+            raise HTTPException(404, f"no incident record {record_id}")
+        r.status, r.status_at, r.status_by = body.status, datetime.now(timezone.utc), body.analyst
+        if body.note is not None:
+            r.note = body.note
+        s.commit()
+        return _incident_dict(r)
+
+
+@router.get("/live/incident_records")
+def live_incident_records(site: str | None = None, status: str | None = None, limit: int = Query(200, ge=1, le=2000)):
+    """Every live incident ever seen (newest activity first), with its lifecycle status."""
+    from src.db.models import LiveIncident
+    with _app().state.Session() as s:
+        q = select(LiveIncident)
+        if site:
+            q = q.where(LiveIncident.site == _site(site))
+        if status:
+            q = q.where(LiveIncident.status == status)
+        return {"records": [_incident_dict(r) for r in s.scalars(q.order_by(desc(LiveIncident.last_seen)).limit(limit))]}
+
+
+@router.get("/live/explain/{flow_id}")
+def live_explain(flow_id: int):
+    """Why the live model flagged (or passed) one live flow, rebuilt in the context it was scored in: its
+    chunk plus the site's preceding flows (up to 5,000), as in process_flows."""
+    with _app().state.Session() as s:
+        f = s.get(LiveFlow, flow_id)
+        if f is None:
+            raise HTTPException(404, f"no live flow {flow_id}")
+        w = s.get(LiveWindow, f.window_id)
+        chunk = s.execute(select(LiveFlow.id, LiveFlow.src_ip, LiveFlow.dst_ip, LiveFlow.features)
+                          .where(LiveFlow.window_id == f.window_id).order_by(LiveFlow.id)).all()
+        received = w.received_at if w.received_at.tzinfo else w.received_at.replace(tzinfo=timezone.utc)
+        ctx_w = select(LiveWindow.id).where(LiveWindow.site == f.site, LiveWindow.id < f.window_id,
+                                            LiveWindow.received_at >= received - timedelta(seconds=CONTEXT_SECONDS))
+        room = max(0, CONTEXT_MAX_FLOWS - len(chunk))
+        ctx = s.execute(select(LiveFlow.src_ip, LiveFlow.dst_ip, LiveFlow.features).where(LiveFlow.window_id.in_(ctx_w))
+                        .order_by(desc(LiveFlow.id)).limit(room)).all() if room else []
+        site, predicted, stored_conf = f.site, f.predicted, f.confidence
+    flows = [{"src_ip": a, "dst_ip": b, "features": x} for a, b, x in reversed(ctx)]
+    edge = len(flows) + [r.id for r in chunk].index(flow_id)
+    flows += [{"src_ip": r.src_ip, "dst_ip": r.dst_ip, "features": r.features} for r in chunk]
+    out = _ml("POST", "/live/explain", {"flows": flows, "edge": edge})
+    return {**out, "flow_id": flow_id, "site": site, "predicted_when_scored": predicted,
+            "confidence_when_scored": stored_conf, "context_flows": len(ctx)}
 
 
 @router.get("/live/incidents/cef", response_class=PlainTextResponse)
@@ -511,21 +618,22 @@ def live_label(body: LabelIn):
     with Session() as s:
         q = update(LiveFlow).values(analyst_label=body.label, labelled_by=body.analyst,
                                     labelled_at=datetime.now(timezone.utc))
-        if body.flow_ids:
-            q = q.where(LiveFlow.id.in_(body.flow_ids))
-        else:
-            since = datetime.now(timezone.utc) - timedelta(minutes=body.last_minutes)
-            wids = select(LiveWindow.id).where(LiveWindow.site == _site(body.site), LiveWindow.received_at >= since)
-            q = q.where(LiveFlow.window_id.in_(wids))
-            if body.label == "Benign" and not body.include_suspicious:
-                suspicious = (LiveFlow.predicted != "Benign") | LiveFlow.unfamiliar.is_(True) | LiveFlow.unsure.is_(True)
-                cnt = select(func.count()).select_from(LiveFlow).where(LiveFlow.window_id.in_(wids), suspicious)
-                if body.only_unlabelled:
-                    cnt = cnt.where(LiveFlow.analyst_label.is_(None))
-                skipped = int(s.scalar(cnt) or 0)
-                q = q.where(LiveFlow.predicted == "Benign", LiveFlow.unfamiliar.is_not(True), LiveFlow.unsure.is_not(True))
         if body.only_unlabelled:
             q = q.where(LiveFlow.analyst_label.is_(None))
+        if body.flow_ids:                         # in chunks: one huge IN (...) exceeds SQLite's variable limit
+            n = sum(s.execute(q.where(LiveFlow.id.in_(part))).rowcount for part in _chunks(body.flow_ids))
+            s.commit()
+            return {"labelled": int(n), "label": body.label, "skipped_suspicious": 0}
+        since = datetime.now(timezone.utc) - timedelta(minutes=body.last_minutes)
+        wids = select(LiveWindow.id).where(LiveWindow.site == _site(body.site), LiveWindow.received_at >= since)
+        q = q.where(LiveFlow.window_id.in_(wids))
+        if body.label == "Benign" and not body.include_suspicious:
+            suspicious = (LiveFlow.predicted != "Benign") | LiveFlow.unfamiliar.is_(True) | LiveFlow.unsure.is_(True)
+            cnt = select(func.count()).select_from(LiveFlow).where(LiveFlow.window_id.in_(wids), suspicious)
+            if body.only_unlabelled:
+                cnt = cnt.where(LiveFlow.analyst_label.is_(None))
+            skipped = int(s.scalar(cnt) or 0)
+            q = q.where(LiveFlow.predicted == "Benign", LiveFlow.unfamiliar.is_not(True), LiveFlow.unsure.is_not(True))
         n = s.execute(q).rowcount
         s.commit()
     return {"labelled": int(n), "label": body.label, "skipped_suspicious": skipped}
@@ -539,9 +647,10 @@ class UnlabelIn(BaseModel):
 def live_unlabel(body: UnlabelIn):
     """Undo labels the model has not learned from yet (learned ones need /live/reset)."""
     with _app().state.Session() as s:
-        n = s.execute(update(LiveFlow).where(LiveFlow.id.in_(body.flow_ids), LiveFlow.used_for_learning.is_(False),
-                                             LiveFlow.analyst_label.is_not(None))
-                      .values(analyst_label=None, labelled_by=None, labelled_at=None)).rowcount
+        n = sum(s.execute(update(LiveFlow).where(LiveFlow.id.in_(part), LiveFlow.used_for_learning.is_(False),
+                                                 LiveFlow.analyst_label.is_not(None))
+                          .values(analyst_label=None, labelled_by=None, labelled_at=None)).rowcount
+                for part in _chunks(body.flow_ids))
         s.commit()
     return {"unlabelled": int(n)}
 
@@ -617,7 +726,7 @@ def _training_groups(rows) -> list[list]:
 class AdaptIn(BaseModel):
     site: str | None = None
     epochs: int | None = Field(default=None, ge=1, le=20)
-    max_windows: int = Field(default=200, ge=1, le=2000)     # capture chunks to draw labels from (newest first)
+    max_windows: int = Field(default=200, ge=1, le=500)      # capture chunks to draw labels from (newest first)
 
 
 @router.post("/live/adapt")
@@ -651,9 +760,12 @@ def live_adapt(body: AdaptIn):
             used += [r.id for r in part if r.analyst_label is not None]
     res = _ml("POST", "/live/adapt", {"windows": windows, "epochs": body.epochs, "holdout": holdout})
     if res.get("accepted"):
+        # by window, not by flow id: thousands of ids in one IN (...) exceed SQLite's variable limit
         with Session() as s:
-            s.execute(update(LiveFlow).where(LiveFlow.id.in_(used)).values(used_for_learning=True))
+            s.execute(update(LiveFlow).where(LiveFlow.window_id.in_(wids), LiveFlow.analyst_label.is_not(None),
+                                             LiveFlow.used_for_learning.is_(False)).values(used_for_learning=True))
             s.commit()
+    res["marked_learned"] = len(used)
     return res
 
 

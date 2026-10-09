@@ -71,7 +71,8 @@ def index():
                 continue
             out.setdefault(ds, {})[mode] = {
                 exp: (base / exp / marker).exists()
-                for exp, marker in [("continual", "summary.csv"), ("drift", "summary.csv"), ("loao", "loao.csv"),
+                for exp, marker in [("continual", "summary.csv"), ("continual_temporal", "summary.csv"),
+                                    ("drift", "summary.csv"), ("loao", "loao.csv"), ("loao_seeds", "summary.csv"),
                                     ("ip_remap", "summary.csv"), ("ewc_lambda_sweep", "sweep.csv"),
                                     ("tuning", "tuning.csv"), ("open_set", "open_set.csv"),
                                     ("conformal", "conformal.csv"), ("incidents", "incidents.csv")]

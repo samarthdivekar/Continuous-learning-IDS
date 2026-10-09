@@ -72,7 +72,7 @@ def main() -> int:
         # (layout, theme, dataset, label mode, compare): every layout x theme on the default context, then the
         # other dataset / label-mode / compare contexts once on desktop, so each switch in the top bar is loaded
         runs = [(lay, th, "cicids2017", "multiclass", "0") for lay in layouts for th in ("dark", "light")]
-        runs += [("desktop", "dark", "cicids2017", "binary", "0"), ("desktop", "dark", "csecicids2018", "multiclass", "0"),
+        runs += [("desktop", "dark", "csecicids2018", "multiclass", "0"),
                  ("desktop", "dark", "cicids2017", "multiclass", "1"), ("desktop", "dark", "csecicids2018", "multiclass", "1")]
         for layout, theme, ds, mode, compare in runs:
             opts = layouts[layout]

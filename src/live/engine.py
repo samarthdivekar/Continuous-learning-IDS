@@ -257,6 +257,22 @@ class LiveEngine:
                 "alpha": ALPHA,
                 "counts": {names[i]: int((pred == i).sum()) for i in np.unique(pred)}}
 
+    def explain(self, flows: list[dict], edge: int) -> dict:
+        """Why the live model judged flow `edge` of `flows` (the flow's chunk inside the context it was
+        scored in) the way it did: the same gradient x input, neighbourhood and structure evidence as the
+        recorded-data explanations (src/explain/explain.py)."""
+        from src.explain.explain import explain_edge, summarize
+        if not 0 <= edge < len(flows):
+            raise ValueError(f"edge {edge} out of range")
+        with self.svc.lock:
+            learner = self.ensure()
+            g = self.graph(flows)
+            exp = explain_edge(learner, g, int(edge), self.svc.data.feature_columns, self.svc.scaler)
+        exp.update({"summary": summarize(exp, self.names), "predicted_label": self.names[exp["predicted_class"]],
+                    "src_ip": flows[edge]["src_ip"], "dst_ip": flows[edge]["dst_ip"], "model": self.model_name,
+                    "version": self.version})
+        return exp
+
     # --------------------------------------------------------------- learning
     def _held_out(self):
         """The held-out TEST windows of every task of the training data: the 'did it forget?' check.

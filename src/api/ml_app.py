@@ -146,6 +146,19 @@ class LiveScoreBody(BaseModel):
     context: list[dict] = []
 
 
+class LiveExplainBody(BaseModel):
+    flows: list[dict]
+    edge: int
+
+
+@app.post("/live/explain")
+def live_explain(body: LiveExplainBody):
+    try:
+        return svc.live.explain(body.flows, body.edge)
+    except ValueError as exc:
+        raise HTTPException(422, str(exc))
+
+
 class LiveAdaptBody(BaseModel):
     windows: list[dict]          # [{"flows": [...], "labels": [label name or null per flow]}]
     epochs: int | None = None

@@ -33,11 +33,15 @@ async function render() {
   const kpis = root.querySelector("#ov-kpis");
   kpis.innerHTML = `<div class="card">${skeleton("kpi")}</div>`.repeat(4);
   root.querySelector("#ov-verdict").innerHTML = skeleton("table");
-  let c, inter = null;
+  let c = null, inter = null;
+  // which experiments exist, so the page never requests one that was not run
+  const have = await get("/results/index").catch(() => ({}));
+  const has = (ds, m, exp) => Boolean(have?.[ds]?.[m]?.[exp]);
   // The headline is the temporal split where it exists (train on each attack's earlier traffic, test on its
   // latest) — the interleaved split puts test windows between training windows and is optimistic.
-  try { c = await get(`/results/continual?dataset=${dataset}&mode=${mode}&split=temporal`); }
-  catch { c = null; }
+  if (has(dataset, mode, "continual_temporal")) {
+    try { c = await get(`/results/continual?dataset=${dataset}&mode=${mode}&split=temporal`); } catch { c = null; }
+  }
   try { inter = await get(`/results/continual?dataset=${dataset}&mode=${mode}`); } catch { inter = null; }
   if (!c) c = inter;
   if (!c) {
@@ -58,10 +62,15 @@ async function render() {
   // the differentiating result: attacks held out of training entirely (binary leave-one-attack-out)
   let unseen = null;
   for (const ds of [dataset, "csecicids2018", "cicids2017"]) {
+    if (!has(ds, "binary", "loao_seeds")) continue;
     try {
       const l = await get(`/results/loao?dataset=${ds}&mode=binary`);
       const rows = l.seeds || [];
-      const g = rows.filter((r) => r.model === "gnn_naive").sort((a, b) => b.heldout_detection_rate_min - a.heldout_detection_rate_min)[0];
+      // the held-out attack where the graph model's WORST seed beats the per-flow model by the most: the
+      // differentiating result (on CIC-IDS2017 both catch an unseen PortScan, so that one says nothing)
+      const ffOf = (cat) => rows.find((r) => r.model === "ffnn_naive" && r.held_out_category === cat)?.heldout_detection_rate_mean ?? 0;
+      const g = rows.filter((r) => r.model === "gnn_naive")
+        .sort((a, b) => (b.heldout_detection_rate_min - ffOf(b.held_out_category)) - (a.heldout_detection_rate_min - ffOf(a.held_out_category)))[0];
       if (g) {
         const ff = rows.find((r) => r.model === "ffnn_naive" && r.held_out_category === g.held_out_category);
         unseen = { ds, cat: g.held_out_category, gnn: g.heldout_detection_rate_mean, min: g.heldout_detection_rate_min,

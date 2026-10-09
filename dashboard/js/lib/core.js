@@ -3,7 +3,10 @@ export const API = window.API_BASE || "/api";
 
 export const state = {
   dataset: localGet("ds", "cicids2017"),
-  mode: localGet("mode", "multiclass"),
+  // The console shows the multiclass task sequence only: the binary sequence ties with the per-flow model on
+  // CIC-IDS2017 and was withdrawn for CSE-CIC-IDS2018 (one seed). Binary leave-one-attack-out (unseen attacks)
+  // is a separate experiment and is always shown.
+  mode: "multiclass",
   compare: localGet("compare", "0") === "1",   // off = one model; on = every ablation
   listeners: new Set(),
 };

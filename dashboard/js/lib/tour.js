@@ -5,14 +5,14 @@ import { $, prefs } from "./core.js";
 
 const STEPS = [
   { view: "overview", title: "The result in one line",
-    body: "The model learned seven attack types one after another and still catches the first one. "
-        + "Every number here is read from the saved experiment files." },
+    body: "The graph model catches some attacks it was never trained on, and learned seven attack types one "
+        + "after another without forgetting the first. Every number here is read from the saved experiment files." },
   { view: "soc", title: "What an analyst sees",
     body: "Thousands of flagged flows collapse into a handful of incidents. Pick one to see why it was "
         + "flagged and what containment the system proposes. Nothing is ever executed." },
-  { view: "live", title: "Watch it adapt",
-    body: "Press Start to replay traffic. When behaviour changes, the drift detector fires and the model "
-        + "retrains itself mid-stream." },
+  { view: "sites", title: "Live traffic",
+    body: "Sensors, the cyber range and the sandbox replay arrive here within seconds. Label what you see and "
+        + "adapt: the update is kept only if it does not forget old attacks or add false alarms." },
   { view: "explorer", title: "An attack has a shape",
     body: "One window as a graph. Port scans fan out from a single host; floods fan in to a single victim. "
         + "That shape is what the graph model sees and a per-flow model cannot." },

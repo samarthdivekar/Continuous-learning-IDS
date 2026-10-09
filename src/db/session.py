@@ -37,7 +37,9 @@ def database_url() -> str:
 def make_engine(url: str | None = None) -> Engine:
     url = url or database_url()
     if url.startswith("sqlite"):
-        engine = create_engine(url, connect_args={"check_same_thread": False})
+        # timeout: wait up to 30 s for another writer (sensor ingest, labels, incident records) instead of
+        # failing with "database is locked" after SQLite's default 5 s
+        engine = create_engine(url, connect_args={"check_same_thread": False, "timeout": 30})
 
         @event.listens_for(engine, "connect")
         def _wal(dbapi_conn, _):  # concurrent reads while the demo thread writes

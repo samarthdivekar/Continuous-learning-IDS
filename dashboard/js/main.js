@@ -1,5 +1,5 @@
 // App shell: sidebar routing (hash-based), global dataset/mode context, service status, theme.
-import { $, $$, esc, get, onContextChange, post, prefs, setApiKey, setContext, state, toast, withdrawn } from "./lib/core.js";
+import { $, $$, esc, get, onContextChange, post, prefs, setApiKey, setContext, state, toast } from "./lib/core.js";
 import { applyDefaults } from "./lib/charts.js";
 import * as tour from "./lib/tour.js";
 import * as palette from "./lib/palette.js";
@@ -47,19 +47,11 @@ const LEGACY = { compare: "models", general: "models", drift: "adapt", trust: "a
 
 function syncSeg(id, value) { $$(`#${id} button`).forEach((b) => b.classList.toggle("on", b.dataset.v === value)); }
 
-/** Keep the switches honest: Binary is unavailable for CSE-CIC-IDS2018 (see core.js `withdrawn`). */
-function syncContext() {
-  syncSeg("ds-seg", state.dataset); syncSeg("mode-seg", state.mode);
-  const binary = $('#mode-seg button[data-v="binary"]');
-  const off = withdrawn(state.dataset, "binary");
-  binary.disabled = off;
-  binary.title = off ? "Withdrawn for CSE-CIC-IDS2018: the binary task sequence had one seed" : "";
-}
+function syncContext() { syncSeg("ds-seg", state.dataset); }
 
 function initControls() {
   syncContext();
   $$("#ds-seg button").forEach((b) => b.addEventListener("click", () => { syncSeg("ds-seg", b.dataset.v); setContext({ dataset: b.dataset.v }); }));
-  $$("#mode-seg button").forEach((b) => b.addEventListener("click", () => { syncSeg("mode-seg", b.dataset.v); setContext({ mode: b.dataset.v }); }));
   $$(".tab").forEach((t) => t.addEventListener("click", () => { location.hash = t.dataset.view; }));
   const drawer = (open) => {                         // narrow screens: the sidebar is a drawer
     document.body.classList.toggle("nav-open", open);
@@ -132,15 +124,11 @@ function initControls() {
       run: () => { syncSeg("ds-seg", "cicids2017"); setContext({ dataset: "cicids2017" }); } },
     { label: "Dataset: CSE-CIC-IDS2018", group: "context",
       run: () => { syncSeg("ds-seg", "csecicids2018"); setContext({ dataset: "csecicids2018" }); } },
-    { label: "Labels: multiclass (named attacks)", group: "context",
-      run: () => { syncSeg("mode-seg", "multiclass"); setContext({ mode: "multiclass" }); } },
-    { label: "Labels: binary (attack vs benign)", group: "context",
-      run: () => { syncSeg("mode-seg", "binary"); setContext({ mode: "binary" }); } },
     { label: () => `Compare models: turn ${state.compare ? "off" : "on"}`, group: "context",
       run: () => { const on = !state.compare; $("#compare-toggle").checked = on; setContext({ compare: on }); } },
-    { label: "Start the live stream", group: "stream", run: () => streamAction("/demo/start", "stream started") },
+    { label: "Start the drift replay", group: "stream", run: () => streamAction("/demo/start", "drift replay started") },
     { label: "Retrain now", group: "stream", run: () => streamAction("/retrain", "adaptation requested") },
-    { label: "Stop the live stream", group: "stream", run: () => streamAction("/demo/stop", "stream stopped") },
+    { label: "Stop the drift replay", group: "stream", run: () => streamAction("/demo/stop", "drift replay stopped") },
     { // a bare number jumps straight to that incident in the queue
       label: (q) => `Open incident #${q || "…"}`, group: "incident", priority: 10,
       match: (q) => /^\d+$/.test(q),
@@ -208,7 +196,7 @@ async function health() {
     pill("#pill-ml", mlOk);
     if ($("#banner").dataset.dismissed !== "1") {
       banner(mlOk ? "" : `<b>Live model unavailable.</b> Overview, Models, Adaptation &amp; trust and Reproducibility still
-        work (they read saved results). Incident queue, Live stream, Graph explorer and Classify need the model service.
+        work (they read saved results). Incident queue, Live sites, Drift replay, Graph explorer and Classify need the model service.
         <span class="muted">${esc(String(ml.detail || "").slice(0, 140))}</span>`);
     }
     $("#pill-ml").title = `${ml.device || "?"}${ml.gpu ? " · " + ml.gpu : ""} · models: ${(ml.models_loaded || []).join(", ")}`;

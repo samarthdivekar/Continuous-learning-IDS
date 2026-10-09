@@ -233,7 +233,8 @@ def create_app(database_url: str | None = None, service=None, load_models: bool 
         flows, flow_ids = None, None
         if body.flow_ids:
             with state.Session() as s:
-                recs = s.scalars(select(FlowRecord).where(FlowRecord.id.in_(body.flow_ids))).all()
+                recs = [r for i in range(0, len(body.flow_ids), 500)        # SQLite caps variables per statement
+                        for r in s.scalars(select(FlowRecord).where(FlowRecord.id.in_(body.flow_ids[i:i + 500]))).all()]
             recs = sorted(recs, key=lambda r: body.flow_ids.index(r.id))
             if not recs:
                 raise HTTPException(404, "no flows found for flow_ids")

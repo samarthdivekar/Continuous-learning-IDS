@@ -13,7 +13,7 @@ const shown = () => (state.compare ? HEADLINE : STORY);
 export async function mount_(el) {
   root = el;
   root.innerHTML = `
-    <div class="view-head"><div><h2>Stream replay <span class="muted" style="font-size:0.5em;vertical-align:middle">(recorded dataset demo)</span></h2>
+    <div class="view-head"><div><h2>Drift replay <span class="muted" style="font-size:0.5em;vertical-align:middle">(recorded dataset demo)</span></h2>
       <p>Replays the <b>recorded dataset's</b> chronological stream (tasks 2 → last) through the models at once — this is a demo of
       the training data, not live sensor traffic (that's <b>Live sites</b>). Each window is predicted first, then its delayed
       labels feed ADWIN; a confirmed error increase triggers an adaptation cycle (EWC + replay for ours).</p></div>

@@ -168,6 +168,24 @@ class LiveWindow(Base):
     source: Mapped[str] = mapped_column(String(16), default="pcap")   # pcap | flows | replay
 
 
+class LiveIncident(Base):
+    """A live incident as a record: one per (site, category, key host), with a lifecycle. Its flows are
+    regrouped on every view; this row keeps the stable id, when it started and was last active, and what the
+    analyst did with it."""
+    __tablename__ = "live_incidents"
+    id: Mapped[int] = mapped_column(PK, primary_key=True, autoincrement=True)
+    site: Mapped[str] = mapped_column(String(64), index=True)
+    category: Mapped[str] = mapped_column(String(32))
+    key_host: Mapped[str] = mapped_column(String(64))
+    first_seen: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    last_seen: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    max_flows: Mapped[int] = mapped_column(Integer, default=0)
+    status: Mapped[str] = mapped_column(String(16), default="open")       # open | acknowledged | closed | reopened
+    status_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    status_by: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    note: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+
 class LiveFlow(Base):
     __tablename__ = "live_flows"
     id: Mapped[int] = mapped_column(PK, primary_key=True, autoincrement=True)

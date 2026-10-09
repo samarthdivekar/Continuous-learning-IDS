@@ -451,7 +451,8 @@ def main():
         if not args.keep:
             print("\ntearing down the range...", flush=True)
             teardown()
-        streamer.join(timeout=30)
+        if streamer.ident is not None:            # it may not have started if setup failed
+            streamer.join(timeout=30)
         shutil.rmtree(capdir, ignore_errors=True)
 
     if streamer.latency:

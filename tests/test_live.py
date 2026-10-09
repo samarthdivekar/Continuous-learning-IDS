@@ -215,6 +215,16 @@ def test_unsure_flows_raise_no_incident_and_live_actions_are_dry_run(client, mon
     assert a["site"] == "lab" and a["status"] == "proposed" and a["dry_run"] is True
     assert client.post("/live/actions", json={"site": "lab", "category": i["category"],
                                               "target": i["proposed"]["target"]}).json()["id"] == a["id"]   # no duplicate
+    rec = i["record"]                                       # incidents are stored records with a lifecycle
+    assert rec["status"] == "open" and rec["site"] == "lab"
+    again = client.get("/live/incidents", params={"site": "lab"}).json()["incidents"]
+    assert {x["record"]["id"] for x in again} == {x["record"]["id"] for x in inc["incidents"]}   # stable ids
+    st = client.post(f"/live/incident_records/{rec['id']}/status", json={"status": "closed", "analyst": "sam"}).json()
+    assert st["status"] == "closed" and st["status_by"] == "sam"
+    client.post("/sensor/flows", json={"site": "lab", "flows": [{**f, "ts": "2099-01-01T00:00:00+00:00"} for f in _flows(client, 4)]})
+    reopened = {x["record"]["id"]: x["record"]["status"] for x in client.get("/live/incidents", params={"site": "lab"}).json()["incidents"]}
+    assert reopened.get(rec["id"]) == "reopened"            # new activity after closing reopens it
+    assert client.get("/live/incident_records").json()["records"]
     d = client.post(f"/actions/{a['id']}/decision", json={"decision": "approve", "analyst": "sam"}).json()
     assert d["status"] == "approved" and d["dry_run"] is True
     assert client.post("/live/actions", json={"site": "lab", "category": "DDoS", "target": "1.2.3.4"}).status_code == 409
@@ -250,6 +260,32 @@ def test_training_groups_keep_normal_and_attack_periods_apart():
     for r in other:
         r.site = "b"
     assert sorted(len(g) for g in routes._training_groups(rows + other)) == [1200, 1500, 2300]   # per site
+
+
+def test_large_label_batches_and_learning_marks(client, monkeypatch):
+    """Thousands of flow ids in one request once overflowed SQLite's per-statement variable limit (a 500 after
+    an ACCEPTED adaptation on the cyber range); labelling, undo and the learned-mark must handle them."""
+    ids = []
+    for _ in range(3):
+        ids += client.post("/sensor/flows", json={"site": "big", "flows": _flows(client, 1500), "detail": True}).json()["flow_ids"]
+    r = client.post("/live/label", json={"label": "Benign", "flow_ids": ids})
+    assert r.status_code == 200 and r.json()["labelled"] == 4500
+    assert client.post("/live/unlabel", json={"flow_ids": ids}).json()["unlabelled"] == 4500
+    client.post("/live/label", json={"label": "Benign", "flow_ids": ids})
+    monkeypatch.setattr(client.svc.live, "_gate", lambda *a, **k: [])
+    res = client.post("/live/adapt", json={"epochs": 1})
+    assert res.status_code == 200 and res.json()["accepted"]
+    with client.Session() as s:
+        assert s.query(LiveFlow).filter(LiveFlow.used_for_learning.is_(True)).count() == 4500
+
+
+def test_live_flow_is_explained_in_its_scoring_context(client):
+    client.post("/sensor/flows", json={"site": "lab", "flows": _flows(client, 30)})
+    out = client.post("/sensor/flows", json={"site": "lab", "flows": _flows(client, 10), "detail": True}).json()
+    e = client.get(f"/live/explain/{out['flow_ids'][3]}").json()
+    assert e["flow_id"] == out["flow_ids"][3] and e["context_flows"] == 30 and e["site"] == "lab"
+    assert e["summary"] and e["features"] and e["predicted_label"] in client.svc.live.names
+    assert client.get("/live/explain/999999").status_code == 404
 
 
 def test_purge_keeps_labelled_flows(client):

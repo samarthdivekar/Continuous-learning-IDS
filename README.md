@@ -16,8 +16,9 @@ support the expected story, the README says so.
 > **Headline results and all tables: [`results/RESULTS.md`](results/RESULTS.md)** (generated from CSVs,
 > never edited by hand). A summary with interpretation is in [Results](#results) below.
 >
-> **What it is for, and what it is not: [`docs/positioning.md`](docs/positioning.md)** (a continual-learning
-> triage layer on an existing IDS's alert stream, not a SOC platform) and the
+> **What it is for, and what it is not: [`docs/positioning.md`](docs/positioning.md)** (a standalone,
+> flow-based detector with an analyst console that learns new attacks under a safety gate; not a SOC platform,
+> and it does not ingest other IDSs' alerts) and the
 > **[model card](docs/model-card.md)** (intended use, data, metrics with their split, failure modes).
 
 ---

@@ -14,10 +14,11 @@
 
 ## Intended use
 
-A triage layer on the flow stream of an IDS a team already runs (see `docs/positioning.md`): grouping
-flagged flows into incidents, flagging traffic unlike known attacks, abstaining when unsure, and learning new
-attack types without forgetting old ones. Every containment action it proposes is a dry run; a person decides
-and acts elsewhere.
+A standalone flow-based detector with an analyst console, run beside a team's existing defences (see
+`docs/positioning.md`): scoring sensor traffic as host/flow graphs, grouping flagged flows into incidents,
+flagging traffic unlike known attacks, abstaining when it cannot tell attack from normal, and learning new
+attack types and the local network from analyst labels — each update gated, rolled back if it would forget or
+add false alarms. Every containment action it proposes is a dry run; a person decides and acts elsewhere.
 
 ## Out of scope
 
