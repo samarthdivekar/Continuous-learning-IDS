@@ -38,7 +38,8 @@ function Stop-Stack {
         foreach ($line in Get-Content $pidFile) {
             $id = [int]($line -split '\s+')[0]
             $p = Get-Process -Id $id -ErrorAction SilentlyContinue
-            if ($p) { Write-Host "stopping $($line)"; Stop-Process -Id $id -Force -ErrorAction SilentlyContinue }
+            # /T: a venv's python.exe is a launcher, the server itself runs as its child process
+            if ($p) { Write-Host "stopping $($line)"; & taskkill.exe /PID $id /T /F 2>&1 | Out-Null }
         }
         Remove-Item $pidFile -Force
     }
