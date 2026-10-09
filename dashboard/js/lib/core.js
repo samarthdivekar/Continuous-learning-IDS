@@ -24,10 +24,8 @@ function localGet(k, d) { try { return localStorage.getItem("gnnids." + k) || d;
 function localSet(k, v) { try { localStorage.setItem("gnnids." + k, v); } catch { /* private mode */ } }
 export const prefs = { get: localGet, set: localSet };
 
-// The API needs a key only when the server was started with GNNIDS_API_KEY. It can come from
-// the URL (?api_key=...) once and is then remembered in this browser.
-const urlKey = new URLSearchParams(location.search).get("api_key");
-if (urlKey) { localSet("apiKey", urlKey); history.replaceState(null, "", location.pathname + location.hash); }
+// The API needs a key only when the server was started with GNNIDS_API_KEY. The console asks for it
+// once (main.js) and remembers it in this browser; it is sent only in the X-API-Key header, never in a URL.
 export const apiKey = () => localGet("apiKey", "");
 export function setApiKey(k) { localSet("apiKey", k || ""); }
 const authHeaders = () => (apiKey() ? { "X-API-Key": apiKey() } : {});

@@ -79,15 +79,25 @@ def index():
     return out
 
 
+# Appendix-only experiments: reported in the README appendix, never served as a model of the console.
+APPENDIX_MODELS = {"gnn_ewc_replay_topo"}
+
+
 @router.get("/continual")
-def continual(dataset: str = "cicids2017", mode: str = "multiclass"):
-    base = _check(dataset, mode) / "continual"
+def continual(dataset: str = "cicids2017", mode: str = "multiclass",
+              split: str = Query("interleaved", pattern="^(interleaved|temporal)$")):
+    """`split=temporal` reads the temporal-split re-run (train on each attack's earlier traffic, test on its
+    latest); `interleaved` the original split, whose test windows sit between training windows."""
+    base = _check(dataset, mode) / ("continual" if split == "interleaved" else "continual_temporal")
     mean = _read_csv(base / "summary.csv")
     if "ip_mode" in mean:
         mean = mean[mean["ip_mode"] == "none"]
+    mean = mean[~mean["model"].isin(APPENDIX_MODELS)]
     std = pd.read_csv(base / "summary_std.csv") if (base / "summary_std.csv").exists() else None
     if std is not None and "ip_mode" in std:
         std = std[std["ip_mode"] == "none"]
+    if std is not None:
+        std = std[~std["model"].isin(APPENDIX_MODELS)]
     models = list(dict.fromkeys(mean["model"]))
     recall = {}
     for m in models:
@@ -104,7 +114,7 @@ def continual(dataset: str = "cicids2017", mode: str = "multiclass"):
         if vals:
             forgetting[m] = {k: float(np.nanmean([v[k] for v in vals])) for k in vals[0]}
     tasks = mean.drop_duplicates("after_task").sort_values("after_task")["task_category"].tolist()
-    return {"dataset": dataset, "mode": mode, "seeds": seeds, "models": models, "tasks": tasks,
+    return {"dataset": dataset, "mode": mode, "split": split, "seeds": seeds, "models": models, "tasks": tasks,
             "summary": _records(mean), "summary_std": _records(std) if std is not None else [],
             "recall_matrix": recall, "forgetting": forgetting}
 

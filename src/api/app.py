@@ -11,6 +11,7 @@ and this app forwards those calls to ML_SERVICE_URL; locally it runs in-process.
 """
 from __future__ import annotations
 
+import hmac
 import os
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
@@ -160,8 +161,9 @@ def create_app(database_url: str | None = None, service=None, load_models: bool 
     app.add_middleware(GZipMiddleware, minimum_size=1024)
 
     # Optional shared-secret auth. With GNNIDS_API_KEY set, every endpoint except /health and
-    # the dashboard's own files needs the key (X-API-Key header or ?api_key=). Unset = open,
-    # which is the local-development default; deployments should set it and sit behind TLS.
+    # the dashboard's own files needs the key in the X-API-Key header — never in the URL, where it
+    # would end up in logs and browser history. Unset = open, the local-development default;
+    # run_stack.ps1 refuses to listen beyond loopback without a key.
     api_key = os.environ.get("GNNIDS_API_KEY") or None
     OPEN_PATHS = ("/health", "/api/health", "/docs", "/openapi.json", "/redoc", "/favicon.ico")
 
@@ -179,8 +181,8 @@ def create_app(database_url: str | None = None, service=None, load_models: bool 
             path = request.url.path
             protected = not (path in OPEN_PATHS or path == "/" or path.startswith("/dashboard"))
             if protected:
-                given = request.headers.get("x-api-key") or request.query_params.get("api_key")
-                if given != api_key:
+                given = request.headers.get("x-api-key") or ""
+                if not hmac.compare_digest(given.encode(), api_key.encode()):
                     return JSONResponse({"detail": "missing or invalid API key"}, status_code=401)
         return await call_next(request)
 

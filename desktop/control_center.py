@@ -24,8 +24,8 @@ ROOT = Path(__file__).resolve().parent.parent
 PY = ROOT / ".venv" / "Scripts" / "python.exe"
 if not PY.exists():
     PY = Path(sys.executable)
-API_DEFAULT = "http://localhost:8000"
-DASH_DEFAULT = "http://localhost:8080"
+API_DEFAULT = "http://127.0.0.1:8000"
+DASH_DEFAULT = "http://127.0.0.1:8080"
 CATEGORIES = ["DoS", "PortScan", "DDoS", "BruteForce", "Infiltration", "Botnet"]
 
 

@@ -268,7 +268,7 @@ def test_api_key_blocks_everything_except_health(cfg, tmp_path, monkeypatch):
         assert c.get("/metrics").status_code == 401                      # no key
         assert c.get("/metrics", headers={"X-API-Key": "wrong"}).status_code == 401
         assert c.get("/metrics", headers={"X-API-Key": "s3cret"}).status_code == 200
-        assert c.get("/metrics?api_key=s3cret").status_code == 200       # query form, for downloads
+        assert c.get("/metrics?api_key=s3cret").status_code == 401       # never accepted in a URL (logs, history)
 
 
 def test_incident_scan_covers_many_windows(client):

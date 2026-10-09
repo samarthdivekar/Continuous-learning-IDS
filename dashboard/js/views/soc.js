@@ -29,8 +29,10 @@ export async function mount_(el) {
   root.innerHTML = `
     <div class="view-head"><div><h2>Incident queue</h2>
       <p>Thousands of flagged flows become a handful of <b>incidents</b> — one per attacker/victim cluster. Open one to see
-      <b>why</b> it was flagged and the <b>containment we would propose</b>. You approve or reject; nothing is ever executed.</p></div>
-      <span class="tag" id="soc-svc" title="The live model service serves one dataset, independent of the switch above"></span></div>
+      <b>why</b> it was flagged and the <b>containment we would propose</b>. You approve or reject; nothing is ever executed.
+      This queue works on the <b>recorded dataset's held-out test windows</b> (so every incident can be checked against ground
+      truth); incidents from real sensor traffic are on <a href="#sites">Live sites</a>.</p></div>
+      <span class="tag" id="soc-svc" title="The model service serves one dataset, independent of the switch above"></span></div>
 
     <div class="grid g4" id="soc-kpis"></div>
 
@@ -89,7 +91,7 @@ export async function mount_(el) {
         <button data-v="approved">Approved</button><button data-v="rejected">Rejected</button></div></div>
       <div id="soc-log"></div></div>`;
 
-  get("/health").then((h) => { $("#soc-svc", root).textContent = `live models: ${h.ml?.dataset || "?"} · ${h.ml?.label_mode || ""}`; })
+  get("/health").then((h) => { $("#soc-svc", root).textContent = `recorded test windows: ${h.ml?.dataset || "?"} · ${h.ml?.label_mode || ""}`; })
     .catch(() => {});
   try { catalog = (await get("/windows/catalog")).filter((w) => w.split === "test" && w.n_attack > 0); }
   catch (e) { catalog = []; showError($("#soc-list", root), e, { what: "the window catalogue" }); }

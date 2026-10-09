@@ -1,9 +1,9 @@
 """Measure the model's false-alarm rate on YOUR OWN benign traffic, before and after teaching it.
 
     # capture ~10 minutes of normal use first (do nothing unusual), then:
-    python sensor/measure_fpr.py --pcap my_normal_traffic.pcap --server http://localhost:8000
+    python sensor/measure_fpr.py --pcap my_normal_traffic.pcap --server http://127.0.0.1:8000
     # or from a flow CSV the pinned CICFlowMeter already produced:
-    python sensor/measure_fpr.py --csv flows.csv --server http://localhost:8000
+    python sensor/measure_fpr.py --csv flows.csv --server http://127.0.0.1:8000
 
 This is the honest version of "does teaching reduce false alarms?": the flows are split into a teach half
 and a held-out half; the server measures the false-positive rate on the held-out half, teaches the teach
@@ -40,7 +40,7 @@ def main() -> None:
     src = p.add_mutually_exclusive_group(required=True)
     src.add_argument("--pcap", type=Path, help="a capture of your own benign traffic")
     src.add_argument("--csv", type=Path, help="a CICFlowMeter flow CSV (from the pinned meter) instead")
-    p.add_argument("--server", default="http://localhost:8000")
+    p.add_argument("--server", default="http://127.0.0.1:8000")
     p.add_argument("--teach-fraction", type=float, default=0.5, help="share taught; the rest is held out (default 0.5)")
     p.add_argument("--epochs", type=int, default=None)
     args = p.parse_args()

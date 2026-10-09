@@ -15,8 +15,8 @@ async function render() {
   const { dataset, mode } = state;
   root.innerHTML = `
     <div class="view-head"><div><h2>Mission overview</h2>
-      <p>Does the continual GNN learn new attacks <b>and</b> remember old ones? Every number on this page is read from
-      <span class="mono">results/${dataset}/${mode}/</span> — nothing is typed in by hand.</p></div></div>
+      <p>Does the continual GNN catch attacks it was never taught, learn new ones <b>and</b> remember old ones? Every number
+      on this page is read from <span class="mono">results/</span> — nothing is typed in by hand.</p></div></div>
     <div id="ov-plain"></div>
     <div class="grid g4" id="ov-kpis"></div>
     <div class="grid g-7-5" style="margin-top:16px">
@@ -33,30 +33,55 @@ async function render() {
   const kpis = root.querySelector("#ov-kpis");
   kpis.innerHTML = `<div class="card">${skeleton("kpi")}</div>`.repeat(4);
   root.querySelector("#ov-verdict").innerHTML = skeleton("table");
-  let c;
-  try { c = await get(`/results/continual?dataset=${dataset}&mode=${mode}`); }
-  catch (e) {
-    kpis.innerHTML = `<div class="card span-2"><div class="empty">No task-sequence results for ${esc(dataset)} / ${esc(mode)} yet (${esc(e.message)}).</div></div>`;
+  let c, inter = null;
+  // The headline is the temporal split where it exists (train on each attack's earlier traffic, test on its
+  // latest) — the interleaved split puts test windows between training windows and is optimistic.
+  try { c = await get(`/results/continual?dataset=${dataset}&mode=${mode}&split=temporal`); }
+  catch { c = null; }
+  try { inter = await get(`/results/continual?dataset=${dataset}&mode=${mode}`); } catch { inter = null; }
+  if (!c) c = inter;
+  if (!c) {
+    kpis.innerHTML = `<div class="card span-2"><div class="empty">No task-sequence results for ${esc(dataset)} / ${esc(mode)} yet.</div></div>`;
     root.querySelector("#ov-verdict").innerHTML = "";
     await dataPanel(dataset);
     return;
   }
-  const last = Math.max(...c.summary.map((r) => r.after_task));
-  const fin = Object.fromEntries(c.summary.filter((r) => r.after_task === last).map((r) => [r.model, r]));
-  const sd = Object.fromEntries((c.summary_std || []).filter((r) => r.after_task === last).map((r) => [r.model, r]));
+  const temporal = c.split === "temporal";
+  const finalOf = (res) => {
+    const last = Math.max(...res.summary.map((r) => r.after_task));
+    return [Object.fromEntries(res.summary.filter((r) => r.after_task === last).map((r) => [r.model, r])),
+            Object.fromEntries((res.summary_std || []).filter((r) => r.after_task === last).map((r) => [r.model, r]))];
+  };
+  const [fin, sd] = finalOf(c);
+  const interOurs = inter && temporal ? finalOf(inter)[0].gnn_ewc_replay : null;
   const ours = fin.gnn_ewc_replay || {}, naive = fin.gnn_naive || {}, xgb = fin.xgboost_static || {}, ffnn = fin.ffnn_ewc_replay || {};
-  let drift = null;
-  try { drift = await get(`/results/drift?dataset=${dataset}&mode=multiclass`); } catch { /* optional */ }
-  const adw = drift?.summary.find((r) => r.model === "gnn_ewc_replay" && r.policy === "adwin");
-  const orc = drift?.summary.find((r) => r.model === "gnn_ewc_replay" && r.policy === "oracle");
+  // the differentiating result: attacks held out of training entirely (binary leave-one-attack-out)
+  let unseen = null;
+  for (const ds of [dataset, "csecicids2018", "cicids2017"]) {
+    try {
+      const l = await get(`/results/loao?dataset=${ds}&mode=binary`);
+      const rows = l.seeds || [];
+      const g = rows.filter((r) => r.model === "gnn_naive").sort((a, b) => b.heldout_detection_rate_min - a.heldout_detection_rate_min)[0];
+      if (g) {
+        const ff = rows.find((r) => r.model === "ffnn_naive" && r.held_out_category === g.held_out_category);
+        unseen = { ds, cat: g.held_out_category, gnn: g.heldout_detection_rate_mean, min: g.heldout_detection_rate_min,
+                   n: g.n, ffnn: ff?.heldout_detection_rate_mean };
+        break;
+      }
+    } catch { /* try the next dataset */ }
+  }
+  const dsName = (d) => (d === "csecicids2018" ? "CSE-CIC-IDS2018" : "CIC-IDS2017");
   kpis.innerHTML = [
-    tile("Our macro-F1 (all tasks)", f3(ours.macro_f1_seen), sd.gnn_ewc_replay ? `± ${f3(sd.gnn_ewc_replay.macro_f1_seen)} over ${c.seeds.length} seeds` : "",
-         `vs FFNN ablation <b>${f3(ffnn.macro_f1_seen)}</b>`),
+    unseen ? tile("Attack never seen in training", pct(unseen.gnn, 1),
+                  `held-out <b>${esc(unseen.cat)}</b> detected · ${int(unseen.n)} seeds (worst ${pct(unseen.min, 1)})`,
+                  `per-flow model: ${pct(unseen.ffnn, 2)} · ${dsName(unseen.ds)}`)
+           : tile("Attack never seen in training", "–", "leave-one-attack-out not run", ""),
+    tile(`Macro-F1 · ${temporal ? "temporal split" : "interleaved split"}`, f3(ours.macro_f1_seen),
+         sd.gnn_ewc_replay ? `± ${f3(sd.gnn_ewc_replay.macro_f1_seen)} over ${c.seeds.length} seeds · FFNN ${f3(ffnn.macro_f1_seen)}` : `FFNN ${f3(ffnn.macro_f1_seen)}`,
+         interOurs ? `interleaved split (optimistic): ${f3(interOurs.macro_f1_seen)}` : (temporal ? "" : "no temporal re-run for this dataset")),
     tile("Retention of task-1 attack", pct(ours.retention_rate, 0),
          `naive retrain: <span class="${(naive.retention_rate ?? 1) < 0.5 ? "delta-bad" : ""}">${pct(naive.retention_rate, 0)}</span>`, "catastrophic forgetting avoided"),
-    tile("False-positive rate", pct(ours.fpr_seen, 2), `benign flows wrongly flagged`, `static XGBoost: ${pct(xgb.fpr_seen, 2)}`),
-    adw ? tile("Drift-triggered retrains", int(adw.retrains), `oracle needed ${int(orc?.retrains)}`, `${int(adw.drift_flags)} ADWIN flags · stream of ${int(adw.stream_windows)} windows`)
-        : tile("Static baseline blind spot", pct(xgb.macro_f1_seen), "macro-F1 of frozen XGBoost", "never learns new attacks"),
+    tile("False-positive rate", pct(ours.fpr_seen, 3), `benign flows wrongly flagged`, `static XGBoost: ${pct(xgb.fpr_seen, 3)}`),
   ].join("");
 
   const tasks = c.tasks || [];
@@ -66,6 +91,7 @@ async function render() {
     After the last one it still catches <b>${pct(ours.retention_rate, 0)}</b> of the first attack type${naive.retention_rate != null
       ? `, while a normally retrained model catches <b>${pct(naive.retention_rate, 0)}</b>` : ""}.
     ${per100k != null ? `It wrongly flags about <b>${int(per100k)}</b> of every 100,000 normal flows.` : ""}
+    ${temporal ? "Figures are from the <b>temporal split</b>: trained on each attack's earlier traffic, tested on its latest." : ""}
     New here? Press <span class="kbd">?</span> for a guided tour and glossary.</div>`;
 
   const order = shownModels(["gnn_ewc_replay", "ffnn_ewc_replay", "gnn_replay", "gnn_ewc", "gnn_naive", "ffnn_naive",
@@ -143,7 +169,7 @@ function archSvg() {
     <defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
       <path d="M0,0 L10,5 L0,10 z" fill="currentColor" style="color:var(--accent)"/></marker></defs>
 
-    ${box(8, 24, 150, "Browser", "8 tabs · ES modules")}
+    ${box(8, 24, 150, "Browser", "9 tabs · ES modules")}
     ${box(208, 24, 170, "Static server", "8080 · serves + proxies /api")}
     ${box(428, 24, 170, "Public API", "8000 · FastAPI")}
     ${box(648, 24, 180, "Model service", "8001 · GPU · 4 models", true)}

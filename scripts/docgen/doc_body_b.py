@@ -430,9 +430,9 @@ leave-one-attack-out, the IP-remap test, the figures, the report and the databas
 <span class="mono">results/dev/</span> and is never reported.</p>
 
 <h3>9.4 Feeding it your own traffic</h3>
-<pre>python scripts\\pcap_to_flows.py capture.pcap --api http://localhost:8000</pre>
-<p>Converts a capture with CICFlowMeter (installed separately), posts the flows and prints the verdicts. With an
-existing flow CSV, skip the conversion with <span class="mono">--csv flows.csv</span>.</p>
+<pre>python sensor\\agent.py --server http://127.0.0.1:8000 --site lab --replay capture.pcap</pre>
+<p>Sends a recorded capture through the pinned CICFlowMeter and the live scorer, exactly like a live sensor; it
+appears on the Live sites tab. A CSV with the full feature set can be scored on the Classify tab.</p>
 
 <h3>9.5 Tests and continuous integration</h3>
 <p>74 tests (<span class="mono">python -m pytest</span>) covering preprocessing, graph building, the learners, the

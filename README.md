@@ -286,9 +286,10 @@ All routes are also served under `/api/…`. Interactive docs: `/docs`.
 
 Set `GNNIDS_API_KEY` to require an `X-API-Key` header on every endpoint except `/health`.
 
-**Feeding it your own traffic.** `python scripts/pcap_to_flows.py capture.pcap` converts a capture with
-CICFlowMeter (install it separately; point to it with `--jar` or `CICFLOWMETER_JAR`), posts the flows to
-`/ingest` and prints the verdicts. With an existing flow CSV, skip conversion: `--csv flows.csv`.
+**Feeding it your own traffic.** `python sensor/agent.py --server http://127.0.0.1:8000 --site lab --replay
+capture.pcap` sends a recorded capture through the same pinned flow meter and live scorer as a live sensor; it
+appears under **Live sites**. A CSV of flows with the full CICFlowMeter feature set can be scored on the
+**Classify** tab.
 
 **Live traffic from sensor machines (`src/live/`, `sensor/`).** A sensor (`sensor/agent.py`, standard
 library + Wireshark's dumpcap) captures a machine's own traffic in short chunks and uploads each to
@@ -1023,7 +1024,7 @@ src/product/        incident grouping, proposed response actions, CEF export for
 src/explain/        per-flow evidence (gradient x input, neighbourhood, structure)
 src/utils/          config, selection of tuned settings, safe checkpoint loading
 dashboard/          8-tab console (Chart.js + d3-force; served by FastAPI, nginx or scripts/dashboard_server.py)
-scripts/            run_stack.ps1 (the five-layer stack as local processes), dashboard_server.py, pcap_to_flows.py
+scripts/            run_stack.ps1 (the five-layer stack as local processes), dashboard_server.py, ui_smoke.py
 experiments/        every script that produces a reported number
 results/            committed CSV/JSON/PNG outputs + RESULTS.md
 tests/              pytest suite (synthetic fixtures only)
