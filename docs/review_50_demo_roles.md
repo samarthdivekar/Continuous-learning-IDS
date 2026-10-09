@@ -64,6 +64,11 @@ Say "3 seeds" / "5 seeds" every time you give a number.
    WebAttack. One dataset, joint training, 3 seeds. It sets the first research question of the second half.
 3. Completed vs remaining (the checklist), framed as RQ1–RQ4, then paper and report.
 
+**If asked "Why not just XGBoost?"** The DEMO.md answer covers XGBoost trained once (it cannot learn new attack
+types). Do not stop there: say that XGBoost retrained on all data, especially with host counts, scored higher than
+the GNN in tonight's preliminary run, and that this is exactly RQ1. The project's contribution is the
+continual-learning loop under a safety gate; whether the graph or host statistics should sit inside it is open.
+
 ---
 
 ## Before the review (everyone, 15 min early)
