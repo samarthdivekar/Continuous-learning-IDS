@@ -88,7 +88,7 @@ $api = Start-Process -FilePath $py -PassThru -WindowStyle Hidden `
 # ---- presentation layer: static dashboard + /api proxy to the API process
 $proxy = Join-Path $root "scripts\dashboard_server.py"
 $dash = Start-Process -FilePath $py -PassThru -WindowStyle Hidden `
-    -ArgumentList $proxy, "--port", "$DashboardPort", "--api", "http://$($BindHost -replace '^localhost$','127.0.0.1'):$ApiPort" `
+    -ArgumentList "`"$proxy`"", "--port", "$DashboardPort", "--api", "http://$($BindHost -replace '^localhost$','127.0.0.1'):$ApiPort" `
     -RedirectStandardOutput "logs\stack_dashboard.log" -RedirectStandardError "logs\stack_dashboard.err.log"
 
 "$($ml.Id) ml", "$($api.Id) api", "$($dash.Id) dashboard" | Set-Content -Encoding ascii $pidFile
