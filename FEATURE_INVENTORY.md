@@ -97,7 +97,7 @@ Also: guided tour, help/glossary, presentation mode, light/dark, command palette
 - **Teach-and-adapt on live traffic** — label flows (analyst + time recorded, undo, bulk "normal" skips suspicious flows) → the model adapts on a copy (scoring continues), trained on merged site windows; **rolled back** if old-attack macro-F1, any category's recall, recorded-benign FPR or the site's held-back normal FPR worsens. Accepted updates survive a restart. Live drift = disagreement with analyst labels. Retention purge (7 days). FPR measurement tool.
 - **Two-site (LAN/MAN)** — `run_stack.ps1 -BindHost <LAN/Tailscale IP>` (requires an API key) → sensors on different networks → one console.
 
-## 8. Cyber range (the VMs)
+## 8. Cyber range (isolated Docker containers)
 - Self-contained, isolated Docker range (no route out): 6 servers each capturing its own traffic, 6 workstations making normal web / shell / mail sessions, 1 attacker.
 - **Streamed live** into the console (site CYBER-RANGE) every few seconds — no batch upload at the end.
 - Attacker runs nmap **port scans** (recon only, no DoS): a SYN scan, then a *different* TCP connect scan.
@@ -110,9 +110,9 @@ Also: guided tour, help/glossary, presentation mode, light/dark, command palette
 - Launchers + Desktop shortcuts: "GNN-IDS Control Center", "Run Cyber Range (demo)".
 
 ## 10. Deliverables & docs
-- `README.md` (full results), `docs/model-card.md`, `docs/positioning.md`, `docs/project-review.md`.
-- `docs/GNN-IDS_Project_Guide.pdf` (53 pp), `docs/GNN-IDS_Technical_Documentation.pdf`.
-- `DEMO_FOR_GUIDE.md`, `docs/LIVE_DEMO.md`, `OVERNIGHT_TEST_REPORT.md`.
+- `README.md` (full results), `docs/model-card.md`, `docs/positioning.md`.
+- `docs/GNN-IDS_Project_Guide.pdf`, `docs/GNN-IDS_Technical_Documentation.pdf`, `docs/GNN-IDS_Paper_Reference.pdf`.
+- `DEMO.md` (the one demo script), `docs/LIVE_DEMO.md` (sensor and two-site setup). Internal UI notes: `docs/archive/`.
 - **10 sample CSVs** (`sample_flows/`) for the Classify tab.
 
 ## 11. Testing & reproducibility

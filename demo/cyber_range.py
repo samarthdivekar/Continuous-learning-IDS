@@ -413,7 +413,7 @@ def main():
         lb = api(args.server, "/live/label", {"label": "Benign", "flow_ids": n1["benign_ids"] + a1["benign_ids"],
                                               "analyst": "cyber-range", "only_unlabelled": False})
         rep["taught_attack"], rep["taught_benign"] = la["labelled"], lb["labelled"]
-        ad = api(args.server, "/live/adapt", {"site": SITE, "epochs": 5})
+        ad = api(args.server, "/live/adapt", {"site": SITE})
         rep["adapt"] = ad
         ob, oa = ad.get("old_attacks_before") or {}, ad.get("old_attacks_after") or {}
         print(f"labelled {la['labelled']} scan flows PortScan, {lb['labelled']} normal flows Benign; "

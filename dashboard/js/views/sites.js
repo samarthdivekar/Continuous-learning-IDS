@@ -31,7 +31,7 @@ export async function mount(el) {
             <option>BruteForce</option><option>Infiltration</option><option>Botnet</option></select></label>
         <button class="btn primary" id="st-replay" title="Feed a real recorded window of this attack through the live scorer">▶ Replay into the live view</button>
       </div>
-      <p class="note" style="margin-top:12px"><b>Other sources:</b> run the <b>cyber range</b> in the desktop app (an attacker VM vs the IDS),
+      <p class="note" style="margin-top:12px"><b>Other sources:</b> run the <b>cyber range</b> in the desktop app (isolated containers: office traffic and an attacker, streamed live),
         or start a sensor on a machine: <span class="mono">python sensor/agent.py --server http://THIS-PC:8000 --site home --iface &lt;n&gt;</span></p>
       <div id="st-nosites" class="empty" style="margin-top:10px"><span class="title">No traffic yet</span>Replay an attack above (or run the cyber range) and it appears below within a few seconds.</div>
     </div>
@@ -177,13 +177,16 @@ async function renderModel() {
   const hist = (m.history || []).slice().reverse();
   el.innerHTML = `<div class="card-head"><div><h3>Live model · v${int(m.version)}</h3>
     <p class="sub">${esc(m.model)} · novelty threshold ${m.novelty_threshold == null ? "–" : m.novelty_threshold.toFixed(2)} ·
-    rolls back if old-attack macro-F1 drops &gt; ${pct(m.max_drop)}</p></div></div>
+    teaching is rolled back if it forgets (old-attack macro-F1 −${pct(m.max_drop, 0)}, any category −${pct(m.max_recall_drop ?? 0.05, 0)})
+    or adds false alarms (+${pct(m.max_fpr_rise ?? 0.005, 1)}); it keeps the last epoch that passes</p></div></div>
     ${hist.length ? `<div class="feed" style="max-height:150px">${hist.map((h) => {
       if (h.reset) return `<div class="ev"><span class="tag">reset</span> back to the trained model (v${int(h.version)})</div>`;
       const ok = h.accepted;
       return `<div class="ev"><span class="num muted">v${int(h.version)}</span>
         <span>${ok ? '<span class="tag good">adapted</span>' : '<span class="tag warn">rolled back</span>'}
-        ${int(h.labelled_flows)} labelled flows · old-attack F1 ${f3(h.old_attacks_before?.macro_f1)} → ${f3(h.old_attacks_after?.macro_f1)}
+        ${int(h.labelled_flows)} labelled flows · old-attack F1 ${f3(h.old_attacks_before?.macro_f1)} → ${f3(h.old_attacks_after?.macro_f1)}${
+          h.site_holdout ? ` · site false alarms ${pct(h.site_holdout.fpr_before)} → ${pct(h.site_holdout.fpr_after)}` : ""}${
+          ok && h.epochs_kept ? ` · ${int(h.epochs_kept)} epoch${h.epochs_kept > 1 ? "s" : ""}` : ""}
         ${ok ? "" : `<span class="muted">(${esc(h.reason || "")})</span>`}</span></div>`;
     }).join("")}</div>` : `<p class="note">No live adaptations yet — the model is exactly as trained.</p>`}`;
 }
@@ -290,7 +293,8 @@ function renderTeach(site) {
     try {
       const r = await post("/live/adapt", site ? { site } : {});
       out.innerHTML = r.accepted
-        ? `<span style="color:var(--good)">Adapted to v${int(r.version)} from ${int(r.labelled_flows)} labels. Old-attack macro-F1 ${f3(r.old_attacks_before.macro_f1)} → ${f3(r.old_attacks_after.macro_f1)} (kept).</span>`
+        ? `<span style="color:var(--good)">Adapted to v${int(r.version)} from ${int(r.labelled_flows)} labels (${int(r.epochs_kept)} epoch${r.epochs_kept > 1 ? "s" : ""}). Old-attack macro-F1 ${f3(r.old_attacks_before.macro_f1)} → ${f3(r.old_attacks_after.macro_f1)}${
+            r.site_holdout ? `; this site's false alarms ${pct(r.site_holdout.fpr_before)} → ${pct(r.site_holdout.fpr_after)}` : ""}.</span>`
         : `<span style="color:var(--warn)">Rolled back: ${esc(r.reason || "would forget old attacks")}.</span>`;
       await tick();
     } catch (err) { out.textContent = err.message; }

@@ -125,8 +125,8 @@ class App:
         lab.pack(fill=BOTH, expand=False, padx=12, pady=6)
         self.btn_range = ttk.Button(lab, text="Run cyber range", command=self.run_cyber_range)
         self.btn_range.grid(row=0, column=0, **pad)
-        ttk.Label(lab, text="two isolated VMs on your PC: an attacker scans a virtual network, the IDS detects it, "
-                  "you teach it, it learns - no real machine is touched", foreground="#888").grid(row=0, column=1, sticky="w", **pad)
+        ttk.Label(lab, text="isolated Docker containers on your PC: office traffic + an attacker's port scan, streamed live; "
+                  "you teach it, the gate checks it did not forget - no real machine is touched (~6 min)", foreground="#888").grid(row=0, column=1, sticky="w", **pad)
 
         # --- log
         logf = ttk.LabelFrame(self.root, text="Activity", padding=8)

@@ -39,6 +39,12 @@ log = get_logger(__name__)
 LIVE_MODEL = "gnn_ewc_replay"
 LIVE_WINDOW_OFFSET = 10_000_000        # live graphs get window ids far from the dataset's
 ALPHA = 0.05                           # conformal error level (README §7 compares 0.01 / 0.05 / 0.10)
+# Live teaching fine-tunes a trained model, so it uses a fraction of the training learning rate and up to
+# LIVE_MAX_EPOCHS epochs, keeping the last epoch that passes the gate. Measured on cyber-range labels: at the
+# full rate even one epoch lost WebAttack (96 % -> 13 % recall); at 0.1x, 7 epochs passed (old-attack F1
+# 0.975 -> 0.972, the site's false alarms 59 % -> 41 %, a held-out scan 50 % -> 99 % detected), the 8th failed.
+LIVE_LR_SCALE = 0.1
+LIVE_MAX_EPOCHS = 10
 
 
 class LiveEngine:
@@ -292,6 +298,8 @@ class LiveEngine:
         clone = make_learner(self.model_name, svc.cfg, data.meta["n_features"], num_classes(svc.cfg), svc.device,
                              node_in=node_in)
         clone.restore_state(self.learner.snapshot_state())      # replay graphs are shared by reference
+        for group in clone.optimizer.param_groups:              # fine-tuning, not training from scratch
+            group["lr"] = clone.lr * LIVE_LR_SCALE
         return clone
 
     @staticmethod
@@ -358,7 +366,7 @@ class LiveEngine:
             # The gate as early stopping: train one epoch at a time and keep the LAST epoch that passes every
             # check. More epochs learn the new traffic more (fewer false alarms on it) but forget more; on the
             # cyber range, 3 epochs at once lost WebAttack while 1 epoch passed (README, live traffic).
-            max_epochs = int(epochs or self.svc.cfg["train"]["gnn_epochs"])
+            max_epochs = int(epochs or LIVE_MAX_EPOCHS)
             best, best_eval, epochs_kept = None, None, 0
             first_eval = None
             for e in range(1, max_epochs + 1):
