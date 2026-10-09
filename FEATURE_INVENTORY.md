@@ -1,0 +1,128 @@
+# GNN-IDS — full feature inventory (for cross-check)
+
+Everything in the project, grouped. Tick as you verify.
+
+---
+
+## 1. The ML core (the research)
+
+**Main model**
+- **E-GraphSAGE** edge classifier — every 5,000-flow window becomes a graph (hosts = nodes, flows = edges
+  with 83 CICFlowMeter features); each flow is classified benign or one of the attack categories. 69,128 params.
+- IP addresses define the graph only — never used as features.
+
+**Continual learning (the contribution)**
+- **EWC** (Elastic Weight Consolidation), λ = 10, γ = 0.9 (chosen on validation).
+- **Subgraph replay** — up to 10 stored windows per attack category, 2 replayed per training step.
+- Learns attack categories one at a time (7 tasks on 2017, 6 on 2018) without catastrophic forgetting.
+
+**All 13 models/baselines implemented** (for the comparison):
+`gnn_ewc_replay` (ours), `gnn_naive`, `gnn_ewc`, `gnn_replay`, `gnn_joint`, `gnn_ewc_replay_topo` (appendix),
+`ffnn_ewc_replay`, `ffnn_ewc`, `ffnn_replay`, `ffnn_naive`, `ffnn_joint`, `xgboost_static`.
+
+**Drift / streaming**
+- **ADWIN** drift detector; policies compared: adwin / periodic / oracle / never.
+- **Safe-adaptation gate** — a retrain is a candidate; rolled back if macro-F1 / FPR / retention worsens.
+- Stream orders: clean blocks vs mixed pairs.
+
+**Trust / robustness**
+- **Open-set / novelty detection** — energy, MSP, prototype scores ("unfamiliar traffic").
+- **Conformal abstention** — abstains when unsure.
+- **Calibration** — ECE / MCE / Brier (are the probabilities honest?).
+- **IP-leakage tests** — permute hosts (must not change) vs randomise sources (topology dependence).
+- **Topology augmentation** (appendix) — trade topology robustness for accuracy.
+
+**Evaluation protocol**
+- Splits: interleaved, temporal, temporal-attack; leave-one-attack-out (unseen attacks).
+- Stats: bootstrap confidence intervals, Wilcoxon tests, 3–5 seeds.
+
+---
+
+## 2. Datasets
+- **CIC-IDS2017** (error-corrected, Engelen 2021) — 7 attack tasks, all flows.
+- **CSE-CIC-IDS2018** (error-corrected, Liu 2022) — 6 attack tasks, 15% label-agnostic sample.
+- 35 reviewed research papers in `research paper/` (git-ignored).
+
+## 3. Key measured results (all reproducible, in README)
+- Temporal macro-F1 **0.915 ± 0.031**; interleaved **0.964**; 2018 **0.911 ± 0.042**.
+- Graph vs per-flow: **+0.044 temporal / +0.036 interleaved**.
+- Retention of first attack: **0.998–1.000** (naive retraining: 0).
+- Unseen DoS (leave-one-out): **98.6% × 3 seeds** on 2018 (per-flow FFNN ≤ 0.07%).
+- Window-size, replay-budget, drift (3 seeds), IP-remap (3 seeds), calibration, serving speed (5.5 ms/window GPU).
+
+---
+
+## 4. The system (the product stack)
+Five layers, one deployment path (`scripts/run_stack.ps1`):
+- **Database** — SQLite (local) / PostgreSQL+TimescaleDB.
+- **Ingestion** — data prep + DB seed.
+- **ML service** (port 8001) — models, graphs, live demo.
+- **Public API** (port 8000) — REST.
+- **Dashboard** (port 8080) — the console.
+
+## 5. API — 50+ endpoints, grouped
+- **Results** (read-only): `/results/{index,continual,confusion,drift,loao,ip_remap,tuning,run_info,data_summary,adaptation,conformal,open_set}`
+- **Predict / graph**: `/predict`, `/graph/{id}`, `/explain/{id}/{edge}`, `/windows`, `/windows/catalog`
+- **Incidents**: `/incidents/scan`, `/incidents/{id}`, `/incidents/{id}/report`, `/incidents/{id}/cef`, `/actions`, `/actions/{id}/decision`
+- **Stream demo**: `/metrics`, `/drift-status`, `/stream/windows`, `/demo/start|stop|status`, `/retrain`
+- **Live traffic**: `/sensor/pcap`, `/sensor/flows`, `/sensor/replay_recorded`, `/live/{sites,windows,graph,incidents,model,score,label,adapt,reset,fpr_study,recorded_flows}`
+
+---
+
+## 6. The console — 9 tabs
+**Operate**
+1. **Overview** — headline results in one screen (macro-F1, retention, FPR, retrains).
+2. **Incident queue** — thousands of flagged flows → a handful of incidents; why flagged, feature attribution,
+   proposed dry-run rule, approve/reject, decision log, CSV + CEF (SIEM) export.
+3. **Live sites** — real/cyber-range/sandbox traffic scored per site; graph; incidents; teach-and-adapt (1-2-3 flow).
+4. **Stream replay (demo)** — replays the recorded dataset through the models; ADWIN drift, adaptation, speed control.
+
+**Evaluate**
+5. **Models** — accuracy, forgetting (BWT), unseen attacks, IP-leakage; per-seed tables.
+6. **Adaptation & trust** — drift/retraining, novelty, conformal abstention, alert load.
+7. **Reproducibility** — the reproduce command, λ sweep, tuning, run metadata, seeds.
+
+**More**
+8. **Graph explorer** — any window as an interactive force graph; ground-truth or model-error overlay.
+9. **Classify** — score a held-out window or an uploaded CSV of flows; every model side by side vs ground truth.
+
+Also: guided tour, help/glossary, presentation mode, light/dark, command palette, dataset/mode/compare switches, service-status pills.
+
+---
+
+## 7. Live-traffic / deployment layer
+- **Sensor** (`sensor/agent.py`) — captures a machine's traffic (Wireshark/dumpcap) or replays a pcap, ships flows.
+- **Pinned CICFlowMeter** (Docker, `sensor/cicflowmeter.Dockerfile`) — converts packets → the exact training features; rejects a capture whose columns don't match.
+- **Live model** — scores sensor traffic per site; flags unfamiliar traffic; groups into incidents (dry-run rules).
+- **Teach-and-adapt on live traffic** — label flows → the model adapts (gated, can't forget). FPR measurement tool.
+- **Two-site (LAN/MAN)** — sensors on different networks over a VPN → one console.
+
+## 8. Cyber range (the VMs)
+- Self-contained, isolated Docker range (attacker + victim containers, no route out).
+- Attacker runs an nmap **port scan** (recon only, no DoS) against the virtual network.
+- Walks the full loop: scan → (often undetected) → teach → fresh scan detected → old attacks kept.
+- **Writes an HTML report** after each run (`reports/`), opens it automatically.
+
+## 9. Desktop app
+- **Control center** (`desktop/control_center.py`, tkinter) — start/stop stack, status, open console, run sensor,
+  sandbox replay, **Run cyber range**.
+- Launchers + Desktop shortcuts: "GNN-IDS Control Center", "Run Cyber Range (demo)".
+
+## 10. Deliverables & docs
+- `README.md` (full results), `docs/model-card.md`, `docs/positioning.md`, `docs/project-review.md`.
+- `docs/GNN-IDS_Project_Guide.pdf` (53 pp), `docs/GNN-IDS_Technical_Documentation.pdf`.
+- `DEMO_FOR_GUIDE.md`, `docs/LIVE_DEMO.md`, `OVERNIGHT_TEST_REPORT.md`.
+- **10 sample CSVs** (`sample_flows/`) for the Classify tab.
+
+## 11. Testing & reproducibility
+- **103 automated tests** (pytest); **UI smoke test** (44 page loads × light/dark).
+- `experiments/reproduce_all.py` — regenerates every number with one command.
+- Every result folder has `run_info.json` (seed, config, versions, GPU, data hash, command).
+
+---
+
+### The honest limitations (also part of the project — examiners value these)
+- Never blocks traffic — dry-run only.
+- A real modern attack (e.g. live nmap) is **not** detected out of the box — lab-trained model, real-traffic gap.
+- Graph advantage depends on attackers being few hosts (NAT/spoofing breaks it).
+- Drift detection needs labels; unseen-attack detection is unreliable for some categories.
