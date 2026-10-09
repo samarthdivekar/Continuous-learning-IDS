@@ -29,15 +29,15 @@ The grey line of text under the title says this in plain English; the verdict ta
 
 > "A detector that outputs 100,000 alerts is useless. This is the queue a person actually works."
 
-* Press **Load incidents**: ~5,000 flows in the window, **4,986 flagged**, folded into **1 incident**.
-* Switch the scope to **Recent windows** → scans 20 windows (~98,000 flows) into **14 incidents**.
+* Set **Source → Recorded** and scope **One window**, then press **Load incidents**: ~5,000 flows in the window, **4,986 flagged**, folded into **1 incident**.
+* Switch the scope to **Recent** → scans 20 windows (~98,000 flows) into **14 incidents**.
 * Click an incident: the **plain-English explanation** ("probed 996 different destination ports — a
   port-scan pattern"), the evidence bars, and the network context.
 * The **proposed containment** with the exact iptables rule. Say clearly: *nothing is executed; the
   analyst approves and the decision is recorded as a dry run.*
 * **Open report** → a printable one-pager (Print → Save as PDF) to attach to a ticket.
 
-## 3 · It keeps learning (Live stream, 2 min)
+## 3 · It keeps learning (Drift replay, under Evaluate, 2 min)
 
 > "Traffic changes. The system notices and retrains itself."
 

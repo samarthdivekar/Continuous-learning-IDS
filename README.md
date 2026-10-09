@@ -217,15 +217,16 @@ does this unless `-SkipSeed`). A single-process variant is `python -m uvicorn sr
 
 ![The console: sidebar navigation with service status, and a top bar holding the dataset, label mode and Compare-models switch](docs/screens/redesign-overview.png)
 
-The console has eight pages in two groups in the sidebar, *Operate* (what a security team uses) and *Evaluate* (the evidence
-behind it). Every panel is fed by result files or live API data, and a missing experiment shows "not run yet",
+The console has nine pages in the sidebar: *Operate* (what a security team uses), *Evaluate* (the evidence behind it) and
+*More* (graph explorer, classify). Every panel is fed by result files or live API data, and a missing experiment shows "not run yet",
 never a number.
 
 | Page | What it shows |
 |---|---|
 | Overview | the result in plain words, headline KPIs, the "adapts / remembers" verdict table, attack timeline, architecture |
 | Incident queue | one window **or the last N windows** (a shift's queue); alerts grouped into incidents; per-incident explanation (feature attribution, network context, plain-English summary); proposed containment rule; approve / reject with a decision log (dry run); filters, a printable report and a CEF download |
-| Live stream | replays the stream through four models; ADWIN flags, adaptations, per-window counts, drift feed, speed control, forced retrain |
+| Live sites | live traffic from sensors, the cyber range or the sandbox replay of a recorded attack, scored as it arrives; incidents, unsure and unfamiliar flows, gated teaching |
+| Drift replay | replays the recorded stream through four models; ADWIN flags, adaptations, per-window counts, drift feed, speed control, forced retrain |
 | Graph explorer | any window graph as an interactive force layout (zoom, hover, category filters) with a per-flow **model-error overlay** |
 | Classify | run the models on a held-out window or on an uploaded CSV with the full feature set (incomplete files are rejected, never imputed) |
 | Models | *Accuracy & forgetting* (metric over tasks with ±1 std bands, recall heatmaps, BWT, confusion matrix) and *Unseen attacks & IP leakage* (leave-one-attack-out, IP-remap) |

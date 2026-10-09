@@ -31,7 +31,7 @@ scores it → it shows up as a **red site (CYBER-RANGE)** in the console, with a
 
 ### Part 1 — "The IDS detects attacks" (instant, always works)
 1. In **Live sites**, next to **Sandbox**, pick **DoS** (or PortScan / DDoS).
-2. Click **Replay recorded attack**.
+2. Click **▶ Replay into the live view**.
 3. A **red site** appears with a graph and the attack flagged. Open **Incident queue** (left) to show the
    attacker's IP, why it was flagged, and the proposed (dry-run) firewall rule.
 
