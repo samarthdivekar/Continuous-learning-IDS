@@ -129,6 +129,29 @@ model cannot see" holds for *host structure*, but this run says the **graph netw
 checked: CSE-CIC-IDS2018 (where the graph's unseen-attack results are strongest), the continual setting, and more
 seeds. Until then this is preliminary and is not in the README headline, as the plan requires.
 
+### Unseen attacks on CSE-CIC-IDS2018 (same protocol, seeds 42–44)
+
+Check: flow-only XGBoost again reproduces the existing `xgboost_static` LOAO numbers exactly (DoS 90.1 / 84.8 / 86.8 %).
+(`results/csecicids2018/binary/context_baseline_loao/per_seed.csv`; GNN from `results/csecicids2018/binary/loao_seeds/per_seed.csv`)
+
+| Held out | XGBoost + host context | XGBoost flow only | GNN (graph) |
+|---|---|---|---|
+| DoS | **100 / 100 / 100 %** | 90.1 / 84.8 / 86.8 % | 98.6 / 98.6 / 98.6 % |
+| DDoS | 75.7 / 76.4 / 75.7 % | 0 / 0 / 0 % | 99.4 / 82.6 / 67.5 % |
+| BruteForce | 0 / 0 / 0 % | 0 / 0 / 0 % | **99.7 / 0.07 / 100 %** |
+| Botnet | 0 / 0 / 0 % | 0 / 0 / 0 % | **8.5 / 84.9 / 11.0 %** |
+| Infiltration | 1.0 / 1.0 / 1.0 % | 0 / 0 / 0 % | 0 / 0 / 0.3 % |
+| WebAttack | 0 / 0 / 0 % | 0 / 0 / 0 % | 0 / 0 / 0 % |
+
+False-positive rate ≤ 0.04 % for the host-context model, ≤ 0.14 % for the GNN.
+
+**Reading across both datasets.** Host statistics in a tree model reproduce most of the graph's unseen-attack
+detection (DoS, DDoS, and on 2017 Infiltration, WebAttack and BruteForce, where they beat it). The graph network's own
+remaining edge is on 2018 BruteForce (two of three seeds) and Botnet (one of three seeds) — real, but seed-unstable.
+The honest claim is narrower than the README's: **most of the unseen-attack advantage comes from host-level
+structure, which simple per-window statistics capture; the message-passing network adds detection on some 2018
+attacks, unreliably.** Preliminary (joint training, 3 seeds); not in the README headline.
+
 ## Still broken or open, and how the demo avoids it
 
 * The external-review experiment chains are paused (see top); the README still makes no claim from them.

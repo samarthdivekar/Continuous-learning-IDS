@@ -40,7 +40,7 @@ error-corrected CIC-IDS2017 and CSE-CIC-IDS2018 datasets, with an analyst consol
 * **ADWIN is not cheaper on 2017** (about twice the retrains of a fixed schedule); on 2018 it halves retrains but only
   ties on quality.
 
-## Preliminary result (tonight; joint training only, 3 seeds, CIC-IDS2017)
+## Preliminary result (tonight; joint training only, 3 seeds)
 A jointly trained XGBoost on flow features reaches **0.974** macro-F1 on the same test flows, above the jointly trained
 GNN (0.951); adding 12 per-window host-statistics columns lifts it to **0.987**. In distribution, host statistics match
 the graph. Whether they also match it on **unseen** attacks is below.
@@ -48,8 +48,13 @@ the graph. Whether they also match it on **unseen** attacks is below.
 On **unseen** attacks (CIC-IDS2017, leave-one-attack-out, 3 seeds) the host-context XGBoost catches DoS 97 %,
 Infiltration 98 %, WebAttack 100 % and BruteForce 47–90 %, against 63–68 %, 51–68 %, 8–100 % and ≈ 0 % for the GNN;
 it is worse only on PortScan (84.5 % vs 100 %), with similar false alarms (worst 1.50 % vs 1.96 %). **Honest
-reading: host statistics, not the graph network, carry the advantage on 2017.** RQ1 (below) must now test 2018 and the
-continual setting before any graph claim is made.
+reading: host statistics, not the graph network, carry the advantage on 2017.** RQ1 (below) must now test the continual setting
+before any graph claim is made.
+
+On **2018** the picture is mixed: host-context XGBoost catches unseen DoS 100 % (GNN 98.6 %) and DDoS a stable ~76 %
+(GNN 99 / 83 / 68 %), but misses BruteForce and Botnet entirely, which the GNN catches on 2 of 3 and 1 of 3 seeds.
+**So most of the unseen-attack advantage comes from host-level structure that simple statistics capture; the graph
+network adds detection of some 2018 attacks, unreliably across seeds.**
 
 ## Completed vs remaining
 | Completed | Remaining (as research questions) |
