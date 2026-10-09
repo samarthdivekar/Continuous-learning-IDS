@@ -60,6 +60,8 @@ MODEL_SPECS = {
     # Review baselines. "ctx": the per-flow input also carries per-window host aggregates (src/graph/host_context.py):
     # if these match the GNN, the graph's advantage is "window context", not message passing.
     "ffnn_ctx_ewc_replay": {"family": "ffnn", "ewc": True, "replay": True, "ctx": True},
+    "ffnn_ctx_naive":      {"family": "ffnn", "ewc": False, "replay": False, "ctx": True},   # leave-one-attack-out
+    "xgboost_ctx_static":  {"family": "xgb", "ctx": True},                                   # leave-one-attack-out
     "ffnn_ctx_joint":      {"family": "ffnn", "ewc": False, "replay": False, "joint": True, "ctx": True},
     # XGBoost that keeps learning (the frozen-after-task-1 model is a strawman on its own): refit on the new task
     # plus a class-balanced reservoir of earlier flows (replay), or on everything seen so far (joint).
