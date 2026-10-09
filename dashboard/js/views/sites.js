@@ -54,7 +54,7 @@ export async function mount(el) {
       <div class="card" id="st-model" style="margin-bottom:16px"></div>
       <div class="grid g-8-4">
         <div class="card"><div class="card-head"><div><h3>Incidents <span id="st-scope" class="muted"></span></h3>
-          <p class="sub">flagged flows of recent chunks, grouped by attacker/victim; each carries a dry-run rule</p></div></div>
+          <p class="sub">flagged flows of the last 15 minutes, grouped by attacker/victim within each site; each carries a dry-run rule</p></div></div>
           <div id="st-incidents"></div></div>
         <div class="grid" style="gap:16px">
           <div class="card"><h3>Unfamiliar traffic</h3><p class="sub">called benign but unlike anything seen in training — candidates for a new attack</p>
@@ -79,7 +79,7 @@ export async function mount(el) {
   gview = new GraphView(root.querySelector("#st-gstage"));
   root.querySelector("#st-gfit").addEventListener("click", () => gview.fit());
   await tick();
-  timer = setInterval(tick, 3000);
+  timer = setInterval(tick, 2000);
 }
 
 export function refresh() { tick(); }
@@ -105,7 +105,7 @@ async function tick() {
   if (badge) badge.classList.toggle("hidden", !sites.some((s) => s.online && s.flows_5min));
 
   await renderModel();
-  const q = sel ? `site=${encodeURIComponent(sel)}&windows=40` : "windows=40";
+  const q = sel ? `site=${encodeURIComponent(sel)}&windows=200&minutes=15` : "windows=200&minutes=15";
   const inc = await get(`/live/incidents?${q}`).catch(() => null);
   if (inc) {
     // re-render the incident list only when it actually changed, so clicks/scroll are not interrupted
@@ -131,13 +131,16 @@ async function renderGraph() {
   }
   if (latest.window_id === gWindow) return;
   gWindow = latest.window_id;
-  const g = await get(`/live/graph/${latest.window_id}`).catch(() => null);
+  // the site's last two minutes: the same span each chunk is scored in (one chunk alone is a few flows)
+  const g = await get(`/live/site_graph?site=${encodeURIComponent(latest.site)}&seconds=120`).catch(() => null);
   if (!g || gWindow !== latest.window_id) return;
   gview.mode = "truth";
   gview.setData(g);
+  const age = latest.received_at ? Math.max(0, Math.round((Date.now() - Date.parse(latest.received_at)) / 1000)) : null;
   root.querySelector("#st-gtitle").textContent = `Live traffic graph · ${esc(latest.site)}`;
-  root.querySelector("#st-gsub").innerHTML = `${int(g.n_nodes)} hosts, ${int(g.n_edges)} flows · ${int(g.n_attack_edges)} predicted attack` +
-    (g.truncated ? ` · showing the busiest ${g.nodes.length} hosts` : "");
+  root.querySelector("#st-gsub").innerHTML = `last 2 min · ${int(g.n_nodes)} hosts, ${int(g.n_edges)} flows · ${int(g.n_attack_edges)} predicted attack` +
+    (g.truncated ? ` · showing the busiest ${g.nodes.length} hosts` : "") +
+    (age != null ? ` · newest chunk ${age}s ago` : "");
   const cats = Object.entries(g.category_counts || {});
   root.querySelector("#st-glegend").innerHTML = (cats.length
     ? cats.map(([c, v]) => `<span class="item" style="cursor:default"><i class="line" style="background:${catColor(c)}"></i>${esc(c)} <span class="muted num">${int(v)}</span></span>`).join("")
@@ -181,7 +184,7 @@ async function renderModel() {
 function renderIncidents(inc) {
   const el = root.querySelector("#st-incidents");
   if (!inc.incidents.length) {
-    el.innerHTML = `<div class="empty">No flagged flows in the last 40 chunks${sel ? ` from ${esc(sel)}` : ""}. ${int(inc.n_flows)} flows seen.</div>`;
+    el.innerHTML = `<div class="empty">No flagged flows in the last 15 minutes${sel ? ` from ${esc(sel)}` : ""}. ${int(inc.n_flows)} flows seen.</div>`;
     return;
   }
   el.innerHTML = inc.incidents.map((i) => {

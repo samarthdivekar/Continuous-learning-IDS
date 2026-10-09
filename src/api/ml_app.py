@@ -143,6 +143,7 @@ def demo_status():
 # ------------------------------------------------------------------ live traffic (src/live)
 class LiveScoreBody(BaseModel):
     flows: list[dict]
+    context: list[dict] = []
 
 
 class LiveAdaptBody(BaseModel):
@@ -153,7 +154,7 @@ class LiveAdaptBody(BaseModel):
 @app.post("/live/score")
 def live_score(body: LiveScoreBody):
     try:
-        return svc.live.score(body.flows)
+        return svc.live.score(body.flows, body.context)
     except ValueError as exc:                  # MissingFeaturesError
         raise HTTPException(422, str(exc))
     except FileNotFoundError as exc:

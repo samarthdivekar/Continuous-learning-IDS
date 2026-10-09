@@ -181,18 +181,23 @@ class LiveEngine:
         g.window_id = int(window_id)
         return g
 
-    def score(self, flows: list[dict]) -> dict:
+    def score(self, flows: list[dict], context: list[dict] | None = None) -> dict:
+        """Score `flows`. `context` = the site's recent earlier flows: they join the graph (so a short
+        capture chunk is judged inside a window of comparable size to training) but only `flows` are
+        returned."""
+        context = context or []
         with self.svc.lock:
             learner = self.ensure()
-            g = self.graph(flows)
+            g = self.graph(context + flows)
             logits, _ = learner.predict_details(g)
+            logits = logits[len(context):]
         probs = torch.softmax(torch.from_numpy(logits), dim=-1).numpy()
         pred = probs.argmax(1)
         energy = self._energy(logits)
         unfamiliar = energy > self.threshold
         names = self.names
         return {"model": self.model_name, "version": self.version, "n_flows": int(len(pred)),
-                "n_nodes": int(g.num_nodes), "labels": [names[i] for i in pred],
+                "n_nodes": int(g.num_nodes), "n_context": len(context), "labels": [names[i] for i in pred],
                 "confidence": [round(float(c), 4) for c in probs.max(1)],
                 "probs": probs.round(5).tolist(), "novelty": [round(float(e), 4) for e in energy],
                 "unfamiliar": [bool(u) for u in unfamiliar], "threshold": self.threshold,

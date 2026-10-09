@@ -102,16 +102,35 @@ def docker_available() -> tuple[bool, str]:
     return True, "ok"
 
 
-def pcap_to_flows(pcap: Path, timeout: float = 300) -> list[dict]:
-    """Convert one capture with the pinned flow meter (in Docker) and return its flows."""
-    ok, why = docker_available()
+_DOCKER_OK: tuple[float, tuple[bool, str]] | None = None
+
+
+def _docker_available_cached(ttl: float = 30.0) -> tuple[bool, str]:
+    """docker_available() costs a process start per call; a sensor sends a chunk every few seconds."""
+    global _DOCKER_OK
+    import time
+    if _DOCKER_OK is None or time.monotonic() - _DOCKER_OK[0] > ttl or not _DOCKER_OK[1][0]:
+        _DOCKER_OK = (time.monotonic(), docker_available())
+    return _DOCKER_OK[1]
+
+
+PCAP_HEADER_BYTES = 24
+
+
+def pcaps_to_flows(pcaps: list[Path], timeout: float = 300) -> list[dict]:
+    """Convert several captures in ONE flow-meter run (one container start, not one per chunk)."""
+    pcaps = [Path(p) for p in pcaps if Path(p).stat().st_size > PCAP_HEADER_BYTES]   # header only = no packets
+    if not pcaps:
+        return []
+    ok, why = _docker_available_cached()
     if not ok:
         raise FlowMeterError(why)
     with tempfile.TemporaryDirectory(prefix="gnnids_fm_") as tmp:
         tmp = Path(tmp)
         (tmp / "in").mkdir()
         (tmp / "out").mkdir()                              # cfm writes nothing if the folder is missing
-        shutil.copy(pcap, tmp / "in" / "capture.pcap")
+        for i, p in enumerate(pcaps):
+            shutil.copy(p, tmp / "in" / f"capture_{i:04d}.pcap")
         cmd = ["docker", "run", "--rm", "--network", "none", "-v", f"{tmp}:/data", IMAGE, "/data/in", "/data/out"]
         r = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout,
                            env={**os.environ, "MSYS_NO_PATHCONV": "1"})
@@ -119,4 +138,22 @@ def pcap_to_flows(pcap: Path, timeout: float = 300) -> list[dict]:
         if r.returncode != 0 or not produced:
             tail = " ".join((r.stdout + r.stderr).strip().splitlines()[-3:])
             raise FlowMeterError(f"flow meter failed (exit {r.returncode}): {tail[:300]}")
-        return read_flow_csv(produced[0])
+        flows = []
+        for csv_path in produced:
+            flows += read_flow_csv(csv_path)
+        return flows
+
+
+def pcap_to_flows(pcap: Path, timeout: float = 300) -> list[dict]:
+    """Convert one capture with the pinned flow meter (in Docker) and return its flows."""
+    ok, why = docker_available()
+    if not ok:
+        raise FlowMeterError(why)
+    return pcaps_to_flows([Path(pcap)], timeout=timeout)
+
+
+def is_ip_flow(flow: dict) -> bool:
+    """CICFlowMeter also emits records for non-IP frames (ARP and similar) with protocol 0 and
+    addresses decoded from the wrong header bytes (e.g. 8.6.0.1 -> 8.0.6.4). They are not traffic
+    between hosts; live ingest drops them rather than raise incidents on made-up addresses."""
+    return bool(flow.get("protocol"))

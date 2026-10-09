@@ -58,7 +58,7 @@ def _ml(method: str, path: str, body: dict | None = None, params: dict | None = 
     live = svc.live
     try:
         if path == "/live/score":
-            return live.score(body["flows"])
+            return live.score(body["flows"], body.get("context"))
         if path == "/live/adapt":
             from src.live.engine import label_id
             names = live.names
@@ -111,20 +111,44 @@ class SensorFlowsIn(BaseModel):
     site: str
     flows: list[SensorFlow] = Field(max_length=200_000)
     source: str = Field(default="flows", pattern="^(flows|replay|pcap)$")
+    detail: bool = False          # also return each flow's id and predicted label (cyber range, tests)
 
 
-def process_flows(site: str, flows: list[dict], source: str) -> dict:
+CONTEXT_SECONDS = 120        # a chunk is scored inside the site's flows of the last two minutes ...
+CONTEXT_MAX_FLOWS = 5000     # ... up to the training window size (5,000 flows per graph)
+
+
+def _context(site: str, n_new: int, now: datetime) -> list[dict]:
+    """The site's most recent earlier flows, so a few-second chunk is not scored as a tiny graph."""
+    room = CONTEXT_MAX_FLOWS - n_new
+    if room <= 0:
+        return []
+    since = now - timedelta(seconds=CONTEXT_SECONDS)
+    with _app().state.Session() as s:
+        wids = select(LiveWindow.id).where(LiveWindow.site == site, LiveWindow.received_at >= since)
+        rows = s.execute(select(LiveFlow.src_ip, LiveFlow.dst_ip, LiveFlow.features)
+                         .where(LiveFlow.window_id.in_(wids)).order_by(desc(LiveFlow.id)).limit(room)).all()
+    return [{"src_ip": a, "dst_ip": b, "features": f} for a, b, f in reversed(rows)]
+
+
+def process_flows(site: str, flows: list[dict], source: str, detail: bool = False) -> dict:
     """Score one chunk of a site's flows, store it, and summarise what was found."""
+    from src.live.flowmeter import is_ip_flow
     Session = _app().state.Session
     now = datetime.now(timezone.utc)
+    n_in = len(flows)
+    flows = [f for f in flows if is_ip_flow(f)] if source == "pcap" else flows
+    ignored = n_in - len(flows)
     if not flows:                              # quiet chunk: still a heartbeat for the site
         with Session() as s:
             w = LiveWindow(site=site, received_at=now, n_flows=0, n_hosts=0, n_flagged=0, n_unfamiliar=0,
                            counts={}, source=source)
             s.add(w)
             s.commit()
-            return {"window_id": w.id, "site": site, "n_flows": 0, "counts": {}, "flagged": 0, "unfamiliar": 0}
-    res = _ml("POST", "/live/score", {"flows": flows})
+            return {"window_id": w.id, "site": site, "n_flows": 0, "counts": {}, "flagged": 0, "unfamiliar": 0,
+                    "ignored_non_ip": ignored, **({"flow_ids": [], "labels": []} if detail else {})}
+    context = _context(site, len(flows), now) if source != "replay" else []
+    res = _ml("POST", "/live/score", {"flows": flows, "context": context})
     times = [t for t in (_ts(f.get("ts")) for f in flows) if t is not None]
     flagged = sum(1 for lab in res["labels"] if lab != "Benign")
     unfamiliar = sum(res["unfamiliar"])
@@ -135,15 +159,21 @@ def process_flows(site: str, flows: list[dict], source: str) -> dict:
                        model_version=res["version"], source=source)
         s.add(w)
         s.flush()
-        s.add_all([LiveFlow(window_id=w.id, site=site, ts=_ts(f.get("ts")), src_ip=f["src_ip"], dst_ip=f["dst_ip"],
-                            src_port=f.get("src_port"), dst_port=f.get("dst_port"), protocol=f.get("protocol"),
-                            features=f["features"], predicted=lab, confidence=conf, novelty=nov, unfamiliar=unf)
-                   for f, lab, conf, nov, unf in zip(flows, res["labels"], res["confidence"], res["novelty"],
-                                                     res["unfamiliar"])])
+        rows = [LiveFlow(window_id=w.id, site=site, ts=_ts(f.get("ts")), src_ip=f["src_ip"], dst_ip=f["dst_ip"],
+                         src_port=f.get("src_port"), dst_port=f.get("dst_port"), protocol=f.get("protocol"),
+                         features=f["features"], predicted=lab, confidence=conf, novelty=nov, unfamiliar=unf)
+                for f, lab, conf, nov, unf in zip(flows, res["labels"], res["confidence"], res["novelty"],
+                                                  res["unfamiliar"])]
+        s.add_all(rows)
         s.commit()
         wid = w.id
-    return {"window_id": wid, "site": site, "n_flows": len(flows), "n_hosts": res["n_nodes"],
-            "counts": res["counts"], "flagged": flagged, "unfamiliar": unfamiliar, "model_version": res["version"]}
+        ids = [r.id for r in rows] if detail else None
+    out = {"window_id": wid, "site": site, "n_flows": len(flows), "n_hosts": res["n_nodes"],
+           "n_context": res.get("n_context", 0), "counts": res["counts"], "flagged": flagged,
+           "unfamiliar": unfamiliar, "model_version": res["version"], "ignored_non_ip": ignored}
+    if detail:
+        out["flow_ids"], out["labels"] = ids, res["labels"]
+    return out
 
 
 @router.post("/sensor/pcap")
@@ -166,7 +196,7 @@ async def sensor_pcap(request: Request):
 
 @router.post("/sensor/flows")
 def sensor_flows(body: SensorFlowsIn):
-    return process_flows(_site(body.site), [f.model_dump() for f in body.flows], body.source)
+    return process_flows(_site(body.site), [f.model_dump() for f in body.flows], body.source, body.detail)
 
 
 class ReplayRecordedIn(BaseModel):
@@ -219,6 +249,26 @@ def live_graph(window_id: int, max_nodes: int = Query(150, ge=5, le=800)):
         rows = s.scalars(select(LiveFlow).where(LiveFlow.window_id == window_id).order_by(LiveFlow.id)).all()
     if not rows:
         raise HTTPException(404, f"no live window {window_id}")
+    return {"window_id": window_id, **_graph_payload(rows, max_nodes)}
+
+
+@router.get("/live/site_graph")
+def live_site_graph(site: str, seconds: int = Query(120, ge=5, le=3600), max_nodes: int = Query(150, ge=5, le=800)):
+    """A site's traffic of the last `seconds` as one graph: the same span the live scorer looks at
+    (each chunk is scored inside the site's recent flows), rather than one few-second chunk."""
+    site = _site(site)
+    since = datetime.now(timezone.utc) - timedelta(seconds=seconds)
+    with _app().state.Session() as s:
+        wids = select(LiveWindow.id).where(LiveWindow.site == site, LiveWindow.received_at >= since)
+        rows = s.scalars(select(LiveFlow).where(LiveFlow.window_id.in_(wids))
+                         .order_by(desc(LiveFlow.id)).limit(CONTEXT_MAX_FLOWS)).all()
+    return {"site": site, "seconds": seconds, **_graph_payload(rows, max_nodes)}
+
+
+def _graph_payload(rows, max_nodes: int) -> dict:
+    if not rows:
+        return {"n_nodes": 0, "n_edges": 0, "n_attack_edges": 0, "category_counts": {}, "truncated": False,
+                "nodes": [], "edges": [], "note": "no traffic in this span"}
     hosts = {}
     for r in rows:
         for ip in (r.src_ip, r.dst_ip):
@@ -251,7 +301,7 @@ def live_graph(window_id: int, max_nodes: int = Query(150, ge=5, le=800)):
               "category": max(p["cats"], key=p["cats"].get) if p["cats"] else "Benign"}
              for (si, di), p in pairs.items() if si in keep and di in keep]
     n_attack = int(sum(1 for r in rows if r.predicted != "Benign"))
-    return {"window_id": window_id, "n_nodes": n, "n_edges": len(rows), "n_attack_edges": n_attack,
+    return {"n_nodes": n, "n_edges": len(rows), "n_attack_edges": n_attack,
             "category_counts": cat_counts, "truncated": n > max_nodes,
             "nodes": [{"id": i, "ip": ip_of[i], "degree": int(deg[i]), "out_degree": int(out_deg[i]),
                        "in_degree": int(in_deg[i]), "attack_degree": int(atk[i])} for i in order],
@@ -273,10 +323,12 @@ def live_windows(site: str | None = None, limit: int = Query(120, ge=1, le=2000)
                          "source": r.source} for r in rows]}
 
 
-def _recent_flows(s, site: str | None, windows: int):
+def _recent_flows(s, site: str | None, windows: int, minutes: float | None = None):
     wq = select(LiveWindow.id)
     if site:
         wq = wq.where(LiveWindow.site == site)
+    if minutes:
+        wq = wq.where(LiveWindow.received_at >= datetime.now(timezone.utc) - timedelta(minutes=minutes))
     wids = s.scalars(wq.order_by(desc(LiveWindow.id)).limit(windows)).all()
     if not wids:
         return []
@@ -285,38 +337,47 @@ def _recent_flows(s, site: str | None, windows: int):
 
 @router.get("/live/incidents")
 def live_incidents(site: str | None = None, windows: int = Query(30, ge=1, le=500),
+                   minutes: float = Query(15, gt=0, le=1440),
                    min_confidence: float = Query(0.0, ge=0.0, le=1.0)):
+    """Incidents of the last `minutes` only (an old incident must not look current), grouped PER SITE:
+    two sites can both use 192.168.1.x, and those are different machines."""
     from src.product.incidents import build_incidents
     from src.product.response import propose_action
     site = _site(site) if site else None
     with _app().state.Session() as s:
-        rows = _recent_flows(s, site, windows)
+        rows = _recent_flows(s, site, windows, minutes)
     names = _ml("GET", "/live/model")["classes"]
     idx = {n: i for i, n in enumerate(names)}
     flagged = [r for r in rows if r.predicted != "Benign" and r.predicted in idx]
     incidents = []
-    if flagged:
-        probs = np.zeros((len(flagged), len(names)))
-        for i, r in enumerate(flagged):
+    by_site: dict[str, list] = {}
+    for r in flagged:
+        by_site.setdefault(r.site, []).append(r)
+    now = datetime.now(timezone.utc)
+    for site_name, fl in by_site.items():
+        probs = np.zeros((len(fl), len(names)))
+        for i, r in enumerate(fl):
             probs[i, idx[r.predicted]] = r.confidence
             probs[i, 0] = 1.0 - r.confidence
-        src = np.array([r.src_ip for r in flagged])
-        dst = np.array([r.dst_ip for r in flagged])
-        ts = np.array([(r.ts or datetime.now(timezone.utc)).replace(tzinfo=None) for r in flagged], dtype="datetime64[us]")
-        ids = np.array([r.id for r in flagged])
-        sites = np.array([r.site for r in flagged])
+        src = np.array([r.src_ip for r in fl])
+        dst = np.array([r.dst_ip for r in fl])
+        ts = np.array([(r.ts or now).replace(tzinfo=None) for r in fl], dtype="datetime64[us]")
+        ids = np.array([r.id for r in fl])
         for inc in build_incidents(src, dst, probs, names, threshold=min_confidence, ts=ts):
             fi = np.asarray(inc.pop("flow_indices"))
+            inc["site"] = site_name
+            inc["sites"] = [site_name]
             inc["proposed"] = propose_action(inc)
             inc["proposed"]["dry_run"] = True
             inc["flow_ids"] = ids[fi][:5000].tolist()
-            inc["sites"] = sorted(set(sites[fi].tolist()))
-            ports = [flagged[i].dst_port for i in fi[:2000] if flagged[i].dst_port is not None]
+            ports = [fl[i].dst_port for i in fi[:2000] if fl[i].dst_port is not None]
             inc["top_ports"] = [int(p) for p, _ in sorted(((p, ports.count(p)) for p in set(ports)),
                                                           key=lambda kv: -kv[1])[:5]]
-            inc["labelled"] = sum(1 for i in fi if flagged[i].analyst_label is not None)
+            inc["labelled"] = sum(1 for i in fi if fl[i].analyst_label is not None)
             incidents.append(inc)
-        incidents.sort(key=lambda d: -d["severity"])
+    incidents.sort(key=lambda d: -d["severity"])
+    for k, inc in enumerate(incidents):
+        inc["incident_id"] = k + 1
     # unfamiliar traffic the model calls benign: grouped by source host, for the analyst to look at
     unf = {}
     for r in rows:
@@ -331,7 +392,7 @@ def live_incidents(site: str | None = None, windows: int = Query(30, ge=1, le=50
                 d["ports"].add(int(r.dst_port))
     unfamiliar = sorted(({**d, "destinations": len(d["destinations"]), "ports": sorted(d["ports"])[:10]}
                          for d in unf.values()), key=lambda d: -d["flows"])[:50]
-    return {"site": site, "windows": windows, "n_flows": len(rows), "flagged_flows": len(flagged),
+    return {"site": site, "windows": windows, "minutes": minutes, "n_flows": len(rows), "flagged_flows": len(flagged),
             "incidents": incidents[:100], "unfamiliar": unfamiliar, "dry_run": True}
 
 

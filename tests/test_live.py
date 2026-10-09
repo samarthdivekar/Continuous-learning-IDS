@@ -158,6 +158,37 @@ def test_label_then_adapt_is_gated_and_learns_once(client):
     assert client.post("/live/reset").json()["reset"] is True
 
 
+def test_chunks_are_scored_in_site_context_and_non_ip_is_dropped(client):
+    first = client.post("/sensor/flows", json={"site": "lab", "flows": _flows(client, 30)}).json()
+    assert first["n_context"] == 0
+    nxt = _flows(client, 10) + [{**_flows(client, 1)[0], "protocol": 0, "src_ip": "8.6.0.1", "dst_ip": "8.0.6.4"}]
+    r = client.post("/sensor/flows", json={"site": "lab", "flows": nxt, "source": "pcap", "detail": True}).json()
+    assert r["n_context"] == 30 and r["n_flows"] == 10 and r["ignored_non_ip"] == 1   # ARP-like record dropped
+    assert len(r["flow_ids"]) == len(r["labels"]) == 10
+    other = client.post("/sensor/flows", json={"site": "elsewhere", "flows": _flows(client, 5)}).json()
+    assert other["n_context"] == 0                                    # context never crosses sites
+    g = client.get("/live/site_graph", params={"site": "lab"}).json()
+    assert g["n_edges"] == 40 and g["nodes"]
+
+
+def test_live_incidents_are_per_site(client, monkeypatch):
+    # force every flow to be flagged so the grouping itself is what is tested
+    real = client.svc.live.score
+
+    def all_dos(flows, context=None):
+        out = real(flows, context)
+        out["labels"] = ["DoS"] * len(flows)
+        out["confidence"] = [0.99] * len(flows)
+        return out
+    monkeypatch.setattr(client.svc.live, "score", all_dos)
+    for site in ("site-a", "site-b"):                  # the same private addresses at two sites
+        client.post("/sensor/flows", json={"site": site, "flows": _flows(client, 20)})
+    inc = client.get("/live/incidents").json()["incidents"]
+    assert inc and all(len(i["sites"]) == 1 for i in inc)
+    assert {i["site"] for i in inc} == {"site-a", "site-b"}
+    assert client.get("/live/incidents", params={"minutes": 0.001}).status_code == 200
+
+
 def test_learning_survives_a_restart_and_reset_deletes_it(client):
     from src.live.engine import LiveEngine
     live = client.svc.live
