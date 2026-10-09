@@ -206,7 +206,7 @@ class LiveFlow(Base):
     category_uncertain: Mapped[bool | None] = mapped_column(Boolean, nullable=True)  # an attack, but which kind is unclear
     analyst_label: Mapped[str | None] = mapped_column(String(32), nullable=True)   # set by /live/label
     labelled_by: Mapped[str | None] = mapped_column(String(64), nullable=True)
-    labelled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    labelled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, index=True)
     used_for_learning: Mapped[bool] = mapped_column(Boolean, default=False)
 
 

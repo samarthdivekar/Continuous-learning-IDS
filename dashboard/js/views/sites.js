@@ -6,7 +6,7 @@ import { catColor, esc, get, int, pct, post, toast } from "../lib/core.js";
 import { GraphView } from "../lib/graphview.js";
 import { withBusy } from "../lib/ui.js";
 
-let root, timer, sel = null, teachSel, incSig = "", gview, gWindow = null;
+let root, timer, ticking = false, sel = null, teachSel, incSig = "", gview, gWindow = null;
 
 const CLASSES = ["Benign", "BruteForce", "DoS", "WebAttack", "Infiltration", "Botnet", "PortScan", "DDoS"];
 
@@ -89,8 +89,16 @@ export async function mount(el) {
 export function refresh() { tick(); }
 export function activate() { tick(); }
 
+// Views stay mounted when hidden, so the 2 s poll runs only while this tab is on screen, and never overlaps
+// itself (a slow tick used to stack up behind the next one and keep the API busy on every other tab).
 async function tick() {
   if (!root || !root.isConnected) { clearInterval(timer); return; }
+  if (ticking || document.hidden || !root.closest(".view")?.classList.contains("on")) return;
+  ticking = true;
+  try { await tickBody(); } finally { ticking = false; }
+}
+
+async function tickBody() {
   let sites;
   try { sites = (await get("/live/sites")).sites; } catch { return; }
   const hasData = sites.length > 0;

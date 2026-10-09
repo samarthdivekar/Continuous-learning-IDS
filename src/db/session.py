@@ -66,6 +66,8 @@ def _add_missing_columns(engine: Engine) -> None:
             with engine.begin() as conn:
                 conn.execute(text(f'ALTER TABLE {table.name} ADD COLUMN "{col.name}" {ddl}'))
             log.info("added column %s.%s", table.name, col.name)
+        for index in table.indexes:                      # an index declared later (e.g. live_flows.labelled_at)
+            index.create(engine, checkfirst=True)
 
 
 def init_db(engine: Engine) -> None:
