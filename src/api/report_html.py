@@ -84,7 +84,7 @@ def incident_report_html(rep: dict) -> str:
             f'{escape(str(ev.get("dst_ip", "")))}</span>; the source contacted '
             f'{st.get("source_distinct_peers", 0)} host(s)'
             + (f' across {st["source_distinct_ports"]} port(s)' if st.get("source_distinct_ports") else "")
-            + f'. Attribution is gradient × input: what the decision is most sensitive to, not proof of cause.</p>')
+            + '. Attribution is gradient × input: what the decision is most sensitive to, not proof of cause.</p>')
 
     rule_html = "".join(f"<p class='note'>{escape(os_name)}</p><pre>{escape(rule)}</pre>"
                         for os_name, rule in (("Linux (iptables)", rules.get("linux")),

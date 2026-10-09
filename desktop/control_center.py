@@ -18,7 +18,7 @@ import threading
 import urllib.request
 import webbrowser
 from pathlib import Path
-from tkinter import BOTH, END, DISABLED, NORMAL, StringVar, Tk, ttk, filedialog
+from tkinter import BOTH, END, DISABLED, NORMAL, StringVar, Tk, ttk
 
 ROOT = Path(__file__).resolve().parent.parent
 PY = ROOT / ".venv" / "Scripts" / "python.exe"
