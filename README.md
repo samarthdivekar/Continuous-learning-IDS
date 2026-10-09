@@ -443,7 +443,7 @@ trained jointly here (no continual learning), so the comparison isolates what th
 |---|---|---|---|
 | DoS | 87.2 % | ≤ 0.07 % | **98.6 / 98.6 / 98.6 %** |
 | DDoS | 0.0 % | 0.0 % | **99.4 / 82.6 / 67.5 %** |
-| BruteForce | 0.0 % | ≤ 0.02 % | 99.7 / 0.07 / 100 % |
+| BruteForce | 0.0 % | 0.0 % | 99.7 / 0.07 / 100 % |
 | Botnet | 0.0 % | 0.0 % | 8.5 / 84.9 / 11.0 % |
 | Infiltration | 0.0 % | 0.0 % | 0 / 0 / 0.3 % |
 | WebAttack | 0.0 % | 0.0 % | 0 / 0 / 0 % |
@@ -468,7 +468,7 @@ XGBoost DoS 90.1 / 84.8 / 86.8 %, every other FFNN cell 0.0–0.07 %.)
 
 | Held out (flows) | XGBoost | FFNN (per-flow) | GNN (graph) |
 |---|---|---|---|
-| DoS (33,606) | 0.7 / 2.6 / 0.4 % | 3.0 / 0.6 / 1.9 % | **67.7 / 62.7 / 68.0 %** |
+| DoS (33,606) | 0.7 / 2.6 / 0.4 % | 3.0 / 0.6 / 1.9 % | **67.7 / 62.7 / 67.9 %** |
 | WebAttack (24) | 0 / 0 / 0 % | 0 / 0 / 0 % | 54.2 / **100** / 8.3 % |
 | Infiltration (16,434) | 26.9 / 40.3 / 39.7 % | 49.3 / 47.4 / 49.3 % | **67.7 / 50.9 / 56.6 %** |
 | PortScan / DDoS | ≥ 98.7 % | ≥ 98.7 % | ≥ 99.99 % |
@@ -553,34 +553,37 @@ differ (3 vs 5); and the test windows differ, so the drop mixes temporal distanc
 #### Are the differences real? (paired statistics, `results/stats/`, `python -m experiments.stats`)
 
 Every seed trains both models on the same data with the same seed, so differences are paired. A difference is
-called a difference only when the bootstrap 95 % CI of the mean paired difference excludes zero. With three or
+called a difference only when both the bootstrap 95 % CI and the paired-t 95 % CI of the mean paired difference
+exclude zero (with three to five seeds the bootstrap alone is too narrow). With three or
 five seeds the exact two-sided Wilcoxon test cannot go below 0.25 or 0.0625, so it can never reach p < 0.05
 here; it is reported for completeness, and every verdict is indicative, not confirmatory.
 
-| Comparison | Question | Metric | Seeds | Ours | Other | Mean diff | Bootstrap 95 % CI | Wilcoxon p (2-sided / 1-sided) | Verdict |
-|---|---|---|---|---|---|---|---|---|---|
-| 2017 · interleaved | does the graph help? | macro-F1 | 3 | 0.964 | 0.928 (ffnn_ewc_replay) | +0.036 | [+0.011, +0.069] | 0.250 / 0.125 | ours better (indicative, n=3) |
-| 2017 · interleaved | does the graph help? | false-positive rate | 3 | 0.066 % | 0.043 % (ffnn_ewc_replay) | +0.023 pp | [+0.016 pp, +0.031 pp] | 0.250 / 1.000 | ffnn_ewc_replay better (indicative, n=3) |
-| 2017 · temporal | does the graph help? | macro-F1 | 5 | 0.915 | 0.870 (ffnn_ewc_replay) | +0.044 | [+0.019, +0.058] | 0.125 / 0.062 | ours better (indicative, n=5) |
-| 2017 · temporal | does the graph help? | false-positive rate | 5 | 0.042 % | 0.041 % (ffnn_ewc_replay) | +0.001 pp | [-0.032 pp, +0.035 pp] | 0.812 / 0.688 | no detectable difference |
-| 2017 · interleaved | does EWC add anything to replay? | macro-F1 | 3 | 0.964 | 0.948 (gnn_replay) | +0.015 | [-0.016, +0.045] | 0.500 / 0.250 | no detectable difference |
-| 2017 · interleaved | does EWC add anything to replay? | false-positive rate | 3 | 0.066 % | 0.116 % (gnn_replay) | -0.050 pp | [-0.087 pp, +0.004 pp] | 0.500 / 0.250 | no detectable difference |
-| 2017 · temporal | does EWC add anything to replay? | macro-F1 | 5 | 0.915 | 0.848 (gnn_replay) | +0.067 | [+0.003, +0.145] | 0.188 / 0.094 | ours better (indicative, n=5) |
-| 2017 · temporal | does EWC add anything to replay? | false-positive rate | 5 | 0.042 % | 0.075 % (gnn_replay) | -0.033 pp | [-0.069 pp, +0.000 pp] | 0.312 / 0.156 | no detectable difference |
-| 2018 · interleaved | does the graph help? | macro-F1 | 3 | 0.911 | 0.836 (ffnn_ewc_replay) | +0.075 | [+0.009, +0.123] | 0.250 / 0.125 | ours better (indicative, n=3) |
-| 2018 · interleaved | does the graph help? | false-positive rate | 3 | 0.176 % | 0.124 % (ffnn_ewc_replay) | +0.052 pp | [-0.234 pp, +0.455 pp] | 1.000 / 0.625 | no detectable difference |
+| Comparison | Question | Metric | Seeds | Ours | Other | Mean diff | Bootstrap 95 % CI | t 95 % CI | Wilcoxon p (2-sided / 1-sided) | Verdict |
+|---|---|---|---|---|---|---|---|---|---|---|
+| 2017 · interleaved | does the graph help? | macro-F1 | 3 | 0.964 | 0.928 (ffnn_ewc_replay) | +0.036 | [+0.011, +0.069] | [-0.039, +0.110] | 0.250 / 0.125 | no detectable difference |
+| 2017 · interleaved | does the graph help? | false-positive rate | 3 | 0.066 % | 0.043 % (ffnn_ewc_replay) | +0.023 pp | [+0.016 pp, +0.031 pp] | [+0.004 pp, +0.041 pp] | 0.250 / 1.000 | ffnn_ewc_replay better (indicative, n=3) |
+| 2017 · temporal | does the graph help? | macro-F1 | 5 | 0.915 | 0.870 (ffnn_ewc_replay) | +0.044 | [+0.019, +0.058] | [+0.010, +0.079] | 0.125 / 0.062 | ours better (indicative, n=5) |
+| 2017 · temporal | does the graph help? | false-positive rate | 5 | 0.042 % | 0.041 % (ffnn_ewc_replay) | +0.001 pp | [-0.032 pp, +0.035 pp] | [-0.054 pp, +0.056 pp] | 0.812 / 0.688 | no detectable difference |
+| 2017 · interleaved | does EWC add anything to replay? | macro-F1 | 3 | 0.964 | 0.948 (gnn_replay) | +0.015 | [-0.016, +0.045] | [-0.061, +0.092] | 0.500 / 0.250 | no detectable difference |
+| 2017 · interleaved | does EWC add anything to replay? | false-positive rate | 3 | 0.066 % | 0.116 % (gnn_replay) | -0.050 pp | [-0.087 pp, +0.004 pp] | [-0.170 pp, +0.070 pp] | 0.500 / 0.250 | no detectable difference |
+| 2017 · temporal | does EWC add anything to replay? | macro-F1 | 5 | 0.915 | 0.848 (gnn_replay) | +0.067 | [+0.003, +0.145] | [-0.046, +0.180] | 0.188 / 0.094 | no detectable difference |
+| 2017 · temporal | does EWC add anything to replay? | false-positive rate | 5 | 0.042 % | 0.075 % (gnn_replay) | -0.033 pp | [-0.069 pp, +0.000 pp] | [-0.089 pp, +0.023 pp] | 0.312 / 0.156 | no detectable difference |
+| 2018 · interleaved | does the graph help? | macro-F1 | 3 | 0.911 | 0.836 (ffnn_ewc_replay) | +0.075 | [+0.009, +0.123] | [-0.072, +0.222] | 0.250 / 0.125 | no detectable difference |
+| 2018 · interleaved | does the graph help? | false-positive rate | 3 | 0.176 % | 0.124 % (ffnn_ewc_replay) | +0.052 pp | [-0.234 pp, +0.455 pp] | [-0.841 pp, +0.945 pp] | 1.000 / 0.625 | no detectable difference |
 
-* **The graph helps, modestly, on both splits.** +0.036 interleaved (n = 3) and +0.044 temporal (n = 5;
-  per seed −0.005, +0.056, +0.054, +0.061, +0.055). The FFNN has the lower false-positive rate on the
-  interleaved split; on the temporal split there is no detectable difference.
+* **The graph helps, modestly, on the temporal split only.** +0.044 temporal (n = 5; per seed −0.005, +0.056,
+  +0.054, +0.061, +0.055; both intervals exclude zero, indicative). On the interleaved split the +0.036
+  (n = 3) is **not a detectable difference** (paired-t CI [−0.039, +0.110]), and there the FFNN has the lower
+  false-positive rate. On the temporal split there is no detectable FPR difference.
 * **Replay is necessary; EWC alone fails** on both splits (0.300 and 0.377 macro-F1, retention 0).
-* **Does EWC add anything on top of replay? Not detectably on the interleaved split; on the temporal split
-  it did, indicatively.** EWC + replay beat replay-only by +0.067, CI [+0.003, +0.145], but the gain comes
+* **Does EWC add anything on top of replay? Not detectably on either split.** On the temporal split
+  EWC + replay averaged +0.067 over replay-only (bootstrap CI [+0.003, +0.145], paired-t CI [−0.046, +0.180]); the mean gain comes
   from two seeds in which replay-only collapsed (+0.208, +0.102); in the other three the difference is
-  −0.021 to +0.027. This **revises the earlier claim that "replay does the work, EWC does not"**: EWC
-  appears to stabilise replay when train and test are further apart. The replay-budget sweep below was run
+  −0.021 to +0.027. So the earlier reading stands: **replay does the work**. EWC may
+  stabilise replay when train and test are further apart (two collapses avoided), but the difference is not detectable. The replay-budget sweep below was run
   on the interleaved split only.
-* **2018 is not settled.** +0.075 for the graph (per seed +0.095, +0.008, +0.123; CI [+0.009, +0.123]), but the GNN's
+* **2018 is not settled.** +0.075 for the graph (per seed +0.094, +0.009, +0.123; bootstrap CI [+0.009, +0.123], but
+  paired-t CI [−0.072, +0.222]: no detectable difference), and the GNN's
   own seeds range 0.863–0.945, so the gap is as much about GNN instability as about the graph (§6).
 
 #### How much replay is enough? (replay-budget sweep, `results/cicids2017/multiclass/replay_budget_sweep/`)
@@ -600,8 +603,8 @@ noise of EWC + replay at the default budget (0.964 ± 0.020). EWC alone fails at
 when replay is scarce does not rescue it either: +0.039 at budget 0 (CI [−0.003, +0.114]) and +0.044 at budget 1
 (CI [−0.017, +0.112]), both carried by one seed, with identical retention. So on the interleaved split the
 conclusion is now evidenced symmetrically: **replay is what prevents forgetting, a small buffer is enough, and EWC
-adds no detectable gain on top of it, at any budget tested.** The temporal split is the exception above,
-where EWC prevented two replay-only collapses; the sweep was not repeated there.
+adds no detectable gain on top of it, at any budget tested.** On the temporal split EWC avoided two replay-only
+collapses, but the overall difference there is not detectable either; the sweep was not repeated there.
 * **The expected forgetting pattern holds on both splits.** The static model never learns new attacks;
   naive retraining forgets the first attack completely; our model learns every new category and keeps
   retention at 0.998–1.000, close to a model retrained on all data.
@@ -640,9 +643,10 @@ this size.
 
 Binary is domain-incremental (the "attack" class persists across tasks), and the picture changes:
 ours 0.9993 macro-F1, FFNN + EWC + replay 0.9991, and **GNN + EWC only reaches 0.9945 with retention 1.0**
-— on CIC-IDS2017, EWC alone works in the setting it was designed for (this did **not** replicate on
-CSE-CIC-IDS2018). GNN naive keeps 0.76 retention; FFNN naive collapses
-to 0.003. The static XGBoost detects only **1.3 %** of attack flows from categories it never saw.
+— on CIC-IDS2017, EWC alone works in the setting it was designed for (untested on CSE-CIC-IDS2018: its only
+binary run was one seed and has been withdrawn, §6). GNN naive keeps 0.76 retention; FFNN naive collapses
+to 0.003. The static XGBoost detects only **1.3 %** of attack flows overall, almost all from the BruteForce category it was
+trained on; of flows from categories it never saw it flags about 0.02 %.
 
 ### 4. Drift-triggered adaptation (stream of tasks 2–7, seeds 42/43/44)
 
@@ -735,7 +739,7 @@ depends on the dataset. Seed 43 is also the weak seed under normal scoring (0.86
 **What 2018 confirms, and what it does not.**
 
 * **Forgetting prevention replicates.** Every replay-based model keeps retention 1.0; naive retraining,
-  FFNN naive and EWC-only drop to 0 (BWT −0.83 to −1.00), exactly as on CIC-IDS2017.
+  FFNN naive and EWC-only drop to 0 (BWT −0.83 to −0.97), exactly as on CIC-IDS2017.
 * **EWC alone fails here too.** In multiclass, EWC-only ends at 0.286 with retention 0 (one seed), as on
   CIC-IDS2017.
 * **ADWIN saves retrains; the quality win does not survive three seeds.** It uses about half the retrains of
@@ -745,9 +749,9 @@ depends on the dataset. Seed 43 is also the weak seed under normal scoring (0.86
   that it won on both cost and quality was seed 42 only; across three seeds the honest reading is **half the
   retrains at quality within noise of the schedule**. Adaptation itself is still essential — "never" collapses
   to 0.154. On CIC-IDS2017 it also retrained about twice as often as the schedule (§4).
-* **GNN vs FFNN on 2018, over three seeds: the GNN is ahead, unevenly.** Multiclass macro-F1 is **0.911 ± 0.042**
-  for the GNN against **0.836 ± 0.029** for the per-flow FFNN. The GNN is ahead in every seed (+0.095, +0.008,
-  +0.123); the bootstrap interval of the paired difference is [+0.009, +0.123] (§2). With three seeds this is
+* **GNN vs FFNN on 2018, over three seeds: the GNN mean is higher, but not detectably.** Multiclass macro-F1 is **0.911 ± 0.042**
+  for the GNN against **0.836 ± 0.029** for the per-flow FFNN. The GNN is higher in every seed (+0.094, +0.009,
+  +0.123); the bootstrap interval is [+0.009, +0.123] but the paired-t interval [−0.072, +0.222] includes zero (§2). With three seeds this is
   indicative, and the next point explains why the GNN's own numbers move so much.
 * **Unseen attacks:** see §1. DoS replicates on all three seeds (98.6 %) and DDoS on all three (FFNN ≤ 0.07 %); BruteForce and Botnet
   swap between seeds.
@@ -808,9 +812,9 @@ The model abstains, handing the flow to an analyst, when its conformal predictio
 | CSE-CIC-IDS2018 | FFNN + EWC + replay | 0.05 | 1,240 → 137 | 4.6 % | 99.99 % |
 | CSE-CIC-IDS2018 | FFNN + EWC + replay | 0.1 | 1,240 → 124 | 9.5 % | 99.99 % |
 
-Which α works depends on the dataset. On CIC-IDS2017 the stricter settings remove all 184 GNN false alarms (α = 0.01 and 0.05), and at α = 0.10 107 remain, as expected, because a smaller α gives larger sets. On CSE-CIC-IDS2018 the re-trained seed-42 GNN makes only 37 false alarms, and abstention removes them gradually: 16 left at α = 0.01, 5 at 0.05, none at 0.10, handing at most 4 % of flows to an analyst. (The earlier seed-42 model made 9,219 false alarms, benign flows called Infiltration, and there the direction reversed: only α = 0.10 removed them, because true Infiltration was so confident that its threshold required p ≥ 0.997. That instability is the Infiltration fragility described in §6.) The lesson stands: the safe α depends on the model and the data and has to be chosen on validation data for each deployment. The FFNN's false alarms are spread thinly and shrink gradually.
+Which α works depends on the dataset. On CIC-IDS2017 the stricter settings remove all 184 GNN false alarms (α = 0.01 and 0.05), and at α = 0.10 107 remain, as expected, because a smaller α gives larger sets. On CSE-CIC-IDS2018 the re-trained seed-42 GNN makes only 37 false alarms, and the direction is the reverse of CIC-IDS2017: 16 remain at α = 0.01, 5 at 0.05 and none only at 0.10, handing at most 4 % of flows to an analyst. (The earlier seed-42 model made 9,219 false alarms, benign flows called Infiltration, and there the direction reversed: only α = 0.10 removed them, because true Infiltration was so confident that its threshold required p ≥ 0.997. That instability is the Infiltration fragility described in §6.) The lesson stands: the safe α depends on the model and the data and has to be chosen on validation data for each deployment. The FFNN's false alarms are spread thinly and shrink gradually.
 
-**Are its probabilities honest?** (calibration, CIC-IDS2017, `results/cicids2017/multiclass/calibration/`,
+**Are its probabilities honest?** (calibration, CIC-IDS2017 and CSE-CIC-IDS2018, `results/<dataset>/multiclass/calibration/`,
 `python -m experiments.run_calibration`; same seed-42 checkpoints and test windows as above)
 
 | Model | Flows | ECE | MCE | Brier | Mean confidence | Accuracy |
@@ -826,8 +830,8 @@ Which α works depends on the dataset. On CIC-IDS2017 the stricter settings remo
 ECE = expected calibration error over 15 equal-width confidence bins; MCE = the worst bin. Both models are
 well calibrated overall, but that figure mostly describes benign traffic (75 % of these test flows). On attack
 flows our model is overconfident: it reports 99.4 % confidence and is right 97.7 % of the time, a larger gap
-than the per-flow FFNN's. This matches the conformal result above, where the GNN's false alarms are confident
-enough to survive every threshold. On CSE-CIC-IDS2018 (re-trained seed-42 models) both models are almost exactly
+than the per-flow FFNN's. This fits the incident result below, where the GNN's false alarms survive every false-alarm
+budget; conformal abstention at α ≤ 0.05 does remove them, at the cost of about 10 % of flows sent to an analyst. On CSE-CIC-IDS2018 (re-trained seed-42 models) both models are almost exactly
 calibrated, because almost every prediction is both confident and right. The reliability diagram is `reliability.png` in the same folder. Single run,
 indicative only.
 
@@ -845,7 +849,7 @@ Flagged flows of the same predicted category are joined into connected attacker/
 | FFNN + EWC + replay | 0.0001 | 102,666 | 65 | 85 % | 99.8 % |
 | FFNN + EWC + replay | 1e-05 | 100,515 | 51 | 98 % | 97.7 % |
 
-On CIC-IDS2017, about 100,000 flow alerts reduce to 50 incidents for the GNN. The budget does not change the GNN's numbers: its false alarms are confident enough to survive every threshold, which is consistent with the conformal result above. For the FFNN the budget matters, taking it from 106 incidents at 54 % precision to 51 at 98 %.
+On CIC-IDS2017, about 100,000 flow alerts reduce to 50 incidents for the GNN. The budget does not change the GNN's numbers: its false alarms are confident enough to survive every budget threshold tried, although conformal abstention at α ≤ 0.05 does remove them (above). For the FFNN the budget matters, taking it from 106 incidents at 54 % precision to 51 at 98 %.
 
 **Will analysts drown in alerts?** (alert → incident grouping, CSE-CIC-IDS2018 test windows)
 Flagged flows of the same predicted category are joined into connected attacker/victim components. The false-alarm budget raises the confidence threshold until the validation false-positive rate fits the budget.
@@ -877,8 +881,8 @@ Two further budget variants failed the same way and are not tabulated: 20 least-
 (0.338).
 
 What this shows (single run each, seed 42; indicative only):
-* **The safety gate works as a guard.** It rejected and rolled back an update that raised the validation false-positive rate. Final quality is similar to the ungated stream, so the gate costs little. It is not a quality improvement.
-* **Pure uncertainty sampling is not enough.** With 100 labels per update, chosen as the flows with the smallest top-2 margin, final macro-F1 collapses although detection stays high. A new attack that the model confidently assigns to an old category is never among the uncertain flows, so it is never labelled and never learned.
+* **The safety gate works as a guard.** It rejected and rolled back an update that raised the validation false-positive rate. Final macro-F1 is similar to the ungated stream (0.962 vs 0.949), but the final FPR ends higher (0.086 % vs 0.026 %), so in this single run the gate did not lower end-of-stream false alarms. It is not a quality improvement.
+* **Pure uncertainty sampling is not enough.** With 100 labels per update, chosen as the flows with the smallest top-2 margin, final macro-F1 collapses (0.438) while detection falls less sharply, to 0.81 (0.999 with all labels). A new attack that the model confidently assigns to an old category is never among the uncertain flows, so it is never labelled and never learned.
 * **Mixing in random labels fixes it.** Spending half of the same 100-label budget on a uniformly random sample (`drift.label_strategy: hybrid`) recovers most of the quality with a small fraction of the labels (compare the hybrid row with the all-labels baseline). This is the recommended setting when labels are scarce.
 
 **Explanations and response.** For any flagged flow, `GET /explain/{window}/{edge}` returns a gradient × input attribution over the flow's own features and the share of evidence that came from neighbouring flows. It also reports structural facts (fan-out, fan-in, distinct target ports) and a one-paragraph summary generated by rules, with no language model. `GET /incidents/{window}` groups alerts and proposes a containment action (block source, rate-limit to victim, or isolate host) with the exact iptables / Windows Firewall rule. `POST /actions/{id}/decision` records an analyst's approve / reject. **Nothing is ever executed:** approval is stored as a dry run. The *Incident queue* tab of the console is built on these endpoints.
@@ -917,9 +921,9 @@ CIC-IDS2017 test windows of 5,000 flows. Laptop: GTX 1650 (4 GB), 8-core CPU, 24
   macro-F1 and stability: two trainings of seeds 42–44 gave 0.906 ± 0.043 and 0.938 ± 0.063 (default model
   0.964 ± 0.020), and the small WebAttack class was lost in three of the six trainings. The dependence can be
   traded away, but not for free.
-* **The graph advantage in distribution is modest.** +0.036 (interleaved, 3 seeds) and +0.044 (temporal,
-  5 seeds) macro-F1 on CIC-IDS2017, both indicative with the seeds available; a tie in 2017 binary; on
-  2018 multiclass +0.075 with the GNN's own seeds ranging 0.863–0.945. The FFNN has the lower false-positive rate on the interleaved
+* **The graph advantage in distribution is modest.** +0.044 macro-F1 on the CIC-IDS2017 temporal split (5 seeds)
+  is the only indicative advantage; +0.036 on the interleaved split (3 seeds) is not a detectable difference; a tie
+  in 2017 binary; on 2018 multiclass +0.075, not detectable, with the GNN's own seeds ranging 0.863–0.945. The FFNN has the lower false-positive rate on the interleaved
   split. The GNN's clearest advantage is detecting some *unseen* attack types (§1), and which ones is
   seed-dependent apart from DoS and DDoS.
 * **The GNN is unstable on 2018 Infiltration.** Three runs of the identical configuration scored 0.855, 0.948
@@ -929,12 +933,12 @@ CIC-IDS2017 test windows of 5,000 flows. Laptop: GTX 1650 (4 GB), 8-core CPU, 24
   number means little.
 * **ADWIN is not cheaper on CIC-IDS2017.** Over three seeds it retrains about twice as often as a fixed
   schedule; with clean task blocks the schedule also ends higher, with mixed attacks ADWIN ends higher (§4).
-  On CSE-CIC-IDS2018 it beat the schedule on both cost and quality (24 vs 48 retrains, 0.943 vs 0.825), in one
-  run. The refractory period and adaptation window were fixed a priori, not tuned; tuning them without a
+  On CSE-CIC-IDS2018, over three seeds, it uses about half the retrains (23 vs 48) and only ties the schedule on
+  quality (0.836 ± 0.117 vs 0.828 ± 0.010; it won on seed 42 and lost on seed 43, §6). The refractory period and adaptation window were fixed a priori, not tuned; tuning them without a
   separate validation stream would overfit the test stream.
 * **EWC alone is not reliable; EWC with replay may be.** EWC alone fails in class-incremental (multiclass)
-  on both datasets. On top of replay it made no detectable difference on the interleaved split but, on the
-  temporal split, prevented two replay-only collapses (§2). The replay-budget sweep (§2) shows replay alone is
+  on both datasets. On top of replay it made no detectable difference on either split; on the temporal split it
+  prevented two replay-only collapses, but the paired difference is not detectable (§2). The replay-budget sweep (§2) shows replay alone is
   flat from five stored windows per category on the interleaved split; it was not repeated on the temporal one.
 * **One experiment not run.** The planned extra-seed runs (window-size, both datasets' drift, IP-remap and
   unseen-attack seeds, the topology re-run) are now in; the only item still outstanding is the 5-seed re-run
@@ -967,7 +971,7 @@ so the differences are of *scope*, not measured superiority.
 | Line of work | What it does | Where this project differs |
 |---|---|---|
 | [E-GraphSAGE](https://arxiv.org/abs/2103.16329) (Lo et al., 2021) | the edge-featured GNN this project's model is built on; single training run | adds continual learning across a task sequence, drift-triggered adaptation, and a product layer |
-| Continual GNN IDS with experience replay (e.g. ER-GNN based theses, 2026) | replay to resist forgetting as new attack classes arrive | combines replay **and** EWC, and reports the ablation honestly: EWC alone fails, replay is necessary, and EWC on top of replay helped only on the temporal split (§2) |
+| Continual GNN IDS with experience replay (e.g. ER-GNN based theses, 2026) | replay to resist forgetting as new attack classes arrive | combines replay **and** EWC, and reports the ablation honestly: EWC alone fails, replay is necessary, and EWC on top of replay made no detectable difference (it avoided two replay-only collapses on the temporal split, §2) |
 | Conformal / risk-controlled alert triage (2025–26 literature) | calibrated abstention and false-alarm control for SOC queues | class-conditional (Mondrian) sets over a *continual* model, plus the finding that the safe α differs per dataset (§7) |
 | Commercial NDR products | packet capture, enrichment, response automation at scale | not comparable in scope; this project is an evaluated research prototype with dry-run response only |
 

@@ -52,8 +52,10 @@ of the same session (optimistic); *temporal* trains on each attack's earlier tra
 
 * **Retention** of the first attack type after all later tasks: 0.998–1.000 on CIC-IDS2017 (naive retraining: 0).
 * **False-positive rate:** 0.04 % (temporal) and 0.07 % (interleaved) of benign flows on CIC-IDS2017.
-* **Graph vs per-flow, paired over seeds:** +0.044 (temporal, CI +0.019 to +0.058) and +0.036 (interleaved,
-  CI +0.011 to +0.069). Indicative only: with three or five seeds no test can reach conventional significance.
+* **Graph vs per-flow, paired over seeds:** +0.044 on the temporal split (bootstrap CI +0.019 to +0.058, paired-t CI
+  +0.010 to +0.079; indicative, five seeds). On the interleaved split +0.036 is not a detectable difference (paired-t
+  CI −0.039 to +0.110), nor is +0.075 on CSE-CIC-IDS2018. With three or five seeds the Wilcoxon test cannot reach
+  p < 0.05, so every verdict is indicative.
 * **Attacks never seen in training** (CSE-CIC-IDS2018, binary, leave-one-attack-out, three seeds): over 80 % of
   the held-out attack's flows detected in 8 of 18 runs, against at most 0.07 % for the per-flow FFNN. DoS
   replicates perfectly (98.6 % on all three seeds) and DDoS on all three but declining (99.4 / 82.6 / 67.5 %);

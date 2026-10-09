@@ -9,7 +9,7 @@ import { color, css, esc, get, HEADLINE, int, label, pct, post, state, STORY, to
 import { legend, lineOptions, markerPlugin, modelDataset, mount } from "../lib/charts.js";
 import { withBusy } from "../lib/ui.js";
 
-let root, timer, playTimer, charts = {};
+let root, timer, playTimer, charts = {}, liveBusy = false;
 let mode = "recorded";
 // recorded playback
 let rec = null, recFor = null, pos = 0, maxPos = 0, playing = false;
@@ -172,6 +172,12 @@ async function start() {
 
 async function liveTick() {
   if (!root || !root.isConnected || mode !== "live") return;
+  if (liveBusy || document.hidden || !root.closest(".view")?.classList.contains("on")) return;   // on screen only, no overlap
+  liveBusy = true;
+  try { await liveTickBody(); } finally { liveBusy = false; }
+}
+
+async function liveTickBody() {
   let st = {};
   try { st = await get("/demo/status"); } catch { /* ignore */ }
   const alive = !!st.alive;

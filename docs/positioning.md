@@ -26,8 +26,8 @@ about 100,000 flagged flows become about fifty incidents (README §7). Analysts 
 | Correlation, retention, compliance (a SIEM) | Incidents with evidence and a proposed dry-run response, CEF export, an "unsure" list, a novelty flag |
 | Every containment decision (the analyst) | A queue ordered by incident, and a model that learns the local network and new attacks from labels, gated against forgetting |
 
-**What must hold before anyone relies on it.** Every number comes from two lab datasets with block-wise attack
-schedules. On the cyber range, the untaught model called 45–75 % of a simulated office's normal traffic an
+**What must hold before anyone relies on it.** Every benchmark number comes from two lab datasets with block-wise
+attack schedules. On the cyber range (separate runs, not part of `results/`), the untaught model called 45–75 % of a simulated office's normal traffic an
 attack; teaching reduces that, but it must be measured on the deployment's own traffic. The graph's advantage
 depends on attacks coming from few hosts; with randomised sources it collapses (README §5). Drift detection
 needs analyst labels.

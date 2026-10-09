@@ -16,7 +16,7 @@ Everything in the project, grouped. Tick as you verify.
 - **Subgraph replay** — up to 10 stored windows per attack category, 2 replayed per training step.
 - Learns attack categories one at a time (7 tasks on 2017, 6 on 2018) without catastrophic forgetting.
 
-**All 13 models/baselines implemented** (for the comparison):
+**Models/baselines with results** (for the comparison; `ffnn_ewc` and `ffnn_replay` are implemented without results):
 `gnn_ewc_replay` (ours), `gnn_naive`, `gnn_ewc`, `gnn_replay`, `gnn_joint`, `gnn_ewc_replay_topo` (appendix),
 `ffnn_ewc_replay`, `ffnn_ewc`, `ffnn_replay`, `ffnn_naive`, `ffnn_joint`, `xgboost_static`.
 
@@ -33,8 +33,8 @@ Everything in the project, grouped. Tick as you verify.
 - **Topology augmentation** (appendix) — trade topology robustness for accuracy.
 
 **Evaluation protocol**
-- Splits: interleaved, temporal, temporal-attack; leave-one-attack-out (unseen attacks).
-- Stats: bootstrap confidence intervals, Wilcoxon tests, 3–5 seeds.
+- Splits: interleaved and temporal-attack (reported as "temporal"; a plain temporal split is implemented, not evaluated); leave-one-attack-out (unseen attacks).
+- Stats: paired bootstrap and paired-t 95% CIs (a difference counts only if both exclude zero); Wilcoxon for reference; 3–5 seeds.
 
 ---
 
@@ -45,7 +45,7 @@ Everything in the project, grouped. Tick as you verify.
 
 ## 3. Key measured results (all reproducible, in README)
 - Temporal macro-F1 **0.915 ± 0.031**; interleaved **0.964**; 2018 **0.911 ± 0.042**.
-- Graph vs per-flow: **+0.044 temporal / +0.036 interleaved**.
+- Graph vs per-flow (macro-F1, paired): **+0.044 on 2017 temporal** (5 seeds, indicative); +0.036 interleaved and +0.075 on 2018 are not detectable.
 - Retention of first attack: **0.998–1.000** (naive retraining: 0).
 - Unseen DoS (leave-one-out): **98.6% × 3 seeds** on 2018 (per-flow FFNN ≤ 0.07%).
 - Window-size, replay-budget, drift (3 seeds), IP-remap (3 seeds), calibration, serving speed (5.5 ms/window GPU).
@@ -125,5 +125,5 @@ Also: guided tour, help/glossary, presentation mode, light/dark, command palette
 ### The honest limitations (also part of the project — examiners value these)
 - Never blocks traffic — dry-run only.
 - A real modern attack (e.g. live nmap) is **not** detected out of the box — lab-trained model, real-traffic gap.
-- Graph advantage depends on attackers being few hosts (NAT/spoofing breaks it).
+- The GNN relies on attackers being few hosts (randomised sources: 0.952 → 0.431 on 2017, below the unaffected per-flow model).
 - Drift detection needs labels; unseen-attack detection is unreliable for some categories.

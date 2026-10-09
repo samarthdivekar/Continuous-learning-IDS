@@ -6,7 +6,7 @@ import { catColor, esc, get, int, pct, post, toast } from "../lib/core.js";
 import { GraphView } from "../lib/graphview.js";
 import { withBusy } from "../lib/ui.js";
 
-let root, timer, sel = null, teachSel, incSig = "", gview, gWindow = null;
+let root, timer, ticking = false, tickAgain = false, sel = null, teachSel, incSig = "", gview, gWindow = null;
 
 const CLASSES = ["Benign", "BruteForce", "DoS", "WebAttack", "Infiltration", "Botnet", "PortScan", "DDoS"];
 
@@ -89,8 +89,17 @@ export async function mount(el) {
 export function refresh() { tick(); }
 export function activate() { tick(); }
 
+// Views stay mounted when hidden, so the 2 s poll runs only while this tab is on screen, and never overlaps
+// itself (a slow tick used to stack up behind the next one and keep the API busy on every other tab).
 async function tick() {
   if (!root || !root.isConnected) { clearInterval(timer); return; }
+  if (document.hidden || !root.closest(".view")?.classList.contains("on")) return;
+  if (ticking) { tickAgain = true; return; }       // a click asked for fresh data mid-poll: run once more after
+  ticking = true;
+  try { do { tickAgain = false; await tickBody(); } while (tickAgain); } finally { ticking = false; }
+}
+
+async function tickBody() {
   let sites;
   try { sites = (await get("/live/sites")).sites; } catch { return; }
   const hasData = sites.length > 0;
@@ -102,7 +111,8 @@ async function tick() {
   if (!hasData) return;
   renderSites(sites);
   if (sel && !sites.some((s) => s.site === sel)) sel = null;
-  if (!sel && sites.length) sel = sites[0].site;
+  // default to the site that sent traffic most recently, not the first in the list (often an old, idle one)
+  if (!sel && sites.length) sel = [...sites].sort((x, y) => (x.seconds_since ?? 1e12) - (y.seconds_since ?? 1e12))[0].site;
   root.querySelector("#st-scope").textContent = sel ? `· ${sel}` : "· all sites";
 
   const badge = document.querySelector("#sites-badge");

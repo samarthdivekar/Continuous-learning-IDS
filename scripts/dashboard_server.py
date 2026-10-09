@@ -23,6 +23,15 @@ SECURITY_HEADERS = {"Content-Security-Policy": CSP, "X-Content-Type-Options": "n
                     "Referrer-Policy": "no-referrer", "X-Frame-Options": "DENY"}
 
 
+class Server(ThreadingHTTPServer):
+    def handle_error(self, request, client_address):
+        # a browser that closes a connection early (page change, reload) is normal, not worth a traceback
+        import sys
+        if isinstance(sys.exc_info()[1], (ConnectionAbortedError, ConnectionResetError, BrokenPipeError)):
+            return
+        super().handle_error(request, client_address)
+
+
 class Handler(SimpleHTTPRequestHandler):
     api_base = "http://127.0.0.1:8000"
 
@@ -83,7 +92,7 @@ def main():
     a = p.parse_args()
     Handler.api_base = a.api.rstrip("/")
     print(f"dashboard on http://localhost:{a.port}/  ->  api {Handler.api_base}", flush=True)
-    ThreadingHTTPServer(("127.0.0.1", a.port), partial(Handler)).serve_forever()
+    Server(("127.0.0.1", a.port), partial(Handler)).serve_forever()
 
 
 if __name__ == "__main__":

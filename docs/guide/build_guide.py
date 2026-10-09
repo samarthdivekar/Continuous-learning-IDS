@@ -4,7 +4,6 @@
 
 Joins the parts into guide.html (print styles inline), then prints it to PDF with the installed Edge.
 """
-import shutil
 import subprocess
 from pathlib import Path
 
