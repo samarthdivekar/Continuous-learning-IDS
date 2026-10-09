@@ -295,12 +295,31 @@ appears under **Live sites**. A CSV of flows with the full CICFlowMeter feature 
 library + Wireshark's dumpcap) captures a machine's own traffic in short chunks and uploads each to
 `POST /sensor/pcap`; the server converts it with the **pinned corrected CICFlowMeter** (GintsEngelen fork at
 `e3bb9ce`, built by `sensor/cicflowmeter.Dockerfile`), whose CSV columns must equal the training data's or
-the capture is refused. Flows are scored by a live copy of `gnn_ewc_replay` and filed per site; the console's
-**Live sites** tab shows each site's traffic, incidents (with dry-run rules) and traffic unlike anything seen
-in training. Analyst labels adapt the live model as one more continual task — gated against forgetting:
-scored on held-out old-attack windows before and after, rolled back if macro-F1 drops more than 0.02. Two
-sites on different networks (a LAN plus a laptop on a hotspot, over a VPN) demonstrate the MAN topology.
-Nothing is ever blocked. A **sandbox replay** (`POST /sensor/replay_recorded`, a button in the Live sites
+the capture is refused. Flows are scored by a live copy of `gnn_ewc_replay` and filed per site:
+
+* **Scored in context.** A capture chunk lasts a few seconds, far smaller than the 5,000-flow windows the
+  model was trained on, so each chunk is scored inside the site's last two minutes of flows (up to 5,000).
+  Non-IP records the flow meter emits (ARP and similar, protocol 0) are dropped.
+* **Alarms, abstention, novelty.** Class-conditional conformal thresholds (α = 0.05, calibrated on
+  validation windows) decide each flow: when the model cannot tell attack from normal it raises **no
+  alarm** and the flow goes to an *Unsure* list for an analyst; when it is sure of an attack but not of which
+  kind, the alarm is raised and marked "kind uncertain". Traffic unlike anything in training is listed as
+  *Unfamiliar*.
+* **Incidents** are grouped per site (two sites may both use 192.168.1.x) over the last 15 minutes, carry a
+  dry-run rule, can be approved or rejected into the same decision log as the Incident queue, and export as CEF.
+* **Teaching.** Analyst labels (who and when are recorded; unlearned labels can be undone; bulk "mark normal"
+  skips flagged, unsure and unfamiliar flows) adapt the live model as one more continual task, trained on
+  merged site windows shaped like the training data, on a copy while the live model keeps scoring. The update
+  is **rolled back** if, on data it did not train on, old-attack macro-F1 drops by more than 0.02, any old
+  attack category loses more than 5 points of recall, or the false-positive rate rises by more than 0.5 points
+  on recorded benign traffic or on the site's own held-back normal traffic. Accepted updates are saved and
+  survive a restart; *Reset model* returns to the trained model.
+* **Drift** on live traffic is the model's disagreement with analyst labels, per site (adapting is recommended
+  above 10 % with at least 50 labels). Unlabelled live flows are deleted after `GNNIDS_LIVE_RETENTION_DAYS`
+  (default 7) days.
+
+Two sites on different networks (a LAN plus a laptop on a hotspot, over a VPN) demonstrate the MAN topology:
+start the stack with `-BindHost <this machine's LAN or Tailscale IP>` and an API key. Nothing is ever blocked. A **sandbox replay** (`POST /sensor/replay_recorded`, a button in the Live sites
 tab) feeds a real recorded attack window from the held-out test set through the live scorer, so a detection
 can be shown without launching anything. A small **desktop control center** (`python desktop/control_center.py`,
 tkinter, no new dependency) starts the stack, opens the console, runs a sensor and triggers the sandbox

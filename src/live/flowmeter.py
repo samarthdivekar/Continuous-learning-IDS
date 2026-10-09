@@ -117,8 +117,9 @@ def _docker_available_cached(ttl: float = 30.0) -> tuple[bool, str]:
 PCAP_HEADER_BYTES = 24
 
 
-def pcaps_to_flows(pcaps: list[Path], timeout: float = 300) -> list[dict]:
-    """Convert several captures in ONE flow-meter run (one container start, not one per chunk)."""
+def pcaps_to_flows(pcaps: list[Path], timeout: float = 300, tag_source: bool = False) -> list[dict]:
+    """Convert several captures in ONE flow-meter run (one container start, not one per chunk).
+    With `tag_source`, each flow carries "source_pcap": the path of the capture it came from."""
     pcaps = [Path(p) for p in pcaps if Path(p).stat().st_size > PCAP_HEADER_BYTES]   # header only = no packets
     if not pcaps:
         return []
@@ -140,7 +141,12 @@ def pcaps_to_flows(pcaps: list[Path], timeout: float = 300) -> list[dict]:
             raise FlowMeterError(f"flow meter failed (exit {r.returncode}): {tail[:300]}")
         flows = []
         for csv_path in produced:
-            flows += read_flow_csv(csv_path)
+            got = read_flow_csv(csv_path)
+            if tag_source:                         # cfm names its output after the input: capture_0003.pcap_Flow.csv
+                i = int(csv_path.name.split("_")[1].split(".")[0])
+                for f in got:
+                    f["source_pcap"] = str(pcaps[i])
+            flows += got
         return flows
 
 

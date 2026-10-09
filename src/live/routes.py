@@ -15,6 +15,7 @@ Nothing here blocks traffic: incidents carry proposed rules as text, exactly as 
 """
 from __future__ import annotations
 
+import os
 import re
 import tempfile
 from datetime import datetime, timedelta, timezone
@@ -22,9 +23,11 @@ from pathlib import Path
 
 import numpy as np
 from fastapi import APIRouter, HTTPException, Query, Request
+from fastapi.responses import PlainTextResponse
 from fastapi.concurrency import run_in_threadpool
 from pydantic import BaseModel, Field
 from sqlalchemy import desc, func, select, update
+from sqlalchemy.orm import defer
 
 from src.db.models import LiveFlow, LiveWindow
 from src.live.flowmeter import FlowMeterError, pcap_to_flows
@@ -63,7 +66,7 @@ def _ml(method: str, path: str, body: dict | None = None, params: dict | None = 
             from src.live.engine import label_id
             names = live.names
             return live.adapt([(w["flows"], [label_id(names, lab) for lab in w["labels"]]) for w in body["windows"]],
-                              epochs=body.get("epochs"), holdout_benign=body.get("holdout_benign"))
+                              epochs=body.get("epochs"), holdout=body.get("holdout"))
         if path == "/live/reset":
             return live.reset()
         if path == "/live/fpr_study":
@@ -114,6 +117,25 @@ class SensorFlowsIn(BaseModel):
     detail: bool = False          # also return each flow's id and predicted label (cyber range, tests)
 
 
+RETENTION_DAYS = float(os.environ.get("GNNIDS_LIVE_RETENTION_DAYS", "7"))
+_ingests = 0
+
+
+def purge_older_than(days: float) -> dict:
+    """Delete live flows older than `days` (they are personal data in clear text). Flows an analyst
+    labelled are kept as the record of what the model was taught; windows left empty go too."""
+    since = datetime.now(timezone.utc) - timedelta(days=days)
+    with _app().state.Session() as s:
+        old = select(LiveWindow.id).where(LiveWindow.received_at < since)
+        n_flows = s.execute(LiveFlow.__table__.delete().where(LiveFlow.window_id.in_(old),
+                                                              LiveFlow.analyst_label.is_(None))).rowcount
+        still = select(LiveFlow.window_id).distinct()
+        n_windows = s.execute(LiveWindow.__table__.delete().where(LiveWindow.received_at < since,
+                                                                  LiveWindow.id.not_in(still))).rowcount
+        s.commit()
+    return {"deleted_flows": int(n_flows), "deleted_windows": int(n_windows), "older_than_days": days}
+
+
 CONTEXT_SECONDS = 120        # a chunk is scored inside the site's flows of the last two minutes ...
 CONTEXT_MAX_FLOWS = 5000     # ... up to the training window size (5,000 flows per graph)
 
@@ -134,6 +156,10 @@ def _context(site: str, n_new: int, now: datetime) -> list[dict]:
 def process_flows(site: str, flows: list[dict], source: str, detail: bool = False) -> dict:
     """Score one chunk of a site's flows, store it, and summarise what was found."""
     from src.live.flowmeter import is_ip_flow
+    global _ingests
+    _ingests += 1
+    if _ingests % 500 == 1 and RETENTION_DAYS > 0:       # cheap, occasional retention sweep
+        purge_older_than(RETENTION_DAYS)
     Session = _app().state.Session
     now = datetime.now(timezone.utc)
     n_in = len(flows)
@@ -150,29 +176,34 @@ def process_flows(site: str, flows: list[dict], source: str, detail: bool = Fals
     context = _context(site, len(flows), now) if source != "replay" else []
     res = _ml("POST", "/live/score", {"flows": flows, "context": context})
     times = [t for t in (_ts(f.get("ts")) for f in flows) if t is not None]
-    flagged = sum(1 for lab in res["labels"] if lab != "Benign")
+    unsure = res.get("unsure") or [False] * len(flows)
+    cat_unc = res.get("category_uncertain") or [False] * len(flows)
+    # an alarm is a CONFIDENT attack verdict; when the model abstains the flow goes to an analyst instead
+    flagged = sum(1 for lab, u in zip(res["labels"], unsure) if lab != "Benign" and not u)
     unfamiliar = sum(res["unfamiliar"])
     with Session() as s:
         w = LiveWindow(site=site, received_at=now, window_start=min(times) if times else None,
                        window_end=max(times) if times else None, n_flows=len(flows), n_hosts=res["n_nodes"],
-                       n_flagged=flagged, n_unfamiliar=unfamiliar, counts=res["counts"],
+                       n_flagged=flagged, n_unfamiliar=unfamiliar, n_unsure=int(sum(unsure)), counts=res["counts"],
                        model_version=res["version"], source=source)
         s.add(w)
         s.flush()
         rows = [LiveFlow(window_id=w.id, site=site, ts=_ts(f.get("ts")), src_ip=f["src_ip"], dst_ip=f["dst_ip"],
                          src_port=f.get("src_port"), dst_port=f.get("dst_port"), protocol=f.get("protocol"),
-                         features=f["features"], predicted=lab, confidence=conf, novelty=nov, unfamiliar=unf)
-                for f, lab, conf, nov, unf in zip(flows, res["labels"], res["confidence"], res["novelty"],
-                                                  res["unfamiliar"])]
+                         features=f["features"], predicted=lab, confidence=conf, novelty=nov, unfamiliar=unf,
+                         unsure=bool(u), category_uncertain=bool(cu))
+                for f, lab, conf, nov, unf, u, cu in zip(flows, res["labels"], res["confidence"], res["novelty"],
+                                                         res["unfamiliar"], unsure, cat_unc)]
         s.add_all(rows)
         s.commit()
         wid = w.id
         ids = [r.id for r in rows] if detail else None
     out = {"window_id": wid, "site": site, "n_flows": len(flows), "n_hosts": res["n_nodes"],
            "n_context": res.get("n_context", 0), "counts": res["counts"], "flagged": flagged,
-           "unfamiliar": unfamiliar, "model_version": res["version"], "ignored_non_ip": ignored}
+           "unfamiliar": unfamiliar, "unsure": int(sum(unsure)), "model_version": res["version"],
+           "ignored_non_ip": ignored}
     if detail:
-        out["flow_ids"], out["labels"] = ids, res["labels"]
+        out["flow_ids"], out["labels"], out["unsure_flags"] = ids, res["labels"], [bool(u) for u in unsure]
     return out
 
 
@@ -230,13 +261,13 @@ def live_sites():
         out = []
         for site, last, n_windows, n_flows in rows:
             r5 = s.execute(select(func.sum(LiveWindow.n_flows), func.sum(LiveWindow.n_flagged),
-                                  func.sum(LiveWindow.n_unfamiliar))
+                                  func.sum(LiveWindow.n_unfamiliar), func.sum(LiveWindow.n_unsure))
                            .where(LiveWindow.site == site, LiveWindow.received_at >= recent)).one()
             last = last if last.tzinfo else last.replace(tzinfo=timezone.utc)
             out.append({"site": site, "last_seen": _iso(last), "seconds_since": int((now - last).total_seconds()),
                         "online": (now - last).total_seconds() <= ONLINE_SECONDS, "windows": int(n_windows),
                         "flows": int(n_flows or 0), "flows_5min": int(r5[0] or 0), "flagged_5min": int(r5[1] or 0),
-                        "unfamiliar_5min": int(r5[2] or 0)})
+                        "unfamiliar_5min": int(r5[2] or 0), "unsure_5min": int(r5[3] or 0)})
     return {"sites": sorted(out, key=lambda d: d["site"]), "online_seconds": ONLINE_SECONDS}
 
 
@@ -332,7 +363,8 @@ def _recent_flows(s, site: str | None, windows: int, minutes: float | None = Non
     wids = s.scalars(wq.order_by(desc(LiveWindow.id)).limit(windows)).all()
     if not wids:
         return []
-    return s.scalars(select(LiveFlow).where(LiveFlow.window_id.in_(wids))).all()
+    # the incident views never read the 83-feature JSON; not loading it keeps a 3-second poll cheap
+    return s.scalars(select(LiveFlow).options(defer(LiveFlow.features)).where(LiveFlow.window_id.in_(wids))).all()
 
 
 @router.get("/live/incidents")
@@ -348,7 +380,8 @@ def live_incidents(site: str | None = None, windows: int = Query(30, ge=1, le=50
         rows = _recent_flows(s, site, windows, minutes)
     names = _ml("GET", "/live/model")["classes"]
     idx = {n: i for i, n in enumerate(names)}
-    flagged = [r for r in rows if r.predicted != "Benign" and r.predicted in idx]
+    # incidents are built from confident attack verdicts only; abstentions are listed separately below
+    flagged = [r for r in rows if r.predicted != "Benign" and r.predicted in idx and not r.unsure]
     incidents = []
     by_site: dict[str, list] = {}
     for r in flagged:
@@ -374,6 +407,8 @@ def live_incidents(site: str | None = None, windows: int = Query(30, ge=1, le=50
             inc["top_ports"] = [int(p) for p, _ in sorted(((p, ports.count(p)) for p in set(ports)),
                                                           key=lambda kv: -kv[1])[:5]]
             inc["labelled"] = sum(1 for i in fi if fl[i].analyst_label is not None)
+            # share of the incident's flows where the model was sure it is an attack but not of which kind
+            inc["category_uncertain_share"] = float(np.mean([bool(fl[i].category_uncertain) for i in fi]))
             incidents.append(inc)
     incidents.sort(key=lambda d: -d["severity"])
     for k, inc in enumerate(incidents):
@@ -392,8 +427,63 @@ def live_incidents(site: str | None = None, windows: int = Query(30, ge=1, le=50
                 d["ports"].add(int(r.dst_port))
     unfamiliar = sorted(({**d, "destinations": len(d["destinations"]), "ports": sorted(d["ports"])[:10]}
                          for d in unf.values()), key=lambda d: -d["flows"])[:50]
+    # the model abstained (conformal set was not one class): no alarm, an analyst decides
+    uns = {}
+    for r in rows:
+        if r.unsure and r.analyst_label is None:
+            d = uns.setdefault((r.site, r.src_ip), {"site": r.site, "host": r.src_ip, "flows": 0, "flow_ids": [],
+                                                     "leaning": {}})
+            d["flows"] += 1
+            if len(d["flow_ids"]) < 5000:
+                d["flow_ids"].append(r.id)
+            d["leaning"][r.predicted] = d["leaning"].get(r.predicted, 0) + 1
+    unsure = sorted(uns.values(), key=lambda d: -d["flows"])[:50]
     return {"site": site, "windows": windows, "minutes": minutes, "n_flows": len(rows), "flagged_flows": len(flagged),
-            "incidents": incidents[:100], "unfamiliar": unfamiliar, "dry_run": True}
+            "incidents": incidents[:100], "unfamiliar": unfamiliar, "unsure": unsure, "dry_run": True}
+
+
+@router.get("/live/incidents/cef", response_class=PlainTextResponse)
+def live_incidents_cef(site: str | None = None, minutes: float = Query(15, gt=0, le=1440)):
+    """The live incidents as ArcSight CEF lines for a SIEM. Text only: nothing is sent anywhere."""
+    from src.product.siem import incidents_to_cef
+    data = live_incidents(site=site, windows=500, minutes=minutes, min_confidence=0.0)
+    lines = [incidents_to_cef([i], f"live-{i['site']}", "gnn_ewc_replay-live") for i in data["incidents"]]
+    name = f"live_incidents_{site or 'all'}.cef"
+    return PlainTextResponse("\n".join(lines), headers={"Content-Disposition": f'attachment; filename="{name}"'})
+
+
+class LiveActionIn(BaseModel):
+    site: str
+    category: str = Field(max_length=32)
+    target: str = Field(max_length=64)
+    minutes: float = Field(default=15, gt=0, le=1440)
+
+
+@router.post("/live/actions")
+def live_propose(body: LiveActionIn):
+    """Record the proposed (dry-run) action of a live incident, so it can be approved or rejected through
+    POST /actions/{id}/decision like the recorded-data queue. The incident is re-derived on the server and
+    must still exist with that category and target."""
+    from src.db.models import ResponseAction
+    site = _site(body.site)
+    inc = live_incidents(site=site, windows=500, minutes=body.minutes, min_confidence=0.0)["incidents"]
+    match = next((i for i in inc if i["category"] == body.category and i["proposed"]["target"] == body.target), None)
+    if match is None:
+        raise HTTPException(409, "incident no longer present; reload the live view")
+    pr = match["proposed"]
+    with _app().state.Session() as s:
+        existing = s.scalars(select(ResponseAction).where(
+            ResponseAction.site == site, ResponseAction.category == match["category"],
+            ResponseAction.target == pr["target"], ResponseAction.action == pr["action"],
+            ResponseAction.status == "proposed")).first()
+        if existing is None:
+            existing = ResponseAction(window_id=-1, incident_id=match["incident_id"], model_name="gnn_ewc_replay-live",
+                                      category=match["category"], action=pr["action"], target=pr["target"],
+                                      rationale=pr["rationale"], rule_linux=pr["rules"].get("linux"),
+                                      rule_windows=pr["rules"].get("windows"), status="proposed", site=site)
+            s.add(existing)
+            s.commit()
+        return _app()._action_dict(existing)
 
 
 # ------------------------------------------------------------------ labels and learning
@@ -428,12 +518,12 @@ def live_label(body: LabelIn):
             wids = select(LiveWindow.id).where(LiveWindow.site == _site(body.site), LiveWindow.received_at >= since)
             q = q.where(LiveFlow.window_id.in_(wids))
             if body.label == "Benign" and not body.include_suspicious:
-                suspicious = (LiveFlow.predicted != "Benign") | LiveFlow.unfamiliar.is_(True)
+                suspicious = (LiveFlow.predicted != "Benign") | LiveFlow.unfamiliar.is_(True) | LiveFlow.unsure.is_(True)
                 cnt = select(func.count()).select_from(LiveFlow).where(LiveFlow.window_id.in_(wids), suspicious)
                 if body.only_unlabelled:
                     cnt = cnt.where(LiveFlow.analyst_label.is_(None))
                 skipped = int(s.scalar(cnt) or 0)
-                q = q.where(LiveFlow.predicted == "Benign", LiveFlow.unfamiliar.is_not(True))
+                q = q.where(LiveFlow.predicted == "Benign", LiveFlow.unfamiliar.is_not(True), LiveFlow.unsure.is_not(True))
         if body.only_unlabelled:
             q = q.where(LiveFlow.analyst_label.is_(None))
         n = s.execute(q).rowcount
@@ -456,13 +546,45 @@ def live_unlabel(body: UnlabelIn):
     return {"unlabelled": int(n)}
 
 
+DRIFT_MIN_LABELS = 50        # below this many labelled flows the disagreement rate is not reported as drift
+DRIFT_THRESHOLD = 0.10       # model disagrees with analysts on >10 % of not-yet-learned labels -> adapt recommended
+
+
+@router.get("/live/drift")
+def live_drift(minutes: float = Query(60, gt=0, le=10080)):
+    """Live drift signal. Live traffic has no ground truth except analyst labels, so the signal is the
+    model's error on the flows analysts labelled (as the drift experiment's ADWIN watches the labelled
+    error, README §4): per site, how often the label differs from what the model said, over labels not yet
+    learned from. A high rate means the traffic has moved away from what the model knows."""
+    since = datetime.now(timezone.utc) - timedelta(minutes=minutes)
+    with _app().state.Session() as s:
+        rows = s.execute(select(LiveFlow.site, LiveFlow.analyst_label, LiveFlow.predicted)
+                         .where(LiveFlow.analyst_label.is_not(None), LiveFlow.used_for_learning.is_(False),
+                                LiveFlow.labelled_at >= since)).all()
+    per: dict[str, dict] = {}
+    for site, lab, pred in rows:
+        d = per.setdefault(site, {"site": site, "labelled": 0, "disagree": 0, "by_label": {}})
+        d["labelled"] += 1
+        wrong = lab != pred
+        d["disagree"] += int(wrong)
+        b = d["by_label"].setdefault(lab, {"labelled": 0, "model_disagreed": 0})
+        b["labelled"] += 1
+        b["model_disagreed"] += int(wrong)
+    for d in per.values():
+        d["error_rate"] = d["disagree"] / d["labelled"]
+        d["enough_labels"] = d["labelled"] >= DRIFT_MIN_LABELS
+        d["adapt_recommended"] = d["enough_labels"] and d["error_rate"] > DRIFT_THRESHOLD
+    return {"minutes": minutes, "min_labels": DRIFT_MIN_LABELS, "threshold": DRIFT_THRESHOLD,
+            "sites": sorted(per.values(), key=lambda d: d["site"])}
+
+
 HOLDOUT_EVERY = 5            # every 5th flow an analyst marked normal is held back to measure false alarms
 
 
 class AdaptIn(BaseModel):
     site: str | None = None
     epochs: int | None = Field(default=None, ge=1, le=20)
-    max_windows: int = Field(default=40, ge=1, le=200)
+    max_windows: int = Field(default=200, ge=1, le=2000)     # capture chunks to draw labels from (newest first)
 
 
 @router.post("/live/adapt")
@@ -476,23 +598,32 @@ def live_adapt(body: AdaptIn):
         wids = sorted(set(s.scalars(q).all()), reverse=True)[: body.max_windows]
         if not wids:
             raise HTTPException(409, "no new labelled flows; label some first (POST /live/label)")
+        rows = s.scalars(select(LiveFlow).where(LiveFlow.window_id.in_(wids))
+                         .order_by(LiveFlow.site, LiveFlow.id)).all()
+        # Train on windows shaped like the training data: each site's labelled chunks, in order, merged into
+        # graphs of up to 5,000 flows. Learning from many few-second chunk graphs instead made the model
+        # forget (measured on the cyber range: old-attack macro-F1 0.975 -> 0.642 vs 0.975 -> 0.974 merged).
         windows, used, holdout = [], [], []
         n_benign = 0
-        for wid in sorted(wids):
-            rows = s.scalars(select(LiveFlow).where(LiveFlow.window_id == wid).order_by(LiveFlow.id)).all()
-            labels = []
-            for r in rows:
-                lab = r.analyst_label
-                if lab == "Benign":
-                    n_benign += 1
-                    if n_benign % HOLDOUT_EVERY == 0:          # held back: never trained on, only measured
-                        holdout.append({"src_ip": r.src_ip, "dst_ip": r.dst_ip, "features": r.features})
-                        lab = None
-                labels.append(lab)
-            windows.append({"flows": [{"src_ip": r.src_ip, "dst_ip": r.dst_ip, "features": r.features} for r in rows],
-                            "labels": labels})
-            used += [r.id for r in rows if r.analyst_label is not None]
-    res = _ml("POST", "/live/adapt", {"windows": windows, "epochs": body.epochs, "holdout_benign": holdout})
+        by_site: dict[str, list] = {}
+        for r in rows:
+            by_site.setdefault(r.site, []).append(r)
+        for site_rows in by_site.values():
+            for i in range(0, len(site_rows), CONTEXT_MAX_FLOWS):
+                part, labels, hold = site_rows[i:i + CONTEXT_MAX_FLOWS], [], []
+                for j, r in enumerate(part):
+                    lab = r.analyst_label
+                    if lab == "Benign":
+                        n_benign += 1
+                        if n_benign % HOLDOUT_EVERY == 0:      # held back: stays in the graph unlabelled, measured only
+                            hold.append(j)
+                            lab = None
+                    labels.append(lab)
+                windows.append({"flows": [{"src_ip": r.src_ip, "dst_ip": r.dst_ip, "features": r.features}
+                                          for r in part], "labels": labels})
+                holdout.append(hold)
+                used += [r.id for r in part if r.analyst_label is not None]
+    res = _ml("POST", "/live/adapt", {"windows": windows, "epochs": body.epochs, "holdout": holdout})
     if res.get("accepted"):
         with Session() as s:
             s.execute(update(LiveFlow).where(LiveFlow.id.in_(used)).values(used_for_learning=True))
@@ -512,6 +643,16 @@ def live_fpr_study(body: FprStudyIn):
     The flows must be real benign traffic; this is how the live FPR number in docs/LIVE_DEMO.md is made."""
     return _ml("POST", "/live/fpr_study", {"flows": [f.model_dump() for f in body.flows],
                                            "teach_fraction": body.teach_fraction, "epochs": body.epochs})
+
+
+class PurgeIn(BaseModel):
+    older_than_days: float = Field(default=RETENTION_DAYS, ge=0)
+
+
+@router.post("/live/purge")
+def live_purge(body: PurgeIn):
+    """Delete unlabelled live flows older than N days now (0 = all unlabelled live flows)."""
+    return purge_older_than(body.older_than_days)
 
 
 @router.post("/live/reset")

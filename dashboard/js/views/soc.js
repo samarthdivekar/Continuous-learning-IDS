@@ -444,7 +444,7 @@ async function log(status) {
   const tag = (s) => `<span class="tag ${s === "approved" ? "good" : s === "rejected" ? "bad" : "warn"}">${esc(s)}</span>`;
   el.innerHTML = table([
     { title: "When (local time)", value: (r) => localTime(r.decided_at || r.created_at) },
-    { title: "Window / incident", value: (r) => `#${r.window_id} / ${r.incident_id}` },
+    { title: "Source", value: (r) => (r.site ? `live · ${r.site}` : `recorded window #${r.window_id} / ${r.incident_id}`) },
     { title: "Category", html: (r) => `<span class="swatch" style="background:${catColor(r.category)}"></span>${esc(r.category)}` },
     { title: "Action", value: (r) => ACTION_TEXT[r.action] || r.action },
     { title: "Target", html: (r) => `<span class="mono">${esc(r.target)}</span>` },

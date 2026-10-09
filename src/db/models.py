@@ -147,6 +147,7 @@ class ResponseAction(Base):
     decided_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     decided_by: Mapped[str | None] = mapped_column(String(64), nullable=True)
     note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    site: Mapped[str | None] = mapped_column(String(64), nullable=True)   # set for live-traffic incidents (window_id -1)
 
 
 class LiveWindow(Base):
@@ -161,6 +162,7 @@ class LiveWindow(Base):
     n_hosts: Mapped[int] = mapped_column(Integer)
     n_flagged: Mapped[int] = mapped_column(Integer)          # predicted as an attack
     n_unfamiliar: Mapped[int] = mapped_column(Integer)       # unlike anything seen in training (novelty)
+    n_unsure: Mapped[int | None] = mapped_column(Integer, nullable=True)   # model abstained (conformal set != 1 class)
     counts: Mapped[dict] = mapped_column(JSONType)           # predicted label -> flows
     model_version: Mapped[int] = mapped_column(Integer, default=0)
     source: Mapped[str] = mapped_column(String(16), default="pcap")   # pcap | flows | replay
@@ -182,6 +184,8 @@ class LiveFlow(Base):
     confidence: Mapped[float] = mapped_column(Float)
     novelty: Mapped[float | None] = mapped_column(Float, nullable=True)
     unfamiliar: Mapped[bool] = mapped_column(Boolean, default=False)
+    unsure: Mapped[bool | None] = mapped_column(Boolean, nullable=True)    # attack or normal? abstained: no alarm
+    category_uncertain: Mapped[bool | None] = mapped_column(Boolean, nullable=True)  # an attack, but which kind is unclear
     analyst_label: Mapped[str | None] = mapped_column(String(32), nullable=True)   # set by /live/label
     labelled_by: Mapped[str | None] = mapped_column(String(64), nullable=True)
     labelled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

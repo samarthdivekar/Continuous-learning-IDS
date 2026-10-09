@@ -38,15 +38,17 @@ log = get_logger(__name__)
 
 LIVE_MODEL = "gnn_ewc_replay"
 LIVE_WINDOW_OFFSET = 10_000_000        # live graphs get window ids far from the dataset's
+ALPHA = 0.05                           # conformal error level (README §7 compares 0.01 / 0.05 / 0.10)
 
 
 class LiveEngine:
     def __init__(self, svc, model: str = LIVE_MODEL, max_drop: float = 0.02, max_fpr_rise: float = 0.005,
-                 eval_windows_per_task: int = 2):
+                 max_recall_drop: float = 0.05, eval_windows_per_task: int | None = None):
         self.svc = svc
         self.model_name = model
         self.max_drop = max_drop
         self.max_fpr_rise = max_fpr_rise     # 0.5 percentage points of benign flows
+        self.max_recall_drop = max_recall_drop   # no single old attack category may lose more than 5 points
         self._adapt_lock = threading.Lock()
         self.eval_windows_per_task = eval_windows_per_task
         self.learner = None
@@ -94,7 +96,7 @@ class LiveEngine:
         self.live_graphs = []
         if restore:
             self._restore_saved()
-        self.threshold = self._calibrate_threshold()
+        self.threshold, self.conformal_q = self._calibrate(self.learner)
         log.info("live model ready: %s v%d, novelty threshold %.3f", self.model_name, self.version, self.threshold)
 
     # ------------------------------------------------------------ persistence
@@ -162,14 +164,52 @@ class LiveEngine:
             self.restored_from = None
             self.learner, self.live_graphs = self._fresh_learner(), []   # undo a partial restore
 
-    def _calibrate_threshold(self, target_fpr: float = 0.05, max_windows: int = 24) -> float:
-        """Energy score that 95 % of held-out validation flows (benign and known attacks) stay below."""
+    def _calibrate(self, learner, target_fpr: float = 0.05, max_windows: int | None = None) -> tuple[float, dict]:
+        """Calibrate on held-out VALIDATION windows of the training data (never test windows):
+          * novelty: the energy score that 95 % of validation flows (benign and known attacks) stay below;
+          * abstention: class-conditional (Mondrian) conformal thresholds at `ALPHA` — a flow whose
+            prediction set is not exactly one class is "unsure" and goes to an analyst, not to an alarm.
+        Returns (novelty threshold, conformal thresholds per class)."""
+        from src.evaluation.conformal import fit_class_thresholds
         data = self.svc.data
         graphs = [g for t in range(data.n_tasks) for g in data.graphs(t, "val")]
         rng = np.random.default_rng(0)
         pick = rng.permutation(len(graphs))[:max_windows]
-        scores = np.concatenate([self._energy(self.learner.predict_details(graphs[i])[0]) for i in pick])
-        return float(np.quantile(scores, 1 - target_fpr))
+        logits = [learner.predict_details(graphs[i])[0] for i in pick]
+        scores = np.concatenate([self._energy(lo) for lo in logits])
+        probs = torch.softmax(torch.from_numpy(np.concatenate(logits)), dim=-1).numpy()
+        y = np.concatenate([graphs[i].y.numpy() for i in pick])
+        return float(np.quantile(scores, 1 - target_fpr)), fit_class_thresholds(probs, y, ALPHA)
+
+    def _sets(self, probs: np.ndarray) -> np.ndarray | None:
+        """Conformal prediction sets. A class with too few validation flows to calibrate (WebAttack has 9 on
+        CIC-IDS2017) gets no threshold of its own and joins a set only as the model's top prediction —
+        giving it the loosest threshold instead put it in almost every set."""
+        from src.evaluation.conformal import prediction_sets
+        q = getattr(self, "conformal_q", None)
+        if not q:
+            return None
+        sets = prediction_sets(probs, q, fallback=-1.0)
+        top = probs.argmax(1)
+        uncal = ~np.isin(top, list(q))
+        sets[np.flatnonzero(uncal), top[uncal]] = True
+        return sets
+
+    def _unsure(self, probs: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+        """(unsure, category_uncertain) per flow.
+        unsure: the model cannot tell attack from normal — its set holds Benign AND an attack class, or
+          nothing. No alarm; the flow goes to an analyst.
+        category_uncertain: the set excludes Benign but holds several attack classes — an alarm is raised
+          (it is an attack) with the top class, flagged as uncertain.
+        Measured on CIC-IDS2017 test windows at alpha 0.05: alarms keep 96 % of attack flows; abstaining on
+        every set that is not one class kept only 71 % (and 14 % of one recorded DoS window)."""
+        sets = self._sets(probs)
+        if sets is None:
+            z = np.zeros(len(probs), dtype=bool)
+            return z, z
+        n_attack = sets[:, 1:].sum(axis=1)
+        unsure = (sets[:, 0] & (n_attack > 0)) | (sets.sum(axis=1) == 0)
+        return unsure, ~sets[:, 0] & (n_attack > 1)
 
     @staticmethod
     def _energy(logits: np.ndarray) -> np.ndarray:
@@ -200,24 +240,31 @@ class LiveEngine:
         pred = probs.argmax(1)
         energy = self._energy(logits)
         unfamiliar = energy > self.threshold
+        unsure, cat_uncertain = self._unsure(probs)
         names = self.names
         return {"model": self.model_name, "version": self.version, "n_flows": int(len(pred)),
                 "n_nodes": int(g.num_nodes), "n_context": len(context), "labels": [names[i] for i in pred],
                 "confidence": [round(float(c), 4) for c in probs.max(1)],
                 "probs": probs.round(5).tolist(), "novelty": [round(float(e), 4) for e in energy],
                 "unfamiliar": [bool(u) for u in unfamiliar], "threshold": self.threshold,
+                "unsure": [bool(u) for u in unsure], "category_uncertain": [bool(u) for u in cat_uncertain],
+                "alpha": ALPHA,
                 "counts": {names[i]: int((pred == i).sum()) for i in np.unique(pred)}}
 
     # --------------------------------------------------------------- learning
     def _held_out(self):
-        """Two test windows per task of the training data: the 'did it forget?' check."""
+        """The held-out TEST windows of every task of the training data: the 'did it forget?' check.
+        All of them by default — a sample of two per task once let a DoS collapse through (cyber range,
+        2026-10-09: macro-F1 on the sample moved 0.975 -> 0.973 while a recorded DoS window fell from 97 % to
+        6 % detected)."""
         if self._eval_set is None:
             data = self.svc.data
             rng = np.random.default_rng(0)
             gs = []
             for t in range(data.n_tasks):
                 test = data.graphs(t, "test")
-                gs += [test[i] for i in rng.permutation(len(test))[: self.eval_windows_per_task]]
+                k = len(test) if self.eval_windows_per_task is None else self.eval_windows_per_task
+                gs += [test[i] for i in rng.permutation(len(test))[:k]]
             self._eval_set = gs
         return self._eval_set
 
@@ -230,10 +277,12 @@ class LiveEngine:
         yt, yp = np.concatenate(y_true), np.concatenate(y_pred)
         labels = sorted(set(yt.tolist()))
         benign = yt == 0
+        names = self.names
+        recall = {names[c]: float((yp[yt == c] == c).mean()) for c in labels if c != 0}
         return {"macro_f1": float(f1_score(yt, yp, labels=labels, average="macro", zero_division=0)),
                 "fpr": float((yp[benign] != 0).mean()) if benign.any() else 0.0,
                 "attack_recall": float((yp[~benign] == yt[~benign]).mean()) if (~benign).any() else 1.0,
-                "n_flows": int(len(yt))}
+                "recall_per_category": recall, "n_flows": int(len(yt))}
 
     def _clone(self):
         """A trainable copy of the live learner. Learning runs on the copy while the live one keeps
@@ -246,20 +295,27 @@ class LiveEngine:
         return clone
 
     @staticmethod
-    def _site_fpr(learner, g) -> float | None:
-        if g is None:
-            return None
-        return float((learner.predict_proba(g).argmax(1) != 0).mean())
+    def _site_fpr(learner, graphs, holdout) -> float | None:
+        """False-positive rate on held-back normal flows, each predicted INSIDE its own window graph
+        (scored alone, a few dozen flows make an untypically tiny graph and are misjudged)."""
+        flagged, total = 0, 0
+        for g, idx in zip(graphs, holdout):
+            if idx:
+                pred = learner.predict_proba(g).argmax(1)[np.asarray(idx)]
+                flagged += int((pred != 0).sum())
+                total += len(idx)
+        return flagged / total if total else None
 
     def adapt(self, windows: list[tuple[list[dict], list[int | None]]], epochs: int | None = None,
-              holdout_benign: list[dict] | None = None) -> dict:
+              holdout: list[list[int]] | None = None) -> dict:
         """Learn from labelled live windows: [(flows, label id per flow or None)].
 
         Gated three ways, all measured on data the update did not train on; any failure rolls it back:
           * old-attack macro-F1 on held-out dataset test windows may not drop by more than `max_drop`;
           * false-positive rate on those windows' benign flows may not rise by more than `max_fpr_rise`;
-          * false-positive rate on `holdout_benign` (the site's own traffic an analyst marked normal and
-            that was held back from training) may not rise by more than `max_fpr_rise`.
+          * false-positive rate on the site's own held-back normal traffic may not rise by more than
+            `max_fpr_rise`. `holdout[i]` lists positions in window i that an analyst marked normal but
+            that are left unlabelled (never trained on) and only measured.
         Training runs on a copy, so sensor traffic keeps being scored while the model learns."""
         t0 = time.time()
         if not self._adapt_lock.acquire(blocking=False):
@@ -268,40 +324,50 @@ class LiveEngine:
             with self.svc.lock:
                 self.ensure()
                 version = self.version
-                graphs = [self.graph(f, labs, window_id=LIVE_WINDOW_OFFSET + 100_000 * version + i)
-                          for i, (f, labs) in enumerate(windows) if any(lab is not None for lab in labs)]
+                holdout = holdout or [[] for _ in windows]
+                keep = [i for i, (_, labs) in enumerate(windows) if any(lab is not None for lab in labs)]
+                graphs = [self.graph(windows[i][0], windows[i][1], window_id=LIVE_WINDOW_OFFSET + 100_000 * version + i)
+                          for i in keep]
+                hold = [holdout[i] if i < len(holdout) else [] for i in keep]
                 if not graphs:
                     return {"accepted": False, "reason": "no labelled flows", "version": version}
-                hold_g = self.graph(holdout_benign) if holdout_benign else None
                 clone = self._clone()
             n_labelled = int(sum(int(g.label_mask.sum()) for g in graphs))
+            n_hold = sum(len(h) for h in hold)
             before = self._old_attack_metrics(clone)
-            site_before = self._site_fpr(clone, hold_g)
+            site_before = self._site_fpr(clone, graphs, hold)
             clone.learn(graphs, tag=f"live_v{version + 1}", epochs=epochs)
             after = self._old_attack_metrics(clone)
-            site_after = self._site_fpr(clone, hold_g)
+            site_after = self._site_fpr(clone, graphs, hold)
             drop = before["macro_f1"] - after["macro_f1"]
             fpr_rise = after["fpr"] - before["fpr"]
-            site_rise = (site_after - site_before) if hold_g is not None else 0.0
+            site_rise = (site_after - site_before) if n_hold else 0.0
             reasons = []
             if drop > self.max_drop:
                 reasons.append(f"macro-F1 on old attacks fell by {drop:.3f} (limit {self.max_drop:.3f})")
+            for cat, r0 in before["recall_per_category"].items():
+                r1 = after["recall_per_category"].get(cat, 0.0)
+                if r0 - r1 > self.max_recall_drop:
+                    reasons.append(f"{cat} recall fell from {r0:.1%} to {r1:.1%} (limit {self.max_recall_drop:.0%} drop)")
             if fpr_rise > self.max_fpr_rise:
                 reasons.append(f"false alarms on old benign traffic rose by {fpr_rise:.2%} (limit {self.max_fpr_rise:.2%})")
             if site_rise > self.max_fpr_rise:
                 reasons.append(f"false alarms on this site's held-out normal traffic rose by {site_rise:.2%} "
                                f"(limit {self.max_fpr_rise:.2%})")
             accepted = not reasons
+            if accepted:                         # the new weights need their own thresholds
+                new_threshold, new_q = self._calibrate(clone)
             with self.svc.lock:
                 if accepted:
                     self.learner = clone
+                    self.threshold, self.conformal_q = new_threshold, new_q
                     self.version += 1
                     self.live_graphs.extend(graphs)
                 rec = {"accepted": accepted, "version": self.version, "windows": len(graphs),
                        "labelled_flows": n_labelled, "seconds": round(time.time() - t0, 1),
                        "old_attacks_before": before, "old_attacks_after": after,
-                       "site_holdout": None if hold_g is None else
-                       {"n_flows": int(hold_g.edge_index.shape[1]), "fpr_before": site_before, "fpr_after": site_after},
+                       "site_holdout": None if not n_hold else
+                       {"n_flows": n_hold, "fpr_before": site_before, "fpr_after": site_after},
                        "reason": None if accepted else "rolled back: " + "; ".join(reasons)}
                 self.history.append(rec)
                 if accepted:
@@ -361,6 +427,7 @@ class LiveEngine:
                 self.ensure()
         return {"model": self.model_name, "loaded": self.learner is not None, "version": self.version,
                 "novelty_threshold": self.threshold, "max_drop": self.max_drop, "max_fpr_rise": self.max_fpr_rise,
+                "max_recall_drop": self.max_recall_drop,
                 "classes": self.names, "history": self.history[-10:],
                 "learned_windows": len(self.live_graphs), "saved": self.state_path.exists(),
                 "restored_from_disk": self.restored_from is not None}

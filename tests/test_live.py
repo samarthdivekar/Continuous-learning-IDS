@@ -179,6 +179,7 @@ def test_live_incidents_are_per_site(client, monkeypatch):
         out = real(flows, context)
         out["labels"] = ["DoS"] * len(flows)
         out["confidence"] = [0.99] * len(flows)
+        out["unsure"] = [False] * len(flows)
         return out
     monkeypatch.setattr(client.svc.live, "score", all_dos)
     for site in ("site-a", "site-b"):                  # the same private addresses at two sites
@@ -187,6 +188,84 @@ def test_live_incidents_are_per_site(client, monkeypatch):
     assert inc and all(len(i["sites"]) == 1 for i in inc)
     assert {i["site"] for i in inc} == {"site-a", "site-b"}
     assert client.get("/live/incidents", params={"minutes": 0.001}).status_code == 200
+
+
+def test_unsure_flows_raise_no_incident_and_live_actions_are_dry_run(client, monkeypatch):
+    real = client.svc.live.score
+
+    def verdicts(flows, context=None):
+        out = real(flows, context)
+        n = len(flows)
+        out["labels"] = ["DoS"] * n
+        out["confidence"] = [0.99] * n
+        out["unsure"] = [i < n // 2 for i in range(n)]        # the model abstains on the first half
+        return out
+    monkeypatch.setattr(client.svc.live, "score", verdicts)
+    r = client.post("/sensor/flows", json={"site": "lab", "flows": _flows(client, 20)}).json()
+    assert r["unsure"] == 10 and r["flagged"] == 10            # an abstention is not an alarm
+    inc = client.get("/live/incidents", params={"site": "lab"}).json()
+    assert sum(i["n_flows"] for i in inc["incidents"]) == 10
+    assert sum(u["flows"] for u in inc["unsure"]) == 10
+    assert client.get("/live/sites").json()["sites"][0]["unsure_5min"] == 10
+    cef = client.get("/live/incidents/cef", params={"site": "lab"})
+    assert cef.status_code == 200 and cef.text.startswith("CEF:0|")
+    i = inc["incidents"][0]
+    a = client.post("/live/actions", json={"site": "lab", "category": i["category"],
+                                          "target": i["proposed"]["target"]}).json()
+    assert a["site"] == "lab" and a["status"] == "proposed" and a["dry_run"] is True
+    assert client.post("/live/actions", json={"site": "lab", "category": i["category"],
+                                              "target": i["proposed"]["target"]}).json()["id"] == a["id"]   # no duplicate
+    d = client.post(f"/actions/{a['id']}/decision", json={"decision": "approve", "analyst": "sam"}).json()
+    assert d["status"] == "approved" and d["dry_run"] is True
+    assert client.post("/live/actions", json={"site": "lab", "category": "DDoS", "target": "1.2.3.4"}).status_code == 409
+
+
+def test_live_drift_is_the_error_on_analyst_labels(client, monkeypatch):
+    real = client.svc.live.score
+
+    def all_benign(flows, context=None):
+        out = real(flows, context)
+        out["labels"] = ["Benign"] * len(flows)
+        out["unsure"] = [False] * len(flows)
+        return out
+    monkeypatch.setattr(client.svc.live, "score", all_benign)
+    out = client.post("/sensor/flows", json={"site": "lab", "flows": _flows(client, 60), "detail": True}).json()
+    client.post("/live/label", json={"label": "PortScan", "flow_ids": out["flow_ids"][:30]})
+    client.post("/live/label", json={"label": "Benign", "flow_ids": out["flow_ids"][30:]})
+    s = client.get("/live/drift").json()["sites"][0]
+    assert s["labelled"] == 60 and s["disagree"] == 30 and s["error_rate"] == 0.5
+    assert s["adapt_recommended"] and s["by_label"]["PortScan"]["model_disagreed"] == 30
+
+
+def test_purge_keeps_labelled_flows(client):
+    out = client.post("/sensor/flows", json={"site": "lab", "flows": _flows(client, 10), "detail": True}).json()
+    client.post("/live/label", json={"label": "Benign", "flow_ids": out["flow_ids"][:3]})
+    r = client.post("/live/purge", json={"older_than_days": 0}).json()
+    assert r["deleted_flows"] == 7
+    with client.Session() as s:
+        assert s.query(LiveFlow).count() == 3                # the taught flows remain as the audit record
+
+
+def test_abstention_rule_is_attack_vs_normal():
+    import numpy as np
+    from src.live.engine import LiveEngine
+    eng = LiveEngine.__new__(LiveEngine)
+    eng.conformal_q = {0: 0.7, 1: 0.7, 2: 0.7}           # a class joins its set at p >= 0.3; class 3 is uncalibrated
+    probs = np.array([[0.6, 0.4, 0.0, 0.0],               # benign AND attack plausible -> unsure, no alarm
+                      [0.0, 0.55, 0.45, 0.0],             # surely an attack, kind unclear -> alarm, kind uncertain
+                      [0.0, 0.9, 0.1, 0.0],               # one attack class -> plain alarm
+                      [0.1, 0.0, 0.0, 0.9]])              # uncalibrated class only as the top prediction
+    unsure, kind = eng._unsure(probs)
+    assert unsure.tolist() == [True, False, False, False]
+    assert kind.tolist() == [False, True, False, False]
+
+
+def test_live_model_calibrates_abstention(client):
+    live = client.svc.live
+    live.ensure()
+    assert live.conformal_q                                     # per-class thresholds from validation windows
+    out = live.score(_flows(client, 10))
+    assert len(out["unsure"]) == 10 and out["alpha"] == 0.05
 
 
 def test_learning_survives_a_restart_and_reset_deletes_it(client):
@@ -229,6 +308,7 @@ def test_bulk_normal_skips_suspicious_flows_and_labels_can_be_undone(client, mon
         out = real(flows, context)
         out["labels"] = ["DoS" if i % 2 else "Benign" for i in range(len(flows))]
         out["unfamiliar"] = [False] * len(flows)
+        out["unsure"] = [False] * len(flows)
         return out
     monkeypatch.setattr(client.svc.live, "score", half_flagged)
     out = client.post("/sensor/flows", json={"site": "home", "flows": _flows(client, 20), "detail": True}).json()

@@ -69,40 +69,47 @@ def main() -> int:
     with sync_playwright() as p:
         browser = p.chromium.launch(channel=None if args.browser == "chromium" else "msedge", headless=True)
         layouts = {"desktop": {"viewport": {"width": 1440, "height": 900}}, "phone": p.devices["iPhone 13"]}
-        for layout, opts in layouts.items():
-            for theme in ("dark", "light"):
-                ctx = browser.new_context(**opts)
-                ctx.add_init_script(f"localStorage.setItem('gnnids.helpSeen','1');"
-                                    f"localStorage.setItem('gnnids.theme','{theme}');")
-                page = ctx.new_page()
-                errors: list = []
-                page.on("pageerror", lambda e: errors.append(("pageerror", str(e), None)))
+        # (layout, theme, dataset, label mode, compare): every layout x theme on the default context, then the
+        # other dataset / label-mode / compare contexts once on desktop, so each switch in the top bar is loaded
+        runs = [(lay, th, "cicids2017", "multiclass", "0") for lay in layouts for th in ("dark", "light")]
+        runs += [("desktop", "dark", "cicids2017", "binary", "0"), ("desktop", "dark", "csecicids2018", "multiclass", "0"),
+                 ("desktop", "dark", "cicids2017", "multiclass", "1"), ("desktop", "dark", "csecicids2018", "multiclass", "1")]
+        for layout, theme, ds, mode, compare in runs:
+            opts = layouts[layout]
+            ctx = browser.new_context(**opts)
+            ctx.add_init_script(f"localStorage.setItem('gnnids.helpSeen','1');"
+                                f"localStorage.setItem('gnnids.theme','{theme}');"
+                                f"localStorage.setItem('gnnids.ds','{ds}');localStorage.setItem('gnnids.mode','{mode}');"
+                                f"localStorage.setItem('gnnids.compare','{compare}');")
+            page = ctx.new_page()
+            errors: list = []
+            page.on("pageerror", lambda e: errors.append(("pageerror", str(e), None)))
 
-                def on_console(msg):
-                    if msg.type != "error" or "net::ERR_" in msg.text:   # network failures: see requestfailed
-                        return
-                    m = re.search(r"status of (\d{3})", msg.text)
-                    errors.append(("console", msg.text, int(m.group(1)) if m else None))
-                page.on("console", on_console)
-                page.on("requestfailed", lambda r: errors.append(
-                    ("console", f"request failed: {r.url.replace(BASE, '')} ({r.failure})", None)))
+            def on_console(msg):
+                if msg.type != "error" or "net::ERR_" in msg.text:   # network failures: see requestfailed
+                    return
+                m = re.search(r"status of (\d{3})", msg.text)
+                errors.append(("console", msg.text, int(m.group(1)) if m else None))
+            page.on("console", on_console)
+            page.on("requestfailed", lambda r: errors.append(
+                ("console", f"request failed: {r.url.replace(BASE, '')} ({r.failure})", None)))
 
-                page.goto(f"{BASE}/#overview")
-                page.wait_for_timeout(2500)
-                ml_state = page.locator("#pill-ml .status-val").inner_text().strip()
-                ml_down = ml_state != "online"
-                if args.expect_ml != "auto" and ml_down != (args.expect_ml == "down"):
-                    failures.append(f"[{layout}/{theme}] model service is '{ml_state}', expected {args.expect_ml}")
-                for view, subs in PAGES.items():
-                    for sub in (subs or [None]):
-                        if layout == "phone":                    # sub-tabs are reached the same way on a phone
-                            page.evaluate("document.body.classList.remove('nav-open')")
-                        probs = check_page(page, view, sub, ml_down, errors, args.wait)
-                        checked += 1
-                        where = f"[{layout}/{theme}] {view}{' › ' + sub if sub else ''}"
-                        failures += [f"{where}: {x}" for x in probs]
-                        print(f"{'FAIL' if probs else 'ok  '} {where}")
-                ctx.close()
+            page.goto(f"{BASE}/#overview")
+            page.wait_for_timeout(2500)
+            ml_state = page.locator("#pill-ml .status-val").inner_text().strip()
+            ml_down = ml_state != "online"
+            if args.expect_ml != "auto" and ml_down != (args.expect_ml == "down"):
+                failures.append(f"[{layout}/{theme}] model service is '{ml_state}', expected {args.expect_ml}")
+            for view, subs in PAGES.items():
+                for sub in (subs or [None]):
+                    if layout == "phone":                    # sub-tabs are reached the same way on a phone
+                        page.evaluate("document.body.classList.remove('nav-open')")
+                    probs = check_page(page, view, sub, ml_down, errors, args.wait)
+                    checked += 1
+                    where = f"[{layout}/{theme}/{ds}/{mode}{'/compare' if compare == '1' else ''}] {view}{' › ' + sub if sub else ''}"
+                    failures += [f"{where}: {x}" for x in probs]
+                    print(f"{'FAIL' if probs else 'ok  '} {where}")
+            ctx.close()
         browser.close()
     print(f"\n{checked} page loads checked, model service {'down' if ml_down else 'up'}; {len(failures)} problem(s)")
     for f in failures:

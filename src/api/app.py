@@ -119,7 +119,7 @@ def _action_dict(r) -> dict:
             "incident_id": r.incident_id, "model": r.model_name, "category": r.category, "action": r.action,
             "target": r.target, "rationale": r.rationale, "rule_linux": r.rule_linux, "rule_windows": r.rule_windows,
             "status": r.status, "decided_at": r.decided_at.isoformat() if r.decided_at else None,
-            "decided_by": r.decided_by, "note": r.note, "dry_run": True}
+            "decided_by": r.decided_by, "note": r.note, "site": r.site, "dry_run": True}
 
 
 def store_predictions(Session, flow_ids: list[int], result: dict) -> int:

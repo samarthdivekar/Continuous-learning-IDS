@@ -2,7 +2,7 @@
 // the server converts them with the pinned CICFlowMeter, scores them with the live model and files them
 // per site. Here you watch per-site traffic, triage incidents (dry-run rules), label flows and adapt the
 // model without forgetting. Distinct from "Live stream", which replays the recorded dataset.
-import { catColor, css, esc, get, int, pct, post, toast } from "../lib/core.js";
+import { catColor, esc, get, int, openApi, pct, post, toast } from "../lib/core.js";
 import { GraphView } from "../lib/graphview.js";
 import { withBusy } from "../lib/ui.js";
 
@@ -54,9 +54,12 @@ export async function mount(el) {
       <div class="card" id="st-model" style="margin-bottom:16px"></div>
       <div class="grid g-8-4">
         <div class="card"><div class="card-head"><div><h3>Incidents <span id="st-scope" class="muted"></span></h3>
-          <p class="sub">flagged flows of the last 15 minutes, grouped by attacker/victim within each site; each carries a dry-run rule</p></div></div>
+          <p class="sub">confident attack verdicts of the last 15 minutes, grouped by attacker/victim within each site; each carries a dry-run rule</p></div>
+          <div class="toolbar"><button class="icon-btn small" id="st-cef" title="Download these incidents for a SIEM (ArcSight CEF)">⤓ CEF</button></div></div>
           <div id="st-incidents"></div></div>
         <div class="grid" style="gap:16px">
+          <div class="card"><h3>Unsure — needs an analyst</h3><p class="sub">the model could not tell attack from normal (its calibrated prediction set held both), so no alarm was raised</p>
+            <div id="st-unsure"></div></div>
           <div class="card"><h3>Unfamiliar traffic</h3><p class="sub">called benign but unlike anything seen in training — candidates for a new attack</p>
             <div id="st-unfamiliar"></div></div>
           <div class="card"><h3>Teach the model</h3>
@@ -76,6 +79,9 @@ export async function mount(el) {
       sel = "sandbox"; gWindow = null; await tick();
     } catch (err) { toast(err.message); }
   }));
+  root.querySelector("#st-cef").addEventListener("click", () =>
+    openApi(`/live/incidents/cef?minutes=15${sel ? `&site=${encodeURIComponent(sel)}` : ""}`,
+            { filename: `live_incidents_${sel || "all"}.cef` }));
   gview = new GraphView(root.querySelector("#st-gstage"));
   root.querySelector("#st-gfit").addEventListener("click", () => gview.fit());
   await tick();
@@ -105,13 +111,14 @@ async function tick() {
   if (badge) badge.classList.toggle("hidden", !sites.some((s) => s.online && s.flows_5min));
 
   await renderModel();
+  await renderDrift();
   const q = sel ? `site=${encodeURIComponent(sel)}&windows=200&minutes=15` : "windows=200&minutes=15";
   const inc = await get(`/live/incidents?${q}`).catch(() => null);
   if (inc) {
     // re-render the incident list only when it actually changed, so clicks/scroll are not interrupted
     const sig = JSON.stringify([sel, inc.n_flows, inc.incidents.map((i) => [i.category, i.key_host, i.n_flows]),
-      inc.unfamiliar.map((u) => [u.host, u.flows])]);
-    if (sig !== incSig) { incSig = sig; renderIncidents(inc); renderUnfamiliar(inc.unfamiliar); }
+      inc.unfamiliar.map((u) => [u.host, u.flows]), (inc.unsure || []).map((u) => [u.host, u.flows])]);
+    if (sig !== incSig) { incSig = sig; renderIncidents(inc); renderUnfamiliar(inc.unfamiliar); renderUnsure(inc.unsure || []); }
   }
   // the teach panel has a text input; rebuild it only when the selected site changes
   if (sel !== teachSel) { teachSel = sel; renderTeach(sel); gWindow = null; }
@@ -157,7 +164,7 @@ function renderSites(sites) {
         <span class="dot" style="background:${s.online ? "var(--good)" : "var(--muted)"};width:8px;height:8px;border-radius:50%;display:inline-block"></span>
         ${esc(s.site)}</div>
       <div class="value num" style="font-size:26px;color:${alert ? "var(--critical)" : "var(--ink)"}">${int(s.flagged_5min)}</div>
-      <div class="note">flagged / 5 min · ${int(s.flows_5min)} flows · ${s.online ? "online" : `${int(s.seconds_since)}s ago`}${s.unfamiliar_5min ? ` · <span style="color:var(--warn)">${int(s.unfamiliar_5min)} unfamiliar</span>` : ""}</div>
+      <div class="note">flagged / 5 min · ${int(s.flows_5min)} flows · ${s.online ? "online" : `${int(s.seconds_since)}s ago`}${s.unsure_5min ? ` · <span style="color:var(--warn)">${int(s.unsure_5min)} unsure</span>` : ""}${s.unfamiliar_5min ? ` · <span style="color:var(--warn)">${int(s.unfamiliar_5min)} unfamiliar</span>` : ""}</div>
     </button>`;
   }).join("");
   root.querySelectorAll(".site-card").forEach((b) => b.addEventListener("click", () => { sel = b.dataset.site; tick(); }));
@@ -181,6 +188,18 @@ async function renderModel() {
     }).join("")}</div>` : `<p class="note">No live adaptations yet — the model is exactly as trained.</p>`}`;
 }
 
+async function renderDrift() {
+  const el = root.querySelector("#st-drift");
+  if (!el) return;
+  const d = await get("/live/drift").catch(() => null);
+  const s = d && d.sites.find((x) => x.site === sel);
+  if (!s) { el.innerHTML = "Drift: no new analyst labels for this site yet."; return; }
+  const rate = `the model disagreed with your labels on <b>${pct(s.error_rate)}</b> of ${int(s.labelled)} new labels`;
+  el.innerHTML = !s.enough_labels ? `Drift: ${rate} (needs ${int(d.min_labels)}+ labels to judge).`
+    : s.adapt_recommended ? `<span style="color:var(--warn)"><b>Drift detected:</b> ${rate} — adapting is recommended.</span>`
+    : `Drift: ${rate} — below the ${pct(d.threshold, 0)} threshold.`;
+}
+
 function renderIncidents(inc) {
   const el = root.querySelector("#st-incidents");
   if (!inc.incidents.length) {
@@ -193,16 +212,43 @@ function renderIncidents(inc) {
       <div style="display:flex;justify-content:space-between;gap:10px;align-items:baseline">
         <div><span class="tag" style="background:${catColor(i.category)};color:#fff">${esc(i.category)}</span>
           <b>${esc(i.key_host)}</b> <span class="muted">(${esc(i.key_role)}, ${int(i.key_host_flows)} flows)</span></div>
-        <span class="num muted">${int(i.n_flows)} flows · conf ${pct(i.mean_confidence)}</span></div>
+        <span class="num muted">${int(i.n_flows)} flows · conf ${pct(i.mean_confidence)}${i.category_uncertain_share >= 0.5
+          ? ` · <span style="color:var(--warn)" title="the model is sure this is an attack, less sure which kind">kind uncertain</span>` : ""}</span></div>
       <div class="note" style="margin-top:6px">${int(i.n_sources)} sources → ${int(i.n_destinations)} destinations${i.top_ports?.length ? ` · ports ${i.top_ports.map((x) => esc(x)).join(", ")}` : ""}${i.sites?.length ? ` · ${i.sites.map((x) => esc(x)).join(", ")}` : ""}</div>
       <div class="note" style="margin-top:6px"><b>Proposed (dry run):</b> ${esc(p.action || "investigate")} ${esc(p.target || "")} — ${esc(p.rationale || "")}</div>
-      <div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap">
-        <button class="btn small" data-label-ids="${esc(JSON.stringify(i.flow_ids || []))}" data-cat="${esc(i.category)}">Confirm as ${esc(i.category)}</button>
+      <div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+        <button class="btn small" data-label-ids="${esc(JSON.stringify(i.flow_ids || []))}" data-cat="${esc(i.category)}" title="Label these flows for teaching">Confirm as ${esc(i.category)}</button>
         <button class="btn small ghost" data-label-ids="${esc(JSON.stringify(i.flow_ids || []))}" data-cat="Benign">Mark normal (false alarm)</button>
+        <span class="muted" style="margin-left:auto">action:</span>
+        <button class="btn small" data-decide="approve" data-site="${esc(i.site)}" data-cat="${esc(i.category)}" data-target="${esc(p.target || "")}" title="Record approval — dry run, nothing is executed">Approve (dry run)</button>
+        <button class="btn small ghost" data-decide="reject" data-site="${esc(i.site)}" data-cat="${esc(i.category)}" data-target="${esc(p.target || "")}">Reject</button>
       </div></div>`;
   }).join("");
   el.querySelectorAll("[data-label-ids]").forEach((b) => b.addEventListener("click", () =>
     withBusy(b, () => labelIds(JSON.parse(b.dataset.labelIds), b.dataset.cat))));
+  el.querySelectorAll("[data-decide]").forEach((b) => b.addEventListener("click", () => withBusy(b, async () => {
+    try {
+      const a = await post("/live/actions", { site: b.dataset.site, category: b.dataset.cat, target: b.dataset.target });
+      const d = await post(`/actions/${a.id}/decision`, { decision: b.dataset.decide, analyst: "analyst" });
+      toast(`${d.status} (dry run): ${d.action} ${d.target} — recorded in the decision log, nothing executed`);
+    } catch (e) { toast(e.message); }
+  })));
+}
+
+function renderUnsure(list) {
+  const el = root.querySelector("#st-unsure");
+  if (!list.length) { el.innerHTML = `<div class="empty">The model was sure about every recent flow.</div>`; return; }
+  el.innerHTML = list.map((u) => {
+    const lean = Object.entries(u.leaning || {}).sort((a, b) => b[1] - a[1]).map(([k, v]) => `${esc(k)} ${int(v)}`).join(", ");
+    return `<div style="padding:8px 0;border-bottom:1px solid var(--grid)">
+      <div style="display:flex;justify-content:space-between"><b>${esc(u.host)}</b><span class="num">${int(u.flows)} flows</span></div>
+      <div class="note">${esc(u.site)} · leaning ${lean}</div>
+      <div style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap">
+        ${CLASSES.map((c) => `<button class="btn small ghost" data-uids="${esc(JSON.stringify(u.flow_ids || []))}" data-cat="${c}">${c === "Benign" ? "Normal" : c}</button>`).join("")}
+      </div></div>`;
+  }).join("");
+  el.querySelectorAll("[data-uids]").forEach((b) => b.addEventListener("click", () =>
+    withBusy(b, () => labelIds(JSON.parse(b.dataset.uids), b.dataset.cat))));
 }
 
 function renderUnfamiliar(unf) {
@@ -226,6 +272,7 @@ function renderTeach(site) {
       last <input id="st-min" type="number" value="5" min="1" max="240" style="width:64px"> min →
       <button class="btn small" id="st-normal" ${site ? "" : "disabled title='pick a site first'"}>Mark normal</button>
     </div>
+    <div id="st-drift" class="note" style="margin-bottom:10px"></div>
     <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
       <button class="btn primary" id="st-adapt">Adapt model now</button>
       <span class="note">learns from every label not yet used</span>
