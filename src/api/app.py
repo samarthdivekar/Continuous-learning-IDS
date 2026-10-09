@@ -137,6 +137,8 @@ def create_app(database_url: str | None = None, service=None, load_models: bool 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
         state.Session = get_sessionmaker(database_url)
+        from src.live.routes import _RECENT
+        _RECENT.clear()                       # the per-site context cache belongs to this database
         state.ml_url = os.environ.get("ML_SERVICE_URL") or None
         if state.ml_url:
             state.service = None

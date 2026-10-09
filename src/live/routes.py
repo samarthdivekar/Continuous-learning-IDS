@@ -18,6 +18,8 @@ from __future__ import annotations
 import os
 import re
 import tempfile
+import threading
+from collections import deque
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -148,17 +150,40 @@ CONTEXT_SECONDS = 120        # a chunk is scored inside the site's flows of the 
 CONTEXT_MAX_FLOWS = 5000     # ... up to the training window size (5,000 flows per graph)
 
 
+# Each site's recent flows, kept in memory: reading 5,000 flows' features back from SQLite for every chunk
+# made ingest fall behind real time under load (cyber range: 47-100 s behind). Rebuilt from the database
+# after a restart.
+_RECENT: dict[str, "deque[tuple[float, dict]]"] = {}
+_RECENT_LOCK = threading.Lock()
+
+
+def _remember(site: str, flows: list[dict], now: datetime) -> None:
+    with _RECENT_LOCK:
+        dq = _RECENT.setdefault(site, deque(maxlen=CONTEXT_MAX_FLOWS))
+        t = now.timestamp()
+        dq.extend((t, {"src_ip": f["src_ip"], "dst_ip": f["dst_ip"], "features": f["features"]}) for f in flows)
+
+
 def _context(site: str, n_new: int, now: datetime) -> list[dict]:
     """The site's most recent earlier flows, so a few-second chunk is not scored as a tiny graph."""
     room = CONTEXT_MAX_FLOWS - n_new
     if room <= 0:
         return []
     since = now - timedelta(seconds=CONTEXT_SECONDS)
-    with _app().state.Session() as s:
+    with _RECENT_LOCK:
+        dq = _RECENT.get(site)
+        if dq is not None:
+            cutoff = since.timestamp()
+            while dq and dq[0][0] < cutoff:
+                dq.popleft()
+            return [f for _, f in list(dq)[-room:]]
+    with _app().state.Session() as s:              # first chunk since a restart: rebuild from the database
         wids = select(LiveWindow.id).where(LiveWindow.site == site, LiveWindow.received_at >= since)
         rows = s.execute(select(LiveFlow.src_ip, LiveFlow.dst_ip, LiveFlow.features)
                          .where(LiveFlow.window_id.in_(wids)).order_by(desc(LiveFlow.id)).limit(room)).all()
-    return [{"src_ip": a, "dst_ip": b, "features": f} for a, b, f in reversed(rows)]
+    flows = [{"src_ip": a, "dst_ip": b, "features": f} for a, b, f in reversed(rows)]
+    _remember(site, flows, now)
+    return flows
 
 
 def process_flows(site: str, flows: list[dict], source: str, detail: bool = False) -> dict:
@@ -181,6 +206,9 @@ def process_flows(site: str, flows: list[dict], source: str, detail: bool = Fals
             s.commit()
             return {"window_id": w.id, "site": site, "n_flows": 0, "counts": {}, "flagged": 0, "unfamiliar": 0,
                     "ignored_non_ip": ignored, **({"flow_ids": [], "labels": []} if detail else {})}
+    if source == "replay":
+        # recorded traffic replayed now: it happens now (its 2017 capture times would date the incident in 2017)
+        flows = [{**f, "ts": now.isoformat()} for f in flows]
     context = _context(site, len(flows), now) if source != "replay" else []
     res = _ml("POST", "/live/score", {"flows": flows, "context": context})
     times = [t for t in (_ts(f.get("ts")) for f in flows) if t is not None]
@@ -206,6 +234,8 @@ def process_flows(site: str, flows: list[dict], source: str, detail: bool = Fals
         s.commit()
         wid = w.id
         ids = [r.id for r in rows] if detail else None
+    if source != "replay":
+        _remember(site, flows, now)
     out = {"window_id": wid, "site": site, "n_flows": len(flows), "n_hosts": res["n_nodes"],
            "n_context": res.get("n_context", 0), "counts": res["counts"], "flagged": flagged,
            "unfamiliar": unfamiliar, "unsure": int(sum(unsure)), "model_version": res["version"],

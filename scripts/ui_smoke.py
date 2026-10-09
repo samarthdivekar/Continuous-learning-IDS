@@ -10,9 +10,8 @@ the Edge already installed on Windows (channel "msedge"); elsewhere pass --brows
 For every page and sub-page, at desktop width (1440 px) and phone width (iPhone 13), in dark and in
 light theme, it fails when:
   * the page raises an uncaught JavaScript error;
-  * the console logs an error that is not a failed HTTP request with an expected status (503 when the
-    model service is down; 404 for an experiment that has not been run, which the page shows as
-    "not run yet");
+  * the console logs any error, including any failed HTTP request (only 503s are expected, and only when
+    the model service is down);
   * the page is still showing its loading placeholder after the timeout;
   * the document is wider than the viewport (horizontal scroll on a phone).
 It also checks the sidebar reports the model service in the state --expect-ml asks for.
@@ -41,7 +40,9 @@ def check_page(page, view: str, sub: str | None, ml_down: bool, errors: list, ti
         page.get_by_role("button", name=sub, exact=True).click()
     page.wait_for_timeout(timeout_ms)
     problems = []
-    allowed = {404, 503} if ml_down else {404}
+    # strict: with the model service up, ANY failed request is a problem (pages ask /results/index first and
+    # never request an experiment that was not run); with it down, only its 503s are expected
+    allowed = {503} if ml_down else set()
     for kind, text, status in errors:
         if kind == "pageerror":
             problems.append(f"uncaught error: {text}")

@@ -126,6 +126,12 @@ async function incidents(ds) {
 async function adaptation(ds) {
   const el = $("#tr-ad", root);
   let r;
+  const have = await get("/results/index").catch(() => null);
+  if (have && !have?.[ds]?.multiclass?.adaptation) {      // ask only for experiments that exist
+    el.innerHTML = `<div class="empty"><span class="title">Not run for this dataset</span>The gated and label-budget
+      adaptation variants were run on CIC-IDS2017 only (README §7).</div>`;
+    return;
+  }
   try { r = await get(`/results/adaptation?dataset=${ds}`); } catch (e) { missing(el, e); return; }
   const rows = [];
   for (const k of Object.keys(ADAPT)) {

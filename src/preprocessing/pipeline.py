@@ -155,7 +155,15 @@ class ProcessedData:
             path = graph_cache_dir(self.cfg, resolve_path(self.cfg, "cache")) / f"task{task}_{split}.pt"
             if not path.exists():
                 build_graph_cache(self.cfg, self.df, self.feature_columns)
-            self._graphs[key] = load_graphs(path)
+            graphs = load_graphs(path)
+            drop = (self.cfg.get("features") or {}).get("drop") or []
+            if drop:
+                # Feature ablation: the named columns become a constant (0 = their training mean after
+                # standardisation) in every window, so no model can use them; graph structure is unchanged.
+                idx = [self.feature_columns.index(c) for c in drop]
+                for g in graphs:
+                    g.edge_attr[:, idx] = 0.0
+            self._graphs[key] = graphs
         return self._graphs[key]
 
 

@@ -70,6 +70,11 @@ split:
 
 label_mode: multiclass      # multiclass | binary
 
+features:
+  # Feature ablation: columns named here become a constant in every window for every model (pipeline.graphs).
+  # The shortcut check drops [dst_port, protocol, fwd_init_win_bytes, bwd_init_win_bytes].
+  drop: []
+
 graph:
   node_features: degree     # constant | degree
   hidden: 64
