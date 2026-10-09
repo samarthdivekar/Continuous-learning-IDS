@@ -48,8 +48,27 @@ def make_engine(url: str | None = None) -> Engine:
     return create_engine(url, pool_pre_ping=True)
 
 
+def _add_missing_columns(engine: Engine) -> None:
+    """create_all() makes missing TABLES but never adds a column to an existing one. New nullable
+    columns are added here, so a database from an earlier version keeps working (and keeps its data)."""
+    from sqlalchemy import inspect
+    insp = inspect(engine)
+    for table in Base.metadata.sorted_tables:
+        if not insp.has_table(table.name):
+            continue
+        have = {c["name"] for c in insp.get_columns(table.name)}
+        for col in table.columns:
+            if col.name in have or not col.nullable:
+                continue
+            ddl = col.type.compile(dialect=engine.dialect)
+            with engine.begin() as conn:
+                conn.execute(text(f'ALTER TABLE {table.name} ADD COLUMN "{col.name}" {ddl}'))
+            log.info("added column %s.%s", table.name, col.name)
+
+
 def init_db(engine: Engine) -> None:
     Base.metadata.create_all(engine)
+    _add_missing_columns(engine)
     if engine.dialect.name != "postgresql":
         return
     with engine.begin() as conn:

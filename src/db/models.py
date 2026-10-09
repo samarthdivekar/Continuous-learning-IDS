@@ -183,6 +183,8 @@ class LiveFlow(Base):
     novelty: Mapped[float | None] = mapped_column(Float, nullable=True)
     unfamiliar: Mapped[bool] = mapped_column(Boolean, default=False)
     analyst_label: Mapped[str | None] = mapped_column(String(32), nullable=True)   # set by /live/label
+    labelled_by: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    labelled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     used_for_learning: Mapped[bool] = mapped_column(Boolean, default=False)
 
 

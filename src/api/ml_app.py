@@ -149,6 +149,7 @@ class LiveScoreBody(BaseModel):
 class LiveAdaptBody(BaseModel):
     windows: list[dict]          # [{"flows": [...], "labels": [label name or null per flow]}]
     epochs: int | None = None
+    holdout_benign: list[dict] | None = None
 
 
 @app.post("/live/score")
@@ -167,7 +168,7 @@ def live_adapt(body: LiveAdaptBody):
     try:
         names = svc.live.names
         windows = [(w["flows"], [label_id(names, lab) for lab in w["labels"]]) for w in body.windows]
-        return svc.live.adapt(windows, epochs=body.epochs)
+        return svc.live.adapt(windows, epochs=body.epochs, holdout_benign=body.holdout_benign)
     except ValueError as exc:
         raise HTTPException(422, str(exc))
 

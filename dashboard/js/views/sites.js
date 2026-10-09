@@ -235,7 +235,7 @@ function renderTeach(site) {
   if (normal) normal.addEventListener("click", () => withBusy(normal, async () => {
     try {
       const r = await post("/live/label", { label: "Benign", site, last_minutes: Number(el.querySelector("#st-min").value) });
-      toast(`labelled ${r.labelled} flows normal`);
+      toast(`labelled ${r.labelled} flows normal` + (r.skipped_suspicious ? ` · skipped ${r.skipped_suspicious} flagged/unfamiliar flows (label those individually)` : ""));
     } catch (e) { toast(e.message); }
   }));
   el.querySelector("#st-adapt").addEventListener("click", (e) => withBusy(e.target, async () => {

@@ -6,9 +6,10 @@ attack category. Learning from live labels therefore runs exactly like one more 
 sequence: new windows, EWC penalty, replayed old-attack windows. The checkpoint-loaded models that answer
 /predict are never touched; /live/reset rebuilds this copy from the checkpoint.
 
-Every adaptation is a candidate. Before and after it, the model is scored on held-out test windows of the
-training data (two per task); if old-attack macro-F1 drops by more than `max_drop`, the update is rolled
-back and the response says why. That is what "learns your network without forgetting old attacks" means
+Every adaptation is a candidate, trained on a copy while the live model keeps scoring. Before and after it,
+the copy is scored on held-out test windows of the training data (two per task) and on held-back normal
+traffic of the site itself; if old-attack macro-F1 drops by more than `max_drop`, or the false-positive
+rate on either rises by more than `max_fpr_rise`, the update is rolled back and the response says why. That is what "learns your network without forgetting old attacks" means
 here, measured each time rather than asserted.
 
 Every accepted adaptation is saved to `<cache>/live/<dataset>/<label_mode>/live_state.pt` (weights,
@@ -18,6 +19,7 @@ and restored when the service starts, so what the model learned survives a resta
 from __future__ import annotations
 
 import json
+import threading
 import time
 from pathlib import Path
 
@@ -39,10 +41,13 @@ LIVE_WINDOW_OFFSET = 10_000_000        # live graphs get window ids far from the
 
 
 class LiveEngine:
-    def __init__(self, svc, model: str = LIVE_MODEL, max_drop: float = 0.02, eval_windows_per_task: int = 2):
+    def __init__(self, svc, model: str = LIVE_MODEL, max_drop: float = 0.02, max_fpr_rise: float = 0.005,
+                 eval_windows_per_task: int = 2):
         self.svc = svc
         self.model_name = model
         self.max_drop = max_drop
+        self.max_fpr_rise = max_fpr_rise     # 0.5 percentage points of benign flows
+        self._adapt_lock = threading.Lock()
         self.eval_windows_per_task = eval_windows_per_task
         self.learner = None
         self.version = 0                     # bumped on every accepted adaptation and on reset
@@ -216,11 +221,12 @@ class LiveEngine:
             self._eval_set = gs
         return self._eval_set
 
-    def _old_attack_metrics(self) -> dict:
+    def _old_attack_metrics(self, learner=None) -> dict:
+        learner = learner or self.learner
         y_true, y_pred = [], []
         for g in self._held_out():
             y_true.append(g.y.numpy())
-            y_pred.append(self.learner.predict_proba(g).argmax(1))
+            y_pred.append(learner.predict_proba(g).argmax(1))
         yt, yp = np.concatenate(y_true), np.concatenate(y_pred)
         labels = sorted(set(yt.tolist()))
         benign = yt == 0
@@ -229,37 +235,81 @@ class LiveEngine:
                 "attack_recall": float((yp[~benign] == yt[~benign]).mean()) if (~benign).any() else 1.0,
                 "n_flows": int(len(yt))}
 
-    def adapt(self, windows: list[tuple[list[dict], list[int | None]]], epochs: int | None = None) -> dict:
-        """Learn from labelled live windows: [(flows, label id per flow or None)]. Gated (see module doc)."""
+    def _clone(self):
+        """A trainable copy of the live learner. Learning runs on the copy while the live one keeps
+        scoring sensor traffic; the copy replaces it only if it passes the gate."""
+        svc, data = self.svc, self.svc.data
+        node_in = 3 if svc.cfg["graph"]["node_features"] == "degree" else 1
+        clone = make_learner(self.model_name, svc.cfg, data.meta["n_features"], num_classes(svc.cfg), svc.device,
+                             node_in=node_in)
+        clone.restore_state(self.learner.snapshot_state())      # replay graphs are shared by reference
+        return clone
+
+    @staticmethod
+    def _site_fpr(learner, g) -> float | None:
+        if g is None:
+            return None
+        return float((learner.predict_proba(g).argmax(1) != 0).mean())
+
+    def adapt(self, windows: list[tuple[list[dict], list[int | None]]], epochs: int | None = None,
+              holdout_benign: list[dict] | None = None) -> dict:
+        """Learn from labelled live windows: [(flows, label id per flow or None)].
+
+        Gated three ways, all measured on data the update did not train on; any failure rolls it back:
+          * old-attack macro-F1 on held-out dataset test windows may not drop by more than `max_drop`;
+          * false-positive rate on those windows' benign flows may not rise by more than `max_fpr_rise`;
+          * false-positive rate on `holdout_benign` (the site's own traffic an analyst marked normal and
+            that was held back from training) may not rise by more than `max_fpr_rise`.
+        Training runs on a copy, so sensor traffic keeps being scored while the model learns."""
         t0 = time.time()
-        with self.svc.lock:
-            learner = self.ensure()
-            graphs = [self.graph(f, labs, window_id=LIVE_WINDOW_OFFSET + 100_000 * self.version + i)
-                      for i, (f, labs) in enumerate(windows) if any(lab is not None for lab in labs)]
-            if not graphs:
-                return {"accepted": False, "reason": "no labelled flows", "version": self.version}
-            n_labelled = int(sum(int(g.label_mask.sum()) for g in graphs))
-            before = self._old_attack_metrics()
-            snap = learner.snapshot_state()
-            learner.learn(graphs, tag=f"live_v{self.version + 1}", epochs=epochs)
-            after = self._old_attack_metrics()
-            drop = before["macro_f1"] - after["macro_f1"]
-            accepted = drop <= self.max_drop
-            if accepted:
-                self.version += 1
-                self.live_graphs.extend(graphs)
-            else:
-                learner.restore_state(snap)
-        rec = {"accepted": accepted, "version": self.version, "windows": len(graphs), "labelled_flows": n_labelled,
-               "seconds": round(time.time() - t0, 1), "old_attacks_before": before, "old_attacks_after": after,
-               "reason": None if accepted else
-               f"rolled back: macro-F1 on old attacks fell by {drop:.3f} (limit {self.max_drop:.3f})"}
-        self.history.append(rec)
-        if accepted:
+        if not self._adapt_lock.acquire(blocking=False):
+            return {"accepted": False, "reason": "an adaptation is already running", "version": self.version}
+        try:
             with self.svc.lock:
-                self._save()
-            rec["saved"] = True
-        return rec
+                self.ensure()
+                version = self.version
+                graphs = [self.graph(f, labs, window_id=LIVE_WINDOW_OFFSET + 100_000 * version + i)
+                          for i, (f, labs) in enumerate(windows) if any(lab is not None for lab in labs)]
+                if not graphs:
+                    return {"accepted": False, "reason": "no labelled flows", "version": version}
+                hold_g = self.graph(holdout_benign) if holdout_benign else None
+                clone = self._clone()
+            n_labelled = int(sum(int(g.label_mask.sum()) for g in graphs))
+            before = self._old_attack_metrics(clone)
+            site_before = self._site_fpr(clone, hold_g)
+            clone.learn(graphs, tag=f"live_v{version + 1}", epochs=epochs)
+            after = self._old_attack_metrics(clone)
+            site_after = self._site_fpr(clone, hold_g)
+            drop = before["macro_f1"] - after["macro_f1"]
+            fpr_rise = after["fpr"] - before["fpr"]
+            site_rise = (site_after - site_before) if hold_g is not None else 0.0
+            reasons = []
+            if drop > self.max_drop:
+                reasons.append(f"macro-F1 on old attacks fell by {drop:.3f} (limit {self.max_drop:.3f})")
+            if fpr_rise > self.max_fpr_rise:
+                reasons.append(f"false alarms on old benign traffic rose by {fpr_rise:.2%} (limit {self.max_fpr_rise:.2%})")
+            if site_rise > self.max_fpr_rise:
+                reasons.append(f"false alarms on this site's held-out normal traffic rose by {site_rise:.2%} "
+                               f"(limit {self.max_fpr_rise:.2%})")
+            accepted = not reasons
+            with self.svc.lock:
+                if accepted:
+                    self.learner = clone
+                    self.version += 1
+                    self.live_graphs.extend(graphs)
+                rec = {"accepted": accepted, "version": self.version, "windows": len(graphs),
+                       "labelled_flows": n_labelled, "seconds": round(time.time() - t0, 1),
+                       "old_attacks_before": before, "old_attacks_after": after,
+                       "site_holdout": None if hold_g is None else
+                       {"n_flows": int(hold_g.edge_index.shape[1]), "fpr_before": site_before, "fpr_after": site_after},
+                       "reason": None if accepted else "rolled back: " + "; ".join(reasons)}
+                self.history.append(rec)
+                if accepted:
+                    self._save()
+                    rec["saved"] = True
+            return rec
+        finally:
+            self._adapt_lock.release()
 
     def fpr_study(self, flows: list[dict], teach_fraction: float = 0.5, epochs: int | None = None) -> dict:
         """Measure what teaching does to false alarms on the user's own benign traffic, honestly:
@@ -310,7 +360,7 @@ class LiveEngine:
             with self.svc.lock:              # a saved state exists: load it so the version shown is real
                 self.ensure()
         return {"model": self.model_name, "loaded": self.learner is not None, "version": self.version,
-                "novelty_threshold": self.threshold, "max_drop": self.max_drop,
+                "novelty_threshold": self.threshold, "max_drop": self.max_drop, "max_fpr_rise": self.max_fpr_rise,
                 "classes": self.names, "history": self.history[-10:],
                 "learned_windows": len(self.live_graphs), "saved": self.state_path.exists(),
                 "restored_from_disk": self.restored_from is not None}

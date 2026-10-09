@@ -63,7 +63,7 @@ def _ml(method: str, path: str, body: dict | None = None, params: dict | None = 
             from src.live.engine import label_id
             names = live.names
             return live.adapt([(w["flows"], [label_id(names, lab) for lab in w["labels"]]) for w in body["windows"]],
-                              epochs=body.get("epochs"))
+                              epochs=body.get("epochs"), holdout_benign=body.get("holdout_benign"))
         if path == "/live/reset":
             return live.reset()
         if path == "/live/fpr_study":
@@ -403,6 +403,10 @@ class LabelIn(BaseModel):
     site: str | None = None
     last_minutes: float | None = Field(default=None, gt=0, le=240)
     only_unlabelled: bool = True
+    # Bulk "everything from this site was normal" must not whitelist an attack that happened in that
+    # period: by default it skips flows the model flagged or found unfamiliar (label those one by one).
+    include_suspicious: bool = False
+    analyst: str = Field(default="analyst", max_length=64)
 
 
 @router.post("/live/label")
@@ -413,19 +417,46 @@ def live_label(body: LabelIn):
     if not body.flow_ids and not (body.site and body.last_minutes):
         raise HTTPException(422, "give flow_ids, or site and last_minutes")
     Session = _app().state.Session
+    skipped = 0
     with Session() as s:
-        q = update(LiveFlow).values(analyst_label=body.label)
+        q = update(LiveFlow).values(analyst_label=body.label, labelled_by=body.analyst,
+                                    labelled_at=datetime.now(timezone.utc))
         if body.flow_ids:
             q = q.where(LiveFlow.id.in_(body.flow_ids))
         else:
             since = datetime.now(timezone.utc) - timedelta(minutes=body.last_minutes)
             wids = select(LiveWindow.id).where(LiveWindow.site == _site(body.site), LiveWindow.received_at >= since)
             q = q.where(LiveFlow.window_id.in_(wids))
+            if body.label == "Benign" and not body.include_suspicious:
+                suspicious = (LiveFlow.predicted != "Benign") | LiveFlow.unfamiliar.is_(True)
+                cnt = select(func.count()).select_from(LiveFlow).where(LiveFlow.window_id.in_(wids), suspicious)
+                if body.only_unlabelled:
+                    cnt = cnt.where(LiveFlow.analyst_label.is_(None))
+                skipped = int(s.scalar(cnt) or 0)
+                q = q.where(LiveFlow.predicted == "Benign", LiveFlow.unfamiliar.is_not(True))
         if body.only_unlabelled:
             q = q.where(LiveFlow.analyst_label.is_(None))
         n = s.execute(q).rowcount
         s.commit()
-    return {"labelled": int(n), "label": body.label}
+    return {"labelled": int(n), "label": body.label, "skipped_suspicious": skipped}
+
+
+class UnlabelIn(BaseModel):
+    flow_ids: list[int] = Field(min_length=1, max_length=200_000)
+
+
+@router.post("/live/unlabel")
+def live_unlabel(body: UnlabelIn):
+    """Undo labels the model has not learned from yet (learned ones need /live/reset)."""
+    with _app().state.Session() as s:
+        n = s.execute(update(LiveFlow).where(LiveFlow.id.in_(body.flow_ids), LiveFlow.used_for_learning.is_(False),
+                                             LiveFlow.analyst_label.is_not(None))
+                      .values(analyst_label=None, labelled_by=None, labelled_at=None)).rowcount
+        s.commit()
+    return {"unlabelled": int(n)}
+
+
+HOLDOUT_EVERY = 5            # every 5th flow an analyst marked normal is held back to measure false alarms
 
 
 class AdaptIn(BaseModel):
@@ -445,13 +476,23 @@ def live_adapt(body: AdaptIn):
         wids = sorted(set(s.scalars(q).all()), reverse=True)[: body.max_windows]
         if not wids:
             raise HTTPException(409, "no new labelled flows; label some first (POST /live/label)")
-        windows, used = [], []
+        windows, used, holdout = [], [], []
+        n_benign = 0
         for wid in sorted(wids):
             rows = s.scalars(select(LiveFlow).where(LiveFlow.window_id == wid).order_by(LiveFlow.id)).all()
+            labels = []
+            for r in rows:
+                lab = r.analyst_label
+                if lab == "Benign":
+                    n_benign += 1
+                    if n_benign % HOLDOUT_EVERY == 0:          # held back: never trained on, only measured
+                        holdout.append({"src_ip": r.src_ip, "dst_ip": r.dst_ip, "features": r.features})
+                        lab = None
+                labels.append(lab)
             windows.append({"flows": [{"src_ip": r.src_ip, "dst_ip": r.dst_ip, "features": r.features} for r in rows],
-                            "labels": [r.analyst_label for r in rows]})
+                            "labels": labels})
             used += [r.id for r in rows if r.analyst_label is not None]
-    res = _ml("POST", "/live/adapt", {"windows": windows, "epochs": body.epochs})
+    res = _ml("POST", "/live/adapt", {"windows": windows, "epochs": body.epochs, "holdout_benign": holdout})
     if res.get("accepted"):
         with Session() as s:
             s.execute(update(LiveFlow).where(LiveFlow.id.in_(used)).values(used_for_learning=True))

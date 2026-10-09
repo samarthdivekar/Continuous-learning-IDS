@@ -144,11 +144,11 @@ def test_label_then_adapt_is_gated_and_learns_once(client):
     client.post("/sensor/flows", json={"site": "home", "flows": _flows(client, 40)})
     assert client.post("/live/label", json={"label": "NotAClass", "site": "home", "last_minutes": 5}).status_code == 422
     assert client.post("/live/adapt", json={}).status_code == 409                # nothing labelled yet
-    r = client.post("/live/label", json={"label": "Benign", "site": "home", "last_minutes": 5})
+    r = client.post("/live/label", json={"label": "Benign", "site": "home", "last_minutes": 5, "include_suspicious": True})
     assert r.status_code == 200 and r.json()["labelled"] == 40
     res = client.post("/live/adapt", json={"epochs": 1}).json()
     assert {"accepted", "old_attacks_before", "old_attacks_after", "labelled_flows"} <= set(res)
-    assert res["labelled_flows"] == 40
+    assert res["labelled_flows"] == 32 and res["site_holdout"]["n_flows"] == 8   # every 5th normal flow held back
     model = client.get("/live/model").json()
     if res["accepted"]:
         assert model["version"] == 1
@@ -194,7 +194,7 @@ def test_learning_survives_a_restart_and_reset_deletes_it(client):
     live = client.svc.live
     live.max_drop = 1.0                                   # force acceptance: this test is about persistence
     client.post("/sensor/flows", json={"site": "home", "flows": _flows(client, 40)})
-    client.post("/live/label", json={"label": "Benign", "site": "home", "last_minutes": 5})
+    client.post("/live/label", json={"label": "Benign", "site": "home", "last_minutes": 5, "include_suspicious": True})
     res = client.post("/live/adapt", json={"epochs": 1}).json()
     assert res["accepted"] and res["saved"] and live.state_path.exists()
     weights = {k: v.clone() for k, v in live.learner.model.state_dict().items()}
@@ -208,6 +208,52 @@ def test_learning_survives_a_restart_and_reset_deletes_it(client):
     r = client.post("/live/reset").json()
     assert r["reset"] and r["labels_released"] == 40 and not live.state_path.exists()
     assert client.post("/live/adapt", json={"epochs": 1}).status_code == 200   # labels can be re-taught
+
+
+def test_gate_rolls_back_on_false_alarms_and_holds_out_site_traffic(client):
+    live = client.svc.live
+    client.post("/sensor/flows", json={"site": "home", "flows": _flows(client, 50)})
+    client.post("/live/label", json={"label": "Benign", "site": "home", "last_minutes": 5, "include_suspicious": True})
+    live.max_drop, live.max_fpr_rise = 1.0, -1.0          # any FPR change at all now fails the gate
+    v = live.version
+    res = client.post("/live/adapt", json={"epochs": 1}).json()
+    assert not res["accepted"] and "false alarms" in res["reason"] and live.version == v
+    assert res["site_holdout"]["n_flows"] == 10            # every 5th of 50 normal flows held back, not trained on
+    assert not live.state_path.exists()                    # a rolled-back update is never saved
+
+
+def test_bulk_normal_skips_suspicious_flows_and_labels_can_be_undone(client, monkeypatch):
+    real = client.svc.live.score
+
+    def half_flagged(flows, context=None):
+        out = real(flows, context)
+        out["labels"] = ["DoS" if i % 2 else "Benign" for i in range(len(flows))]
+        out["unfamiliar"] = [False] * len(flows)
+        return out
+    monkeypatch.setattr(client.svc.live, "score", half_flagged)
+    out = client.post("/sensor/flows", json={"site": "home", "flows": _flows(client, 20), "detail": True}).json()
+    r = client.post("/live/label", json={"label": "Benign", "site": "home", "last_minutes": 5, "analyst": "sam"}).json()
+    assert r["labelled"] == 10 and r["skipped_suspicious"] == 10       # the flagged half is left for review
+    with client.Session() as s:
+        rows = s.query(LiveFlow).filter(LiveFlow.analyst_label.isnot(None)).all()
+        assert {x.labelled_by for x in rows} == {"sam"} and all(x.labelled_at for x in rows)
+    assert client.post("/live/unlabel", json={"flow_ids": out["flow_ids"]}).json()["unlabelled"] == 10
+
+
+def test_old_database_gets_new_columns(tmp_path):
+    import sqlite3
+    db = tmp_path / "old.db"
+    con = sqlite3.connect(db)
+    con.execute("CREATE TABLE live_flows (id INTEGER PRIMARY KEY, window_id INTEGER, site VARCHAR(64), "
+                "src_ip VARCHAR(64), dst_ip VARCHAR(64), features JSON, predicted VARCHAR(32), confidence FLOAT, "
+                "unfamiliar BOOLEAN, used_for_learning BOOLEAN)")
+    con.execute("INSERT INTO live_flows (id, site, src_ip, dst_ip, predicted) VALUES (1, 's', 'a', 'b', 'Benign')")
+    con.commit()
+    con.close()
+    reset_for_tests(f"sqlite:///{db.as_posix()}")
+    cols = {r[1] for r in sqlite3.connect(db).execute("PRAGMA table_info(live_flows)")}
+    assert {"labelled_by", "labelled_at", "ts", "analyst_label"} <= cols
+    assert sqlite3.connect(db).execute("SELECT count(*) FROM live_flows").fetchone()[0] == 1   # data kept
 
 
 def test_fpr_study_measures_and_restores(client):
